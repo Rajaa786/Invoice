@@ -741,8 +741,7 @@ const InvoiceForm = () => {
         customer: {
           name:
             selectedCustomer.firstName && selectedCustomer.lastName
-              ? `${selectedCustomer.salutation || ""} ${
-                  selectedCustomer.firstName
+              ? `${selectedCustomer.salutation || ""} ${selectedCustomer.firstName
                 } ${selectedCustomer.lastName}`.trim()
               : selectedCustomer.companyName || "Customer Name",
           addressLine1: selectedCustomer.billingAddressLine1 || "",
@@ -904,8 +903,8 @@ const InvoiceForm = () => {
                             selectedCompany
                               ? selectedCompany.companyName
                               : isLoadingCompanies
-                              ? "Loading companies..."
-                              : "Select company"
+                                ? "Loading companies..."
+                                : "Select company"
                           }
                         />
                       </SelectTrigger>
@@ -997,8 +996,7 @@ const InvoiceForm = () => {
                       <SelectValue
                         placeholder={
                           selectedCustomer
-                            ? `${selectedCustomer.firstName || ""} ${
-                                selectedCustomer.lastName || ""
+                            ? `${selectedCustomer.firstName || ""} ${selectedCustomer.lastName || ""
                               }`.trim()
                             : "Select or add customer"
                         }
@@ -1056,9 +1054,8 @@ const InvoiceForm = () => {
                                 >
                                   <div className="flex-1">
                                     {/* Display combined first name and last name */}
-                                    {`${customer.firstName || ""} ${
-                                      customer.lastName || ""
-                                    }`.trim() ||
+                                    {`${customer.firstName || ""} ${customer.lastName || ""
+                                      }`.trim() ||
                                       customer.name ||
                                       "Unnamed Customer"}
                                   </div>
@@ -1155,7 +1152,7 @@ const InvoiceForm = () => {
 
                 <div className="flex items  -center">
                   <Label htmlFor="terms" className="w-28 pt-2 ml-6">
-                    Terms
+                    Expected Due
                   </Label>
                   <div className="flex  relative w-36">
                     <Select
