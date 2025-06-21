@@ -1,0 +1,1 @@
+// This file will be moved to /dashboard/analytics/page.jsx for proper routing. No code changes needed here, just move the file. 

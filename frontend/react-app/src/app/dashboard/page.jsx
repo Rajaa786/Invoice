@@ -13,6 +13,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import Link from "next/link";
 
 export default function Page() {
   return (
@@ -45,6 +46,11 @@ export default function Page() {
             <div className="aspect-video rounded-xl bg-muted/50" />
           </div>
           <div className="min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min" />
+          <div className="mt-8">
+            <Link href="/dashboard/InvoiceAnalyticsPage">
+              <button className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">Go to Invoice Analytics Dashboard</button>
+            </Link>
+          </div>
         </div>
       </SidebarInset>
     </SidebarProvider>
