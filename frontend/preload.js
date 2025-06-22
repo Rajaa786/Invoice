@@ -34,4 +34,9 @@ contextBridge.exposeInMainWorld("electron", {
       uploadData
     ),
   getCompanyWithInvoices: () => ipcRenderer.invoke("get-company-with-invoices"),
+
+  analytics: {
+    getCompanySplit: () => ipcRenderer.invoke("analytics:getCompanySplit"),
+    // Add more analytics endpoints here
+  },
 });

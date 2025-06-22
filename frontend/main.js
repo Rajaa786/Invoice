@@ -9,6 +9,7 @@ const { registerCompanyDashboardIpc } = require("./ipc/companyDashboard");
 const { registerCustomerDashboardIpc } = require("./ipc/customerDashboard");
 const { registerTallyIpc } = require("./ipc/tallyHandlers.js");
 const log = require("electron-log");
+const { registerAnalyticsDashboardIpc } = require("./ipc/analyticsDashboard");
 
 
 // Configure electron-log
@@ -111,6 +112,7 @@ function createWindow() {
   registerTallyIpc();
   registerInvoiceGeneratorIpc();
   registerInvoiceItemsIpc();
+  registerAnalyticsDashboardIpc();
   console.log("IPC handlers registered");
 }
 

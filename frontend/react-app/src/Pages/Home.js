@@ -23,6 +23,7 @@ import { useBreadcrumb } from "../contexts/BreadcrumbContext";
 import { useParams } from "react-router-dom";
 import Company from "../components/MainDashboardComponents/Company";
 import TallyDirectImport from "../components/ImportTally/TallyDirectImport";
+import InvoiceAnalyticsPage from "../components/analytics/InvoiceAnalyticsPage";
 
 const Dashboard = () => {
   const { breadcrumbs, setMainDashboard } = useBreadcrumb();
@@ -63,7 +64,11 @@ const Dashboard = () => {
       url: "#",
       icon: ShoppingBag,
     },
-
+    {
+      title: "Analytics",
+      url: "#",
+      icon: Grid2X2,
+    },
     {
       title: "Tally",
       icon: Grid2X2,
@@ -133,6 +138,7 @@ const Dashboard = () => {
               {activeTab === "Items" && <Items />}
               {activeTab === "Invoice" && <ReportGenerator />}
               {activeTab === "Company" && <Company />}
+              {activeTab === "Analytics" && <InvoiceAnalyticsPage />}
               {activeTab === "Upload to Tally" && (
                 <TallyDirectImport
                   defaultVoucher={"Payment Receipt Contra"}
