@@ -12,23 +12,23 @@ const MetricCard = ({
   stats
 }) => {
   const [count, setCount] = useState(0);
-  
+
   useEffect(() => {
     const duration = 2000;
     const startTime = Date.now();
-    
+
     const updateCount = () => {
       const currentTime = Date.now();
       const elapsed = currentTime - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      
+
       setCount(Math.floor(progress * value));
-      
+
       if (progress < 1) {
         requestAnimationFrame(updateCount);
       }
     };
-    
+
     requestAnimationFrame(updateCount);
   }, [value]);
 
@@ -49,24 +49,24 @@ const MetricCard = ({
           )}
         </div>
       </CardHeader>
-      
+
       <CardContent>
         <div className="relative h-64 overflow-hidden rounded-lg bg-gradient-to-b from-blue-500 to-blue-700">
           {/* Animated content */}
           <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-10">
             <div className="text-5xl font-bold mb-2 animate-fadeIn">
-              {count.toLocaleString()}
+              {(count || 0).toLocaleString()}
             </div>
             <div className="text-sm opacity-90">{unit}</div>
           </div>
-          
+
           {/* Wave animations */}
           <div className="absolute bottom-0 left-0 right-0 h-64">
             <div className="absolute bottom-0 left-0 right-0 h-24 animate-wave bg-white/15" />
             <div className="absolute bottom-0 left-0 right-0 h-32 animate-wave-slow bg-white/12" />
             <div className="absolute bottom-0 left-0 right-0 h-28 animate-wave-slower bg-white/10" />
           </div>
-          
+
           {/* Time period metrics */}
           {metrics && (
             <div className="absolute bottom-0 left-0 right-0 bg-blue-800/30 backdrop-blur-sm">
@@ -81,7 +81,7 @@ const MetricCard = ({
             </div>
           )}
         </div>
-        
+
         {/* Bottom stats */}
         {stats && (
           <div className="grid grid-cols-2 gap-4 mt-4">

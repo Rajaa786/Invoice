@@ -10,7 +10,7 @@ const customers = sqliteTable("customers", {
   lastName: text("last_name").notNull(),
   panNumber: text("pan_number"),                    // Optional
 
-  companyName: text("company_name").notNull(),       
+  companyName: text("company_name").notNull(),
   currency: text("currency").notNull(),
 
   gstApplicable: text("gst_applicable").notNull(),  // 'Yes' | 'No'
@@ -36,6 +36,41 @@ const customers = sqliteTable("customers", {
   shippingContactNo: text("shipping_contact_no").notNull(),
   shippingEmail: text("shipping_email").notNull(),
   shippingAlternateContactNo: text("shipping_alternate_contact_no"),
+
+  // Enhanced Analytics Fields
+  relationshipType: text("relationship_type"), // 'recurring', 'one-time', 'seasonal', 'project-based'
+  customerCategory: text("customer_category"), // 'premium', 'standard', 'basic'
+  customerSize: text("customer_size"), // 'enterprise', 'mid-market', 'small'
+  industry: text("industry"), // Customer's industry for segmentation
+
+  // Business Relationship
+  accountManager: text("account_manager"), // Who manages this account
+  relationshipStartDate: text("relationship_start_date"), // When did business relationship start
+  customerStatus: text("customer_status"), // 'active', 'inactive', 'prospect', 'churned'
+
+  // Financial Details
+  creditLimit: integer("credit_limit"),
+  paymentTerms: text("payment_terms"), // 'net_30', 'net_15', 'immediate', etc.
+  preferredPaymentMethod: text("preferred_payment_method"),
+
+  // Analytics and Scoring
+  satisfactionScore: integer("satisfaction_score"), // 1-5 scale
+  riskRating: text("risk_rating"), // 'low', 'medium', 'high'
+  loyaltyScore: integer("loyalty_score"), // 1-100 scale
+
+  // Business Intelligence
+  acquisitionChannel: text("acquisition_channel"), // 'referral', 'marketing', 'cold_call', etc.
+  lifetimeValue: integer("lifetime_value"), // Calculated or estimated
+  churnProbability: integer("churn_probability"), // 0-100 percentage
+
+  // Communication Preferences
+  preferredContactMethod: text("preferred_contact_method"), // 'email', 'phone', 'sms'
+  marketingOptIn: text("marketing_opt_in"), // 'yes', 'no'
+
+  // Additional Metadata
+  notes: text("notes"), // Free text notes about customer
+  tags: text("tags"), // JSON array of tags for categorization
+  customFields: text("custom_fields"), // JSON object for extensibility
 });
 
 module.exports = { customers };

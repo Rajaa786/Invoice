@@ -119,10 +119,10 @@ const StatsMetricCard = ({
   const pieData =
     type === "timeSaved"
       ? [
-          { name: "Automated Tasks", value: 60 },
-          { name: "Manual Tasks", value: 30 },
-          { name: "Other", value: 10 },
-        ]
+        { name: "Automated Tasks", value: 60 },
+        { name: "Manual Tasks", value: 30 },
+        { name: "Other", value: 10 },
+      ]
       : [];
 
   return (
@@ -152,15 +152,15 @@ const StatsMetricCard = ({
         {/* Main Value */}
         <div>
           <div className="text-4xl font-bold text-white tracking-tight">
-            {mainValue.toLocaleString()}
+            {(mainValue || 0).toLocaleString()}
           </div>
           <div className="text-sm text-white/80">
             {mainValueLabel ||
               (type === "timeSaved"
                 ? "Minutes Saved"
                 : type === "reports"
-                ? "Reports Generated"
-                : "Statements Processed")}
+                  ? "Reports Generated"
+                  : "Statements Processed")}
           </div>
         </div>
 

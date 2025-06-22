@@ -1,5 +1,6 @@
 // src/db/schema.js
 const { sqliteTable, text, integer, real } = require("drizzle-orm/sqlite-core");
+const { sql } = require("drizzle-orm");
 const { companies } = require("../schema/Company");
 const { customers } = require("../schema/Customer");
 
@@ -22,6 +23,12 @@ const invoices = sqliteTable("invoices", {
   terms: text("terms").notNull(),
   ledger: text("ledger"),
 
+  // Status tracking - Enhanced for analytics
+  status: text("status").notNull().default("pending"), // 'pending', 'paid', 'overdue', 'cancelled', 'draft'
+  paidDate: text("paid_date"), // Date when invoice was paid
+  paymentMethod: text("payment_method"), // 'cash', 'bank_transfer', 'cheque', 'card', 'upi'
+  paymentReference: text("payment_reference"), // Reference number for payment
+
   // Tax information
   cgstRate: real("cgst_rate"),
   sgstRate: real("sgst_rate"),
@@ -32,9 +39,45 @@ const invoices = sqliteTable("invoices", {
   sgstAmount: real("sgst_amount"),
   totalAmount: real("total_amount"),
 
+  // Additional analytics fields
+  discountAmount: real("discount_amount").default(0),
+  discountPercentage: real("discount_percentage").default(0),
+
+  // Tracking fields
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  createdBy: text("created_by"), // User who created the invoice
+
   // Additional fields
   narration: text("narration"),
   termsAndConditions: text("terms_and_conditions"),
+
+  // Customer communication tracking
+  emailSent: integer("email_sent").default(0), // Boolean: 0 = false, 1 = true
+  emailSentDate: text("email_sent_date"),
+  reminderCount: integer("reminder_count").default(0),
+  lastReminderDate: text("last_reminder_date"),
+
+  // Financial tracking
+  partialPaymentAmount: real("partial_payment_amount").default(0),
+  remainingAmount: real("remaining_amount"), // Calculated field
+
+  // Priority and tags
+  priority: text("priority").default("normal"), // 'low', 'normal', 'high', 'urgent'
+  tags: text("tags"), // JSON string of tags array
+
+  // Notes and follow-up
+  internalNotes: text("internal_notes"),
+  followUpDate: text("follow_up_date"),
+
+  // Location tracking (for multi-location businesses)
+  branchId: text("branch_id"),
+  territory: text("territory"),
+
+  // Currency and exchange rate (for international invoices)
+  currency: text("currency").default("INR"),
+  exchangeRate: real("exchange_rate").default(1.0),
+  baseCurrencyAmount: real("base_currency_amount"), // Amount in base currency
 });
 
 module.exports = {

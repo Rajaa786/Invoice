@@ -24,6 +24,37 @@ const companies = sqliteTable("companies", {
   // Added fields for logo and signature file paths
   logoPath: text("logo_path"),
   signaturePath: text("signature_path"),
+
+  // Enhanced Analytics Fields
+  establishedYear: integer("established_year"),
+  employeeCount: integer("employee_count"),
+  website: text("website"),
+  industry: text("industry"), // Technology, Manufacturing, Services, Healthcare, etc.
+  annualRevenue: integer("annual_revenue"), // For better benchmarking
+  businessModel: text("business_model"), // B2B, B2C, B2B2C
+  companySize: text("company_size"), // Startup, SME, Enterprise
+
+  // Business Intelligence Fields
+  primaryMarket: text("primary_market"), // Domestic, International, Both
+  customerSegment: text("customer_segment"), // Enterprise, SMB, Consumer
+  valueProposition: text("value_proposition"), // Cost Leadership, Differentiation, Focus
+
+  // Operational Details
+  operatingHours: text("operating_hours"), // 24/7, Business Hours, Custom
+  timezone: text("timezone"),
+
+  // Social and External Links
+  linkedinUrl: text("linkedin_url"),
+  facebookUrl: text("facebook_url"),
+  twitterUrl: text("twitter_url"),
+
+  // Financial Information
+  fiscalYearStart: text("fiscal_year_start"), // MM-DD format
+  taxId: text("tax_id"),
+
+  // Compliance and Certifications
+  certifications: text("certifications"), // JSON string of certifications
+  complianceStandards: text("compliance_standards"), // JSON string of standards
 });
 
 module.exports = { companies };

@@ -36,7 +36,71 @@ contextBridge.exposeInMainWorld("electron", {
   getCompanyWithInvoices: () => ipcRenderer.invoke("get-company-with-invoices"),
 
   analytics: {
-    getCompanySplit: () => ipcRenderer.invoke("analytics:getCompanySplit"),
-    // Add more analytics endpoints here
+    getSummaryMetrics: (filters = {}) =>
+      ipcRenderer.invoke("analytics:getSummaryMetrics", filters),
+
+    getRevenueOverTime: (filters = {}) =>
+      ipcRenderer.invoke("analytics:getRevenueOverTime", filters),
+
+    getInvoiceStatusDistribution: (filters = {}) =>
+      ipcRenderer.invoke("analytics:getInvoiceStatusDistribution", filters),
+
+    getCustomerRevenueAnalysis: (filters = {}) =>
+      ipcRenderer.invoke("analytics:getCustomerRevenueAnalysis", filters),
+
+    getCompanySplit: (filters = {}) =>
+      ipcRenderer.invoke("analytics:getCompanySplit", filters),
+
+    getTopItemsAnalysis: (filters = {}) =>
+      ipcRenderer.invoke("analytics:getTopItemsAnalysis", filters),
+
+    getTaxLiabilityReport: (filters = {}) =>
+      ipcRenderer.invoke("analytics:getTaxLiabilityReport", filters),
+
+    getInvoiceAgingReport: (filters = {}) =>
+      ipcRenderer.invoke("analytics:getInvoiceAgingReport", filters),
+
+    getPaymentDelayAnalysis: (filters = {}) =>
+      ipcRenderer.invoke("analytics:getPaymentDelayAnalysis", filters),
+
+    clearCache: () =>
+      ipcRenderer.invoke("analytics:clearCache"),
+
+    subscribeToUpdates: (callback) => {
+      ipcRenderer.on("analytics:dataUpdated", callback);
+      return () => ipcRenderer.removeListener("analytics:dataUpdated", callback);
+    }
+  },
+
+  // 🔧 Database Migration API
+  migration: {
+    // Run pending migrations
+    runPending: () =>
+      ipcRenderer.invoke("migration:runPending"),
+
+    // Get migration status
+    getStatus: () =>
+      ipcRenderer.invoke("migration:getStatus"),
+
+    // Check if schema is up to date
+    isUpToDate: () =>
+      ipcRenderer.invoke("migration:isUpToDate")
+  },
+
+  // 🔍 Zoom Level Monitoring API
+  zoom: {
+    // Get current zoom level
+    getLevel: () =>
+      ipcRenderer.invoke("get-zoom-level"),
+
+    // Set zoom level
+    setLevel: (level) =>
+      ipcRenderer.invoke("set-zoom-level", level),
+
+    // Subscribe to zoom level changes
+    onZoomChanged: (callback) => {
+      ipcRenderer.on("zoom-level-updated", (event, data) => callback(data));
+      return () => ipcRenderer.removeListener("zoom-level-updated", callback);
+    }
   },
 });

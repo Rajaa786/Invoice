@@ -1,36 +1,58 @@
 require("dotenv").config();
-const { drizzle } = require("drizzle-orm/libsql");
-const { createClient } = require("@libsql/client");
-const { eq } = require("drizzle-orm");
-const { users } = require("../db/schema/User");
+const { drizzle } = require("drizzle-orm/better-sqlite3");
+const Database = require("better-sqlite3");
+const path = require("path");
 
 class DatabaseManager {
   static #instance = null;
 
   static getInstance() {
     if (!DatabaseManager.#instance) {
-      const dbUrl = process.env.DB_FILE_NAME;
-      if (!dbUrl) {
-        throw new Error(
-          "DATABASE_URL is not defined in the environment variables."
-        );
+      // Use DB_FILE_NAME from env or default to local database
+      const dbPath = process.env.DB_FILE_NAME || path.join(__dirname, '../database.db');
+
+      console.log('Database path:', dbPath);
+
+      try {
+        // Create better-sqlite3 database instance
+        // const sqlite = new Database(dbPath);
+
+        // Enable foreign keys and other optimizations
+        // sqlite.pragma('foreign_keys = ON');
+        // sqlite.pragma('journal_mode = WAL');
+        // sqlite.pragma('synchronous = NORMAL');
+
+        // Create Drizzle ORM instance with the sqlite database
+        const db = drizzle(dbPath);
+
+        DatabaseManager.#instance = new DatabaseManager(db);
+        console.log('Database connected successfully');
+      } catch (error) {
+        console.error('Database connection failed:', error);
+        throw new Error(`Failed to connect to database: ${error.message}`);
       }
-
-      // Initialize libsql client
-      const client = createClient({ url: dbUrl });
-
-      // Create Drizzle ORM instance with the schema
-      DatabaseManager.#instance = new DatabaseManager(drizzle(client));
     }
     return DatabaseManager.#instance;
   }
 
   constructor(db) {
     this.db = db;
+    // this.sqlite = sqlite;
   }
 
   getDatabase() {
     return this.db;
+  }
+
+  // getSqliteInstance() {
+  //   return this.sqlite;
+  // }
+
+  close() {
+    // if (this.sqlite) {
+    //   this.sqlite.close();
+    //   console.log('Database connection closed');
+    // }
   }
 }
 

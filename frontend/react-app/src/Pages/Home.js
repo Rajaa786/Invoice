@@ -23,7 +23,7 @@ import { useBreadcrumb } from "../contexts/BreadcrumbContext";
 import { useParams } from "react-router-dom";
 import Company from "../components/MainDashboardComponents/Company";
 import TallyDirectImport from "../components/ImportTally/TallyDirectImport";
-import InvoiceAnalyticsPage from "../components/analytics/InvoiceAnalyticsPage";
+import InvoiceAnalyticsPage from "../components/MainDashboardComponents/InvoiceAnalyticsPage";
 
 const Dashboard = () => {
   const { breadcrumbs, setMainDashboard } = useBreadcrumb();

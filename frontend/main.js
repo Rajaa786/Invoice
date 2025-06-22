@@ -10,7 +10,7 @@ const { registerCustomerDashboardIpc } = require("./ipc/customerDashboard");
 const { registerTallyIpc } = require("./ipc/tallyHandlers.js");
 const log = require("electron-log");
 const { registerAnalyticsDashboardIpc } = require("./ipc/analyticsDashboard");
-
+const { registerMigrationIpc } = require("./ipc/migrationRunner");
 
 // Configure electron-log
 log.transports.console.level = "debug"; // Set the log level
@@ -113,6 +113,11 @@ function createWindow() {
   registerInvoiceGeneratorIpc();
   registerInvoiceItemsIpc();
   registerAnalyticsDashboardIpc();
+  registerMigrationIpc();
+
+  // Register zoom level monitoring
+  registerZoomMonitoring();
+
   console.log("IPC handlers registered");
 }
 
@@ -134,6 +139,73 @@ app.on("activate", () => {
     createWindow();
   }
 });
+
+// Zoom level monitoring function
+function registerZoomMonitoring() {
+  // Handle zoom level requests
+  ipcMain.handle('get-zoom-level', async () => {
+    if (mainWindow) {
+      const zoomLevel = mainWindow.webContents.getZoomLevel();
+      const zoomFactor = mainWindow.webContents.getZoomFactor();
+      console.log(`Current Zoom Level: ${zoomLevel}, Zoom Factor: ${zoomFactor.toFixed(2)}x`);
+      return { zoomLevel, zoomFactor };
+    }
+    return { zoomLevel: 0, zoomFactor: 1 };
+  });
+
+  // Handle zoom level changes
+  ipcMain.handle('set-zoom-level', async (event, level) => {
+    if (mainWindow) {
+      mainWindow.webContents.setZoomLevel(level);
+      const zoomFactor = mainWindow.webContents.getZoomFactor();
+      console.log(`Zoom Level set to: ${level}, Zoom Factor: ${zoomFactor.toFixed(2)}x`);
+      return { zoomLevel: level, zoomFactor };
+    }
+    return { zoomLevel: 0, zoomFactor: 1 };
+  });
+
+  // Monitor zoom changes (this will catch Ctrl+/- shortcuts)
+  if (mainWindow) {
+    mainWindow.webContents.on('zoom-changed', (event, zoomDirection) => {
+      const zoomLevel = mainWindow.webContents.getZoomLevel();
+      const zoomFactor = mainWindow.webContents.getZoomFactor();
+      console.log(`🔍 ZOOM CHANGED: Direction: ${zoomDirection}, Level: ${zoomLevel}, Factor: ${zoomFactor.toFixed(2)}x (${Math.round(zoomFactor * 100)}%)`);
+
+      // Send zoom update to renderer process
+      mainWindow.webContents.send('zoom-level-updated', {
+        zoomLevel,
+        zoomFactor,
+        percentage: Math.round(zoomFactor * 100),
+        direction: zoomDirection
+      });
+    });
+
+    // Also monitor when zoom level is set programmatically
+    const originalSetZoomLevel = mainWindow.webContents.setZoomLevel;
+    mainWindow.webContents.setZoomLevel = function (level) {
+      originalSetZoomLevel.call(this, level);
+      setTimeout(() => {
+        const zoomLevel = this.getZoomLevel();
+        const zoomFactor = this.getZoomFactor();
+        console.log(`🔍 ZOOM SET PROGRAMMATICALLY: Level: ${zoomLevel}, Factor: ${zoomFactor.toFixed(2)}x (${Math.round(zoomFactor * 100)}%)`);
+
+        mainWindow.webContents.send('zoom-level-updated', {
+          zoomLevel,
+          zoomFactor,
+          percentage: Math.round(zoomFactor * 100),
+          direction: 'programmatic'
+        });
+      }, 10);
+    };
+
+    // Log initial zoom level
+    setTimeout(() => {
+      const zoomLevel = mainWindow.webContents.getZoomLevel();
+      const zoomFactor = mainWindow.webContents.getZoomFactor();
+      console.log(`🔍 INITIAL ZOOM: Level: ${zoomLevel}, Factor: ${zoomFactor.toFixed(2)}x (${Math.round(zoomFactor * 100)}%)`);
+    }, 1000);
+  }
+}
 
 // Export the tmp directory path for use in other files
 module.exports = { tmpDir };

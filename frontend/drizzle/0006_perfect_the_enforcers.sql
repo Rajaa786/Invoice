@@ -1,1 +1,0 @@
-ALTER TABLE `items` ADD `hsn_sac_code` text;

@@ -13,6 +13,10 @@ import { useState } from 'react';
 import { SidebarProvider } from './components/ui/sidebar';
 import { BreadcrumbProvider, useBreadcrumb } from './contexts/BreadcrumbContext';
 import { ReportProvider } from './contexts/ReportContext';
+import ZoomMonitor from './components/ZoomMonitor';
+import ZoomDebugConsole from './components/ZoomDebugConsole';
+
+
 
 
 function App() {
@@ -21,7 +25,7 @@ function App() {
 
   return (
     <ThemeProvider defaultTheme="system" storageKey="app-theme">
-      {showIntro && <ElectronIntro onComplete={() => setShowIntro(false)} />}
+      {/* {showIntro && <ElectronIntro onComplete={() => setShowIntro(false)} />} */}
       <SidebarProvider>
         <HashRouter>
           <BreadcrumbProvider>
@@ -38,6 +42,10 @@ function App() {
         </HashRouter>
       </SidebarProvider>
       <UpdateNotification />
+      {/* Zoom Monitor for debugging - only shows in development */}
+      {process.env.NODE_ENV === 'development' && <ZoomMonitor position="top-right" />}
+      {/* Zoom Debug Console - toggle with Ctrl+Shift+Z */}
+      {process.env.NODE_ENV === 'development' && <ZoomDebugConsole />}
     </ThemeProvider>
   );
 }
