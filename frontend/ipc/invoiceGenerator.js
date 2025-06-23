@@ -49,6 +49,9 @@ function registerInvoiceGeneratorIpc() {
       const sgstAmount = subtotal * (sgstRate / 100);
       const totalAmount = subtotal + cgstAmount + sgstAmount;
 
+      // Get current timestamp in ISO format
+      const currentTimestamp = new Date().toISOString();
+
       // Create the invoice record in the database
       const insertedInvoice = await db
         .insert(invoices)
@@ -60,14 +63,29 @@ function registerInvoiceGeneratorIpc() {
           dueDate: dueDateISO,
           terms: invoiceData.paymentTerms || "0",
           ledger: invoiceData.incomeLedger || "",
+          status: invoiceData.status || "pending",
           cgstRate: cgstRate,
           sgstRate: sgstRate,
           subtotal: subtotal,
           cgstAmount: cgstAmount,
           sgstAmount: sgstAmount,
           totalAmount: totalAmount,
+          discountAmount: parseFloat(invoiceData.discountAmount) || 0,
+          discountPercentage: parseFloat(invoiceData.discountPercentage) || 0,
           narration: invoiceData.customerNotes || "",
           termsAndConditions: invoiceData.termsAndConditions || "",
+          priority: invoiceData.priority || "normal",
+          tags: invoiceData.tags || "",
+          internalNotes: invoiceData.internalNotes || "",
+          currency: invoiceData.currency || "INR",
+          exchangeRate: parseFloat(invoiceData.exchangeRate) || 1.0,
+          paymentMethod: invoiceData.paymentMethod || "",
+          paymentReference: invoiceData.paymentReference || "",
+          branchId: invoiceData.branchId || "",
+          territory: invoiceData.territory || "",
+          createdBy: invoiceData.createdBy || "",
+          createdAt: currentTimestamp,
+          updatedAt: currentTimestamp,
         })
         .returning();
 

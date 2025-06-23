@@ -63,6 +63,9 @@ contextBridge.exposeInMainWorld("electron", {
     getPaymentDelayAnalysis: (filters = {}) =>
       ipcRenderer.invoke("analytics:getPaymentDelayAnalysis", filters),
 
+    getSmartAlerts: (filters = {}) =>
+      ipcRenderer.invoke("analytics:getSmartAlerts", filters),
+
     clearCache: () =>
       ipcRenderer.invoke("analytics:clearCache"),
 

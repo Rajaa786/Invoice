@@ -54,7 +54,7 @@ import { Badge } from "../ui/badge";
 import CustomerForm from "./CustomerForm";
 import CompanyForm from "./CompanyForm";
 import ItemForm from "./ItemForm";
-import generateInvoicePDF from "./generateInvoicePDF";
+import { generateInvoicePDF } from "./generateInvoicePDF";
 
 const InvoiceForm = () => {
   // State for form fields
@@ -118,6 +118,7 @@ const InvoiceForm = () => {
   const [createdBy, setCreatedBy] = useState("");
   const [currentTab, setCurrentTab] = useState("basic");
   const [completedTabs, setCompletedTabs] = useState(new Set());
+  const [incomeLedger, setIncomeLedger] = useState("Sales");
 
   useEffect(() => {
     const fetchCompanies = async () => {
@@ -688,7 +689,7 @@ const InvoiceForm = () => {
         invoiceDate: invoiceDate,
         dueDate: dueDate,
         paymentTerms: paymentTerms,
-        incomeLedger: document.getElementById("incomeLedger").value,
+        incomeLedger: incomeLedger,
         items: items.map((item) => ({
           id: item.id,
           details: item.details || "",
@@ -857,6 +858,7 @@ const InvoiceForm = () => {
     setCustomerNotes("Thanks for your business.");
     setTermsAndConditions("");
     setSignature(null);
+    setIncomeLedger("Sales");
     // Don't reset company initials as they should persist
   };
 
@@ -1294,7 +1296,12 @@ const InvoiceForm = () => {
 
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Income Ledger</Label>
-                  <Input id="incomeLedger" placeholder="Sales" />
+                  <Input
+                    id="incomeLedger"
+                    placeholder="Sales"
+                    value={incomeLedger}
+                    onChange={(e) => setIncomeLedger(e.target.value)}
+                  />
                 </div>
 
                 <div className="space-y-2">

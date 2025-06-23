@@ -19,6 +19,8 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const RETRY_ATTEMPTS = 3;
 const RETRY_DELAY = 1000; // 1 second
 
+
+
 // In-memory cache with TTL
 class AnalyticsCache {
     constructor() {
@@ -94,6 +96,13 @@ export function useAnalytics() {
     const [globalError, setGlobalError] = useState(null);
     const abortControllerRef = useRef(null);
 
+    // Check if we're in an Electron environment
+    const isElectronAvailable = useMemo(() => {
+        return typeof window !== 'undefined' && 
+               window.electron && 
+               window.electron.analytics;
+    }, []);
+
     // Cleanup on unmount
     useEffect(() => {
         return () => {
@@ -105,7 +114,13 @@ export function useAnalytics() {
 
     // Generic API call with retry logic
     const makeApiCall = useCallback(async (apiMethod, filters = {}, retryCount = 0) => {
-        const cacheKey = `${apiMethod.name}_${JSON.stringify(filters)}`;
+        // Safety check for apiMethod
+        if (!apiMethod || typeof apiMethod !== 'function') {
+            throw new Error('API method is not available. Make sure Electron is properly loaded.');
+        }
+
+        const methodName = apiMethod.name || 'unknown';
+        const cacheKey = `${methodName}_${JSON.stringify(filters)}`;
 
         // Check cache first
         const cached = analyticsCache.get(cacheKey);
@@ -163,7 +178,8 @@ export function useAnalytics() {
         makeApiCall,
         handleError,
         clearCache: analyticsCache.clear.bind(analyticsCache),
-        invalidateCache: analyticsCache.invalidate.bind(analyticsCache)
+        invalidateCache: analyticsCache.invalidate.bind(analyticsCache),
+        isElectronAvailable
     };
 }
 
@@ -181,6 +197,11 @@ export function useSummaryMetrics(filters = {}) {
         setError(null);
 
         try {
+            // Check if Electron API is available
+            if (!window.electron?.analytics?.getSummaryMetrics) {
+                throw new Error('Summary Metrics API is not available. Please ensure Electron is properly loaded.');
+            }
+
             const result = await makeApiCall(
                 window.electron.analytics.getSummaryMetrics,
                 filters
@@ -260,6 +281,11 @@ export function useRevenueOverTime(filters = {}) {
         setError(null);
 
         try {
+            // Check if Electron API is available
+            if (!window.electron?.analytics?.getRevenueOverTime) {
+                throw new Error('Revenue Over Time API is not available. Please ensure Electron is properly loaded.');
+            }
+
             const result = await makeApiCall(
                 window.electron.analytics.getRevenueOverTime,
                 filters
