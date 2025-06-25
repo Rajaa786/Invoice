@@ -8,11 +8,40 @@ const { registerItemDashboardIpc } = require("./ipc/itemDashboard");
 const { registerCompanyDashboardIpc } = require("./ipc/companyDashboard");
 const { registerCustomerDashboardIpc } = require("./ipc/customerDashboard");
 const { registerTallyIpc } = require("./ipc/tallyHandlers.js");
+const { registerInvoiceGeneratorIpc, registerInvoiceItemsIpc } = require("./ipc/invoiceGenerator");
 const log = require("electron-log/main");
 const { registerAnalyticsDashboardIpc } = require("./ipc/analyticsDashboard");
 const { registerMigrationIpc } = require("./ipc/migrationRunner");
 const settings = require('electron-settings');
-const isDev = require("electron-is-dev");
+
+// Utility function to detect development environment
+const isDev = () => {
+  // Method 1: Check NODE_ENV environment variable
+  if (process.env.NODE_ENV === 'development') {
+    return true;
+  }
+
+  // Method 2: Check if we're running from source (not packaged)
+  if (process.defaultApp || /[\\/]electron-prebuilt[\\/]/.test(process.execPath) || /[\\/]electron[\\/]/.test(process.execPath)) {
+    return true;
+  }
+
+  // Method 3: Check if app is packaged
+  if (app.isPackaged === false) {
+    return true;
+  }
+
+  // Method 4: Check for common development indicators
+  if (process.argv.includes('--dev') || process.argv.includes('--development')) {
+    return true;
+  }
+
+  // Default to production
+  return false;
+};
+
+// Cache the result since it won't change during runtime
+const isDevMode = isDev();
 
 // Configure electron-log
 log.initialize();
@@ -35,7 +64,12 @@ log.info(`App version: ${app.getVersion()}`);
 log.info(`Electron version: ${process.versions.electron}`);
 log.info(`Node version: ${process.versions.node}`);
 log.info(`Platform: ${process.platform} ${process.arch}`);
-log.info(`Environment: ${isDev ? 'development' : 'production'}`);
+log.info(`Environment: ${isDevMode ? 'development' : 'production'}`);
+log.debug(`Development mode detection:`);
+log.debug(`  NODE_ENV: ${process.env.NODE_ENV}`);
+log.debug(`  app.isPackaged: ${app.isPackaged}`);
+log.debug(`  process.defaultApp: ${process.defaultApp}`);
+log.debug(`  execPath: ${process.execPath}`);
 log.info('='.repeat(80));
 
 // Create tmp directory for storing images
@@ -82,7 +116,7 @@ function createWindow() {
 
   log.info(`Window created with dimensions: 1800x1000`);
 
-  if (isDev) {
+  if (isDevMode) {
     log.info('Loading development URL: http://localhost:3000');
     mainWindow.loadURL("http://localhost:3000");
   } else {
@@ -99,7 +133,7 @@ function createWindow() {
     });
   }
 
-  if (isDev) {
+  if (isDevMode) {
     log.debug('Development mode - DevTools available but not opened');
     // mainWindow.webContents.openDevTools();
   }
