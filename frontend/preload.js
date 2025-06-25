@@ -105,5 +105,36 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.on("zoom-level-updated", (event, data) => callback(data));
       return () => ipcRenderer.removeListener("zoom-level-updated", callback);
     }
-  },
+  }
+});
+
+// Expose electron-settings API separately for the configuration system
+contextBridge.exposeInMainWorld('electronSettings', {
+  // Get a setting value
+  get: (keyPath) =>
+    ipcRenderer.invoke("settings:get", keyPath),
+
+  // Set a setting value
+  set: (keyPath, value) =>
+    ipcRenderer.invoke("settings:set", keyPath, value),
+
+  // Check if a setting exists
+  has: (keyPath) =>
+    ipcRenderer.invoke("settings:has", keyPath),
+
+  // Reset settings (keyPath optional, resets all if not provided)
+  reset: (keyPath = null) =>
+    ipcRenderer.invoke("settings:reset", keyPath),
+
+  // Export all settings
+  export: () =>
+    ipcRenderer.invoke("settings:export"),
+
+  // Import settings
+  import: (settingsData) =>
+    ipcRenderer.invoke("settings:import", settingsData),
+
+  // Get all settings
+  getAll: () =>
+    ipcRenderer.invoke("settings:getAll")
 });

@@ -38,7 +38,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../ui/alert-dialog";
-import { jsPDF } from "jspdf";
+import { pdf } from "@react-pdf/renderer";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
 import {
   Command,
@@ -55,6 +55,7 @@ import CustomerForm from "./CustomerForm";
 import CompanyForm from "./CompanyForm";
 import ItemForm from "./ItemForm";
 import { generateInvoicePDF } from "./generateInvoicePDF";
+import { useCompanyConfiguration } from "../../hooks/useConfiguration";
 
 const InvoiceForm = () => {
   // State for form fields
@@ -97,6 +98,9 @@ const InvoiceForm = () => {
   const [customTerm, setCustomTerm] = useState(""); // track typed input
 
   const defaultTerms = ["0", "15", "30", "45", "60", "90"];
+
+  // New configuration hooks
+  const { getCompanyInitials, setCompanyInitials: saveCompanyInitials } = useCompanyConfiguration();
 
   // Change this line
   const [invoiceNumber, setInvoiceNumber] = useState(""); // Remove the default "INV-000002"
@@ -446,7 +450,7 @@ const InvoiceForm = () => {
     console.log("New customer data:", customerData);
   };
   // Add after your other handler functions
-  const handleCompanySelect = (companyId) => {
+  const handleCompanySelect = async (companyId) => {
     console.log("Selecting company with ID:", companyId);
 
     // Find the company
@@ -459,13 +463,22 @@ const InvoiceForm = () => {
 
       // Check if we already have custom initials for this company
       let initials;
-      if (companyInitialsMap[company.id]) {
+
+      // Try to get from new configuration system first
+      const savedInitials = await getCompanyInitials(company.id);
+      if (savedInitials) {
+        initials = savedInitials;
+      } else if (companyInitialsMap[company.id]) {
+        // Fallback to old system
         initials = companyInitialsMap[company.id];
+        // Migrate to new system
+        await saveCompanyInitials(company.id, initials);
       } else {
         // Generate default initials
         initials = generateCompanyInitials(company.companyName);
-        // Store the generated initials
+        // Store in both systems
         setCompanyInitialsMap((prev) => ({ ...prev, [company.id]: initials }));
+        await saveCompanyInitials(company.id, initials);
       }
 
       setCompanyInitials(initials);
@@ -525,9 +538,12 @@ const InvoiceForm = () => {
   };
 
   // Add function to update company initials
-  const updateCompanyInitials = (newInitials) => {
+  const updateCompanyInitials = async (newInitials) => {
     if (selectedCompany) {
-      // Update the map
+      // Save to new configuration system
+      await saveCompanyInitials(selectedCompany.id, newInitials);
+
+      // Update the map (for backward compatibility)
       setCompanyInitialsMap((prev) => ({
         ...prev,
         [selectedCompany.id]: newInitials,
@@ -803,18 +819,16 @@ const InvoiceForm = () => {
 
       console.log("PDF invoice data:", invoiceForPDF);
 
-      const doc = generateInvoicePDF(invoiceForPDF);
-
-      const pdfBlob = doc.output("blob");
-      // Set the MIME type explicitly for the blob
-      const pdfBlobWithType = new Blob([pdfBlob], { type: "application/pdf" });
+      // Generate PDF using react-pdf
+      const pdfDocument = generateInvoicePDF(invoiceForPDF);
+      const pdfBlob = await pdf(pdfDocument).toBlob();
 
       // Revoke any existing URL to avoid memory leaks
       if (pdfUrl) {
         URL.revokeObjectURL(pdfUrl);
       }
 
-      const url = URL.createObjectURL(pdfBlobWithType);
+      const url = URL.createObjectURL(pdfBlob);
       setPdfUrl(url);
 
       // Step 13: Show download dialog but don't show preview yet

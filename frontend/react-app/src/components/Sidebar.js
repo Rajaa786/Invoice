@@ -1,5 +1,5 @@
 
-import React,{useEffect} from "react";
+import React, { useEffect } from "react";
 import {
   LayoutDashboard,
   Files,
@@ -9,6 +9,7 @@ import {
   LogOut,
   Sparkles,
   TestTube2,
+  Settings,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -132,6 +133,10 @@ const SidebarDynamic = ({ navItems, activeTab, setActiveTab }) => {
             <BadgeCheck className="mr-2 h-4 w-4" />
             <span>Account</span>
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setActiveTab('Settings')}>
+            <Settings className="mr-2 h-4 w-4" />
+            <span>Settings</span>
+          </DropdownMenuItem>
           <DropdownMenuItem>
             <CreditCard className="mr-2 h-4 w-4" />
             <span>Billing</span>
@@ -154,11 +159,11 @@ const SidebarDynamic = ({ navItems, activeTab, setActiveTab }) => {
     <Sidebar className="transition-all duration-300 ease-in-out">
       <SidebarHeader>
         <div className="h-16 flex items-center px-4 border-b">
-          <img 
-            src={logo} 
-            alt="Logo" 
+          <img
+            src={logo}
+            alt="Logo"
             className={`h-12 cursor-pointer transition-all duration-300 ${isCollapsed ? "w-8" : "w-auto"}`}
-            onClick={() => navigate("/")} 
+            onClick={() => navigate("/")}
           />
         </div>
       </SidebarHeader>

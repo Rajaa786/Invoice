@@ -80,6 +80,7 @@
     "d3-scale-chromatic": "^3.1.0",
     "drizzle-orm": "^0.41.0",
     "electron-log": "^5.3.4",
+    "electron-settings": "^4.0.4",
     "electron-updater": "^6.3.9",
     "fast-xml-parser": "^5.2.1",
     "jspdf": "^3.0.0",

@@ -11,6 +11,7 @@ const { registerTallyIpc } = require("./ipc/tallyHandlers.js");
 const log = require("electron-log");
 const { registerAnalyticsDashboardIpc } = require("./ipc/analyticsDashboard");
 const { registerMigrationIpc } = require("./ipc/migrationRunner");
+const settings = require('electron-settings');
 
 // Configure electron-log
 log.transports.console.level = "debug"; // Set the log level
@@ -117,6 +118,93 @@ function createWindow() {
 
   // Register zoom level monitoring
   registerZoomMonitoring();
+
+  // Configure electron-settings
+  settings.configure({
+    dir: path.join(app.getPath('userData'), 'Settings'),
+    atomicSaving: true,
+    numBackups: 3,
+    prettify: true
+  });
+
+  // Add settings IPC handlers after other IPC handlers
+  ipcMain.handle('settings:get', async (event, keyPath) => {
+    try {
+      return await settings.get(keyPath);
+    } catch (error) {
+      console.error('Error getting setting:', error);
+      return undefined;
+    }
+  });
+
+  ipcMain.handle('settings:set', async (event, keyPath, value) => {
+    try {
+      await settings.set(keyPath, value);
+      return true;
+    } catch (error) {
+      console.error('Error setting value:', error);
+      return false;
+    }
+  });
+
+  ipcMain.handle('settings:has', async (event, keyPath) => {
+    try {
+      return await settings.has(keyPath);
+    } catch (error) {
+      console.error('Error checking setting:', error);
+      return false;
+    }
+  });
+
+  ipcMain.handle('settings:reset', async (event, keyPath = null) => {
+    try {
+      if (keyPath) {
+        await settings.unset(keyPath);
+      } else {
+        await settings.clear();
+      }
+      return true;
+    } catch (error) {
+      console.error('Error resetting settings:', error);
+      return false;
+    }
+  });
+
+  ipcMain.handle('settings:export', async (event) => {
+    try {
+      const allSettings = await settings.getAll();
+      return allSettings;
+    } catch (error) {
+      console.error('Error exporting settings:', error);
+      return null;
+    }
+  });
+
+  ipcMain.handle('settings:import', async (event, settingsData) => {
+    try {
+      // Clear existing settings first
+      await settings.clear();
+
+      // Import new settings
+      for (const [key, value] of Object.entries(settingsData)) {
+        await settings.set(key, value);
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error importing settings:', error);
+      return false;
+    }
+  });
+
+  ipcMain.handle('settings:getAll', async (event) => {
+    try {
+      return await settings.getAll();
+    } catch (error) {
+      console.error('Error getting all settings:', error);
+      return {};
+    }
+  });
 
   console.log("IPC handlers registered");
 }

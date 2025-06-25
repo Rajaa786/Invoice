@@ -9,6 +9,7 @@ import {
   Upload,
   Plus,
   Grid2X2,
+  Settings,
 } from "lucide-react";
 import ReportGenerator from "../components/MainDashboardComponents/Invoice";
 import { cn } from "../lib/utils";
@@ -24,6 +25,7 @@ import { useParams } from "react-router-dom";
 import Company from "../components/MainDashboardComponents/Company";
 import TallyDirectImport from "../components/ImportTally/TallyDirectImport";
 import InvoiceAnalyticsPage from "../components/MainDashboardComponents/InvoiceAnalyticsPage";
+import SettingsPage from "../components/Settings/SettingsPage";
 
 const Dashboard = () => {
   const { breadcrumbs, setMainDashboard } = useBreadcrumb();
@@ -68,6 +70,11 @@ const Dashboard = () => {
       title: "Analytics",
       url: "#",
       icon: Grid2X2,
+    },
+    {
+      title: "Settings",
+      url: "#",
+      icon: Settings,
     },
     {
       title: "Tally",
@@ -139,6 +146,7 @@ const Dashboard = () => {
               {activeTab === "Invoice" && <ReportGenerator />}
               {activeTab === "Company" && <Company />}
               {activeTab === "Analytics" && <InvoiceAnalyticsPage />}
+              {activeTab === "Settings" && <SettingsPage />}
               {activeTab === "Upload to Tally" && (
                 <TallyDirectImport
                   defaultVoucher={"Payment Receipt Contra"}
