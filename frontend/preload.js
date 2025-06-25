@@ -35,6 +35,9 @@ contextBridge.exposeInMainWorld("electron", {
     ),
   getCompanyWithInvoices: () => ipcRenderer.invoke("get-company-with-invoices"),
 
+  // Add method to get app paths for debugging
+  getPath: (name) => ipcRenderer.invoke("app:getPath", name),
+
   analytics: {
     getSummaryMetrics: (filters = {}) =>
       ipcRenderer.invoke("analytics:getSummaryMetrics", filters),

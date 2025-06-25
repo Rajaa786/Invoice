@@ -8,52 +8,80 @@ import { ISettingsProvider } from '../../shared/interfaces/ISettingsProvider.js'
 export class SettingsServiceFactory {
     static _instance = null;
     static _currentService = null;
+    static _initializationPromise = null;
 
     /**
      * Get singleton instance of settings service
-     * @returns {ISettingsProvider} Settings service instance
+     * @returns {Promise<ISettingsProvider>} Settings service instance
      */
-    static getInstance() {
-        if (!this._instance) {
-            this._instance = this.createService();
+    static async getInstance() {
+        if (this._instance) {
+            return this._instance;
         }
+
+        // If initialization is already in progress, wait for it
+        if (this._initializationPromise) {
+            return this._initializationPromise;
+        }
+
+        // Start initialization
+        this._initializationPromise = this.createService();
+        this._instance = await this._initializationPromise;
+        this._initializationPromise = null;
+        
         return this._instance;
     }
 
     /**
      * Create appropriate settings service based on environment
-     * @returns {ISettingsProvider} Settings service instance
+     * @returns {Promise<ISettingsProvider>} Settings service instance
      */
-    static createService() {
-        if (this.isElectronEnvironment()) {
-            return this.createElectronService();
-        } else {
-            return this.createBrowserService();
+    static async createService() {
+        try {
+            if (this.isElectronEnvironment()) {
+                return await this.createElectronService();
+            } else {
+                return await this.createBrowserService();
+            }
+        } catch (error) {
+            console.error('Failed to create settings service:', error);
+            // Fallback to browser service
+            return await this.createBrowserService();
         }
     }
 
     /**
      * Create Electron settings service
-     * @returns {ISettingsProvider} Electron settings service
+     * @returns {Promise<ISettingsProvider>} Electron settings service
      */
-    static createElectronService() {
-        // Dynamic import to avoid issues in browser environment
-        return import('./ElectronSettingsService.js').then(module => {
-            return new module.ElectronSettingsService();
-        }).catch(error => {
+    static async createElectronService() {
+        try {
+            const module = await import('./ElectronSettingsService.js');
+            const service = new module.ElectronSettingsService();
+            await service.init(); // Ensure proper initialization
+            console.log('ElectronSettingsService created and initialized');
+            return service;
+        } catch (error) {
             console.warn('Failed to load Electron settings service, falling back to browser service:', error);
-            return this.createBrowserService();
-        });
+            return await this.createBrowserService();
+        }
     }
 
     /**
      * Create browser settings service (localStorage fallback)
-     * @returns {ISettingsProvider} Browser settings service
+     * @returns {Promise<ISettingsProvider>} Browser settings service
      */
-    static createBrowserService() {
-        return import('./BrowserSettingsService.js').then(module => {
-            return new module.BrowserSettingsService();
-        });
+    static async createBrowserService() {
+        try {
+            const module = await import('./BrowserSettingsService.js');
+            const service = new module.BrowserSettingsService();
+            await service.init(); // Ensure proper initialization
+            console.log('BrowserSettingsService created and initialized');
+            return service;
+        } catch (error) {
+            console.error('Failed to create browser settings service:', error);
+            throw error;
+        }
     }
 
     /**
@@ -74,6 +102,7 @@ export class SettingsServiceFactory {
             throw new Error('Service must implement ISettingsProvider interface');
         }
         this._instance = service;
+        this._initializationPromise = null;
     }
 
     /**
@@ -82,6 +111,7 @@ export class SettingsServiceFactory {
     static reset() {
         this._instance = null;
         this._currentService = null;
+        this._initializationPromise = null;
     }
 
     /**
@@ -208,5 +238,10 @@ export class ServiceRegistry {
     }
 }
 
-// Export singleton getter for convenience
-export const getSettingsService = () => SettingsServiceFactory.getInstance(); 
+/**
+ * Get singleton instance of settings service
+ * @returns {Promise<ISettingsProvider>} Settings service instance
+ */
+export const getSettingsService = async () => {
+    return await SettingsServiceFactory.getInstance();
+}; 

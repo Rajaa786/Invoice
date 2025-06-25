@@ -23,6 +23,7 @@ import {
     Info
 } from 'lucide-react';
 import InvoiceTemplateSettings from './InvoiceTemplateSettings';
+import SettingsDebugger from './SettingsDebugger';
 import {
     useTemplateConfiguration,
     useAppConfiguration,
@@ -150,7 +151,7 @@ const SettingsPage = () => {
                         <div className="space-y-2">
                             <Label htmlFor="language">Language</Label>
                             <Select
-                                value={language || 'english'}
+                                value={language || 'en'}
                                 onValueChange={(value) => setLanguage(value)}
                                 disabled={appLoading}
                             >
@@ -158,9 +159,9 @@ const SettingsPage = () => {
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="english">English</SelectItem>
-                                    <SelectItem value="hindi">Hindi</SelectItem>
-                                    <SelectItem value="spanish">Spanish</SelectItem>
+                                    <SelectItem value="en">English</SelectItem>
+                                    <SelectItem value="hi">Hindi</SelectItem>
+                                    <SelectItem value="es">Spanish</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -175,7 +176,7 @@ const SettingsPage = () => {
                                 <p className="text-sm text-gray-500">Automatically save changes as you work</p>
                             </div>
                             <Switch
-                                checked={uiPreferences?.autoSave || false}
+                                checked={uiPreferences?.autoSave === true}
                                 onCheckedChange={(checked) => setAutoSave(checked)}
                                 disabled={uiLoading}
                             />
@@ -187,7 +188,7 @@ const SettingsPage = () => {
                                 <p className="text-sm text-gray-500">Use a more compact interface layout</p>
                             </div>
                             <Switch
-                                checked={uiPreferences?.compactMode || false}
+                                checked={uiPreferences?.compactMode === true}
                                 onCheckedChange={(checked) => setCompactMode(checked)}
                                 disabled={uiLoading}
                             />
@@ -199,7 +200,7 @@ const SettingsPage = () => {
                                 <p className="text-sm text-gray-500">Preview invoices before downloading</p>
                             </div>
                             <Switch
-                                checked={uiPreferences?.showPreview || false}
+                                checked={uiPreferences?.showPreview === true}
                                 onCheckedChange={(checked) => setShowPreview(checked)}
                                 disabled={uiLoading}
                             />
@@ -222,7 +223,7 @@ const SettingsPage = () => {
                             <p className="text-sm text-gray-500">Receive notifications for important events</p>
                         </div>
                         <Switch
-                            checked={uiPreferences?.notifications || false}
+                            checked={uiPreferences?.notifications === true}
                             onCheckedChange={(checked) => setNotifications(checked)}
                             disabled={uiLoading}
                         />
@@ -436,6 +437,9 @@ const SettingsPage = () => {
 
 
             </Tabs>
+
+            {/* Temporary debugging component - uncomment if needed for debugging */}
+            {/* <SettingsDebugger /> */}
         </div>
     );
 };

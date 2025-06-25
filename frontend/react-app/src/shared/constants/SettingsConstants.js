@@ -106,7 +106,10 @@ export const DEFAULT_SETTINGS = {
         showTooltips: true,
         enableAnimations: true,
         compactMode: false,
-        showAdvancedOptions: false
+        showAdvancedOptions: false,
+        autoSave: true,
+        showPreview: true,
+        notifications: true
     },
     security: {
         sessionTimeout: 30,

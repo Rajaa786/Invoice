@@ -1,25 +1,78 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getConfigurationService } from '../services/configuration/ConfigurationService.js';
 
+// Global cache to prevent redundant API calls
+const SETTINGS_CACHE = new Map();
+const CACHE_EXPIRY = 5000; // 5 seconds
+let configServiceInstance = null;
+
+// Debounce utility
+const debounce = (func, wait) => {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+};
+
+/**
+ * Get cached value or fetch if not cached/expired
+ */
+const getCachedValue = async (key, fetchFn) => {
+    const now = Date.now();
+    const cached = SETTINGS_CACHE.get(key);
+    
+    if (cached && (now - cached.timestamp) < CACHE_EXPIRY) {
+        console.log(`Using cached value for ${key}:`, cached.value);
+        return cached.value;
+    }
+    
+    console.log(`Fetching fresh value for ${key}`);
+    const value = await fetchFn();
+    SETTINGS_CACHE.set(key, { value, timestamp: now });
+    return value;
+};
+
+/**
+ * Clear cache for a specific key or all keys
+ */
+const clearCache = (key = null) => {
+    if (key) {
+        SETTINGS_CACHE.delete(key);
+    } else {
+        SETTINGS_CACHE.clear();
+    }
+};
+
 /**
  * React Hook for Configuration Management
  * Provides clean integration between React components and configuration service
  */
 export const useConfiguration = () => {
-    const [configService, setConfigService] = useState(null);
-    const [isInitialized, setIsInitialized] = useState(false);
+    const [configService, setConfigService] = useState(configServiceInstance);
+    const [isInitialized, setIsInitialized] = useState(!!configServiceInstance);
     const [error, setError] = useState(null);
     const initializationRef = useRef(false);
 
     // Initialize configuration service
     useEffect(() => {
-        if (initializationRef.current) return;
+        if (initializationRef.current || configServiceInstance) return;
         initializationRef.current = true;
 
         const initService = async () => {
             try {
-                const service = getConfigurationService();
-                await service.ensureInitialized?.();
+                console.log('Initializing configuration service...');
+                const service = await getConfigurationService();
+                
+                // Ensure the service is properly initialized
+                await service.ensureInitialized();
+                
+                console.log('Configuration service initialized successfully');
+                configServiceInstance = service;
                 setConfigService(service);
                 setIsInitialized(true);
                 setError(null);
@@ -27,40 +80,64 @@ export const useConfiguration = () => {
                 console.error('Failed to initialize configuration service:', err);
                 setError(err);
                 setIsInitialized(false);
+                
+                // Retry after a delay
+                setTimeout(() => {
+                    console.log('Retrying configuration service initialization...');
+                    initializationRef.current = false;
+                }, 2000);
             }
         };
 
         initService();
     }, []);
 
-    // Generic get method
+    // Generic get method with caching
     const get = useCallback(async (keyPath, defaultValue = undefined) => {
-        if (!configService) return defaultValue;
+        if (!configService || !isInitialized) {
+            console.warn(`Config service not ready, returning default for ${keyPath}`);
+            return defaultValue;
+        }
+        
         try {
-            return await configService.settingsService.get(keyPath) ?? defaultValue;
+            return await getCachedValue(keyPath, async () => {
+                const value = await configService.settingsService.get(keyPath);
+                return value ?? defaultValue;
+            });
         } catch (err) {
             console.error(`Error getting config ${keyPath}:`, err);
             return defaultValue;
         }
-    }, [configService]);
+    }, [configService, isInitialized]);
 
-    // Generic set method
-    const set = useCallback(async (keyPath, value) => {
-        if (!configService) return false;
+    // Generic set method with debouncing and cache invalidation
+    const set = useCallback(debounce(async (keyPath, value) => {
+        if (!configService || !isInitialized) {
+            console.warn(`Config service not ready, cannot set ${keyPath}`);
+            return false;
+        }
         try {
-            return await configService.settingsService.set(keyPath, value);
+            console.log(`Setting config ${keyPath} to:`, value);
+            const result = await configService.settingsService.set(keyPath, value);
+            if (result) {
+                // Clear cache for this key so next get fetches fresh value
+                clearCache(keyPath);
+                console.log(`Set config ${keyPath} result:`, result);
+            }
+            return result;
         } catch (err) {
             console.error(`Error setting config ${keyPath}:`, err);
             return false;
         }
-    }, [configService]);
+    }, 300), [configService, isInitialized]); // 300ms debounce
 
     return {
         configService,
         isInitialized,
         error,
         get,
-        set
+        set,
+        clearCache
     };
 };
 
@@ -68,23 +145,35 @@ export const useConfiguration = () => {
  * Hook for Template Configuration
  */
 export const useTemplateConfiguration = () => {
-    const { configService, isInitialized } = useConfiguration();
+    const { configService, isInitialized, get, set } = useConfiguration();
     const [selectedTemplate, setSelectedTemplateState] = useState('classic_blue');
     const [templateSettings, setTemplateSettingsState] = useState({});
     const [loading, setLoading] = useState(true);
+    const loadingRef = useRef(false);
 
-    // Load initial template configuration
+    // Load initial template configuration only once
     useEffect(() => {
-        if (!isInitialized || !configService) return;
+        if (!isInitialized || !configService || loadingRef.current) return;
+        loadingRef.current = true;
 
         const loadTemplateConfig = async () => {
             try {
                 setLoading(true);
+                console.log('Loading template configuration...');
+                
                 const [template, settings] = await Promise.all([
-                    configService.getSelectedTemplate(),
-                    configService.getTemplateSettings()
+                    get('invoice.templates.selectedTemplate', 'classic_blue'),
+                    get('invoice.templates.settings', {
+                        pageSize: 'A4',
+                        orientation: 'portrait',
+                        fontSize: 'normal',
+                        margins: 'normal',
+                        colorScheme: 'default'
+                    })
                 ]);
 
+                console.log('Loaded template configuration:', { template, settings });
+                
                 setSelectedTemplateState(template);
                 setTemplateSettingsState(settings);
             } catch (error) {
@@ -95,59 +184,80 @@ export const useTemplateConfiguration = () => {
         };
 
         loadTemplateConfig();
-    }, [isInitialized, configService]);
+    }, [isInitialized, configService, get]);
 
-    // Set selected template
+    // Set selected template with optimistic updates
     const setSelectedTemplate = useCallback(async (templateId) => {
         if (!configService) return false;
         try {
-            const success = await configService.setSelectedTemplate(templateId);
-            if (success) {
-                setSelectedTemplateState(templateId);
+            // Optimistic update
+            setSelectedTemplateState(templateId);
+            const success = await set('invoice.templates.selectedTemplate', templateId);
+            if (!success) {
+                // Revert on failure
+                const currentTemplate = await get('invoice.templates.selectedTemplate', 'classic_blue');
+                setSelectedTemplateState(currentTemplate);
             }
             return success;
         } catch (error) {
             console.error('Error setting template:', error);
             return false;
         }
-    }, [configService]);
+    }, [configService, set, get]);
 
-    // Update template settings
+    // Update template settings with optimistic updates
     const updateTemplateSettings = useCallback(async (newSettings) => {
         if (!configService) return false;
         try {
-            const success = await configService.updateTemplateSettings(newSettings);
-            if (success) {
-                setTemplateSettingsState(prev => ({ ...prev, ...newSettings }));
-            }
-            return success;
+            // 🔧 FIXED: Use functional setState to avoid templateSettings dependency
+            setTemplateSettingsState(prevSettings => {
+                const mergedSettings = { ...prevSettings, ...newSettings };
+                
+                // Async save operation (don't wait for it in setState)
+                set('invoice.templates.settings', mergedSettings).then(success => {
+                    if (!success) {
+                        // Revert on failure by fetching current state
+                        get('invoice.templates.settings', prevSettings).then(currentSettings => {
+                            setTemplateSettingsState(currentSettings);
+                        });
+                    }
+                }).catch(error => {
+                    console.error('Error updating template settings:', error);
+                    // Revert to previous state on error
+                    setTemplateSettingsState(prevSettings);
+                });
+                
+                return mergedSettings;
+            });
+            
+            return true; // Return immediately for optimistic UI
         } catch (error) {
             console.error('Error updating template settings:', error);
             return false;
         }
-    }, [configService]);
+    }, [configService, set, get]); // 🔧 FIXED: Removed templateSettings dependency!
 
     // Get template customizations
     const getTemplateCustomizations = useCallback(async (templateId) => {
         if (!configService) return {};
         try {
-            return await configService.getTemplateCustomizations(templateId);
+            return await get(`invoice.templates.customizations.${templateId}`, {});
         } catch (error) {
             console.error('Error getting template customizations:', error);
             return {};
         }
-    }, [configService]);
+    }, [configService, get]);
 
     // Set template customizations
     const setTemplateCustomizations = useCallback(async (templateId, customizations) => {
         if (!configService) return false;
         try {
-            return await configService.setTemplateCustomizations(templateId, customizations);
+            return await set(`invoice.templates.customizations.${templateId}`, customizations);
         } catch (error) {
             console.error('Error setting template customizations:', error);
             return false;
         }
-    }, [configService]);
+    }, [configService, set]);
 
     return {
         selectedTemplate,
@@ -177,15 +287,29 @@ export const useAppConfiguration = () => {
         const loadAppConfig = async () => {
             try {
                 setLoading(true);
+                console.log('Loading app configuration...');
+                
                 const [currentTheme, currentLanguage] = await Promise.all([
                     configService.getTheme(),
                     configService.getLanguage()
                 ]);
 
-                setThemeState(currentTheme);
-                setLanguageState(currentLanguage);
+                console.log('Loaded theme:', currentTheme, 'language:', currentLanguage);
+                console.log('Theme type:', typeof currentTheme, 'Language type:', typeof currentLanguage);
+                
+                // Use fallback values if undefined
+                const finalTheme = currentTheme || 'light';
+                const finalLanguage = currentLanguage || 'en';
+                
+                console.log('Setting final values - theme:', finalTheme, 'language:', finalLanguage);
+                
+                setThemeState(finalTheme);
+                setLanguageState(finalLanguage);
             } catch (error) {
                 console.error('Error loading app configuration:', error);
+                // Set fallback values on error
+                setThemeState('light');
+                setLanguageState('en');
             } finally {
                 setLoading(false);
             }
@@ -198,9 +322,11 @@ export const useAppConfiguration = () => {
     const setTheme = useCallback(async (newTheme) => {
         if (!configService) return false;
         try {
+            console.log('Setting theme to:', newTheme);
             const success = await configService.setTheme(newTheme);
             if (success) {
                 setThemeState(newTheme);
+                console.log('Theme set successfully');
             }
             return success;
         } catch (error) {
@@ -213,9 +339,11 @@ export const useAppConfiguration = () => {
     const setLanguage = useCallback(async (newLanguage) => {
         if (!configService) return false;
         try {
+            console.log('Setting language to:', newLanguage);
             const success = await configService.setLanguage(newLanguage);
             if (success) {
                 setLanguageState(newLanguage);
+                console.log('Language set successfully');
             }
             return success;
         } catch (error) {
@@ -409,7 +537,12 @@ export const useBulkConfiguration = () => {
  */
 export const useUIConfiguration = () => {
     const { configService, isInitialized } = useConfiguration();
-    const [uiPreferences, setUIPreferencesState] = useState({});
+    const [uiPreferences, setUIPreferencesState] = useState({
+        autoSave: false,
+        compactMode: false,
+        showPreview: true,
+        notifications: true
+    });
     const [loading, setLoading] = useState(true);
 
     // Load initial UI configuration
@@ -419,10 +552,35 @@ export const useUIConfiguration = () => {
         const loadUIConfig = async () => {
             try {
                 setLoading(true);
+                console.log('Loading UI configuration...');
+                
                 const preferences = await configService.getUIPreferences();
-                setUIPreferencesState(preferences);
+                console.log('Loaded UI preferences:', preferences);
+                console.log('UI preferences type:', typeof preferences);
+                
+                // Merge with defaults to ensure all properties exist
+                const defaultPreferences = {
+                    autoSave: false,
+                    compactMode: false,
+                    showPreview: true,
+                    notifications: true,
+                    sidebarCollapsed: false,
+                    tablePageSize: 10,
+                    dateFormat: 'DD/MM/YYYY',
+                    numberFormat: 'en-IN',
+                    showTooltips: true
+                };
+                
+                const mergedPreferences = { ...defaultPreferences, ...preferences };
+                console.log('Merged UI preferences:', mergedPreferences);
+                console.log('AutoSave value:', mergedPreferences.autoSave, 'type:', typeof mergedPreferences.autoSave);
+                console.log('ShowPreview value:', mergedPreferences.showPreview, 'type:', typeof mergedPreferences.showPreview);
+                
+                setUIPreferencesState(mergedPreferences);
+                console.log('UI preferences set to:', mergedPreferences);
             } catch (error) {
                 console.error('Error loading UI configuration:', error);
+                // Keep default values on error
             } finally {
                 setLoading(false);
             }
@@ -435,9 +593,14 @@ export const useUIConfiguration = () => {
     const updateUIPreferences = useCallback(async (newPreferences) => {
         if (!configService) return false;
         try {
+            console.log('Updating UI preferences:', newPreferences);
             const success = await configService.updateUIPreferences(newPreferences);
             if (success) {
-                setUIPreferencesState(prev => ({ ...prev, ...newPreferences }));
+                setUIPreferencesState(prev => {
+                    const updated = { ...prev, ...newPreferences };
+                    console.log('UI preferences updated to:', updated);
+                    return updated;
+                });
             }
             return success;
         } catch (error) {
@@ -448,18 +611,22 @@ export const useUIConfiguration = () => {
 
     // Individual setter methods for convenience
     const setAutoSave = useCallback(async (autoSave) => {
+        console.log('Setting autoSave to:', autoSave);
         return await updateUIPreferences({ autoSave });
     }, [updateUIPreferences]);
 
     const setCompactMode = useCallback(async (compactMode) => {
+        console.log('Setting compactMode to:', compactMode);
         return await updateUIPreferences({ compactMode });
     }, [updateUIPreferences]);
 
     const setShowPreview = useCallback(async (showPreview) => {
+        console.log('Setting showPreview to:', showPreview);
         return await updateUIPreferences({ showPreview });
     }, [updateUIPreferences]);
 
     const setNotifications = useCallback(async (notifications) => {
+        console.log('Setting notifications to:', notifications);
         return await updateUIPreferences({ notifications });
     }, [updateUIPreferences]);
 

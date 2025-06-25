@@ -1,6 +1,7 @@
-import ClassicBlueTemplate from './ClassicBlueTemplate';
-import ModernGreenTemplate from './ModernGreenTemplate';
-import MinimalWhiteTemplate from './MinimalWhiteTemplate';
+// Lazy import functions to prevent PDF components from loading in DOM context
+const getClassicBlueTemplate = () => import('./ClassicBlueTemplate').then(mod => mod.default);
+const getModernGreenTemplate = () => import('./ModernGreenTemplate').then(mod => mod.default);
+const getMinimalWhiteTemplate = () => import('./MinimalWhiteTemplate').then(mod => mod.default);
 
 // Template Registry - Central registry for all invoice templates
 export const TEMPLATE_REGISTRY = {
@@ -17,7 +18,8 @@ export const TEMPLATE_REGISTRY = {
             'Professional appearance'
         ],
         preview: '/images/templates/classic-blue-preview.png', // We'll create this later
-        component: ClassicBlueTemplate,
+        component: null, // Will be loaded lazily
+        componentLoader: getClassicBlueTemplate,
         colors: {
             primary: '#1e3a8a',
             secondary: '#3b82f6',
@@ -41,7 +43,8 @@ export const TEMPLATE_REGISTRY = {
             'Contemporary styling'
         ],
         preview: '/images/templates/modern-green-preview.png',
-        component: ModernGreenTemplate,
+        component: null, // Will be loaded lazily
+        componentLoader: getModernGreenTemplate,
         colors: {
             primary: '#16a34a',
             secondary: '#22c55e',
@@ -65,7 +68,8 @@ export const TEMPLATE_REGISTRY = {
             'Distraction-free'
         ],
         preview: '/images/templates/minimal-white-preview.png',
-        component: MinimalWhiteTemplate,
+        component: null, // Will be loaded lazily
+        componentLoader: getMinimalWhiteTemplate,
         colors: {
             primary: '#000000',
             secondary: '#333333',
@@ -107,13 +111,24 @@ export class TemplateFactory {
     }
 
     /**
-     * Get template component by ID
+     * Get template component by ID (async for lazy loading)
      * @param {string} templateId - Template ID
-     * @returns {Function|null} Template component or null if not found
+     * @returns {Promise<Function>|null} Template component promise or null if not found
      */
-    static getTemplateComponent(templateId) {
+    static async getTemplateComponent(templateId) {
         const template = TEMPLATE_REGISTRY[templateId];
-        return template ? template.component : null;
+        if (!template) return null;
+        
+        if (template.component) {
+            return template.component;
+        }
+        
+        if (template.componentLoader) {
+            template.component = await template.componentLoader();
+            return template.component;
+        }
+        
+        return null;
     }
 
     /**

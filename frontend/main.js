@@ -82,6 +82,7 @@ if (!fs.existsSync(tmpDir)) {
 }
 
 let mainWindow = null;
+let settingsFile = null; // Global variable for settings file path
 
 function createProtocol() {
   log.debug('Creating custom protocol handler for app://');
@@ -155,10 +156,22 @@ function createWindow() {
   // Configure electron-settings
   const settingsDir = path.join(app.getPath('userData'), 'Settings');
   log.info(`Configuring electron-settings with directory: ${settingsDir}`);
+  
+  // Create settings directory if it doesn't exist
+  if (!fs.existsSync(settingsDir)) {
+    fs.mkdirSync(settingsDir, { recursive: true });
+    log.info(`Created settings directory: ${settingsDir}`);
+  }
+  
+  // Use a simpler settings file path
+  settingsFile = path.join(settingsDir, 'settings.json');
+  log.info(`Settings file path: ${settingsFile}`);
+  
   settings.configure({
+    fileName: 'settings.json',
     dir: settingsDir,
-    atomicSaving: true,
-    numBackups: 3,
+    atomicSaving: false, // Disable atomic saving to prevent EPERM errors on Windows
+    numBackups: 0, // Disable backups to prevent file conflicts
     prettify: true
   });
   log.info("Electron-settings configured successfully");
@@ -186,6 +199,44 @@ function createWindow() {
       return true;
     } catch (error) {
       log.error(`Error setting ${keyPath}:`, error);
+      
+      // Check for specific Windows permission errors
+      if (error.code === 'EPERM') {
+        log.error('Permission denied error - this might be due to:');
+        log.error('1. Antivirus software blocking file access');
+        log.error('2. Windows file permissions');
+        log.error('3. File being locked by another process');
+        log.error(`Settings file path: ${settingsFile}`);
+        
+        // Try alternative approach - write directly to file
+        try {
+          log.info(`Attempting direct file write for ${keyPath}`);
+          
+          // Read existing settings
+          let existingSettings = {};
+          if (fs.existsSync(settingsFile)) {
+            const fileContent = fs.readFileSync(settingsFile, 'utf8');
+            existingSettings = JSON.parse(fileContent);
+          }
+          
+          // Set the value using dot notation
+          const keys = keyPath.split('.');
+          let target = existingSettings;
+          for (let i = 0; i < keys.length - 1; i++) {
+            if (!target[keys[i]]) target[keys[i]] = {};
+            target = target[keys[i]];
+          }
+          target[keys[keys.length - 1]] = value;
+          
+          // Write the file directly
+          fs.writeFileSync(settingsFile, JSON.stringify(existingSettings, null, 2));
+          log.info(`Successfully set ${keyPath} using direct file write`);
+          return true;
+        } catch (fallbackError) {
+          log.error(`Direct file write also failed for ${keyPath}:`, fallbackError);
+        }
+      }
+      
       return false;
     }
   });
@@ -266,6 +317,18 @@ function createWindow() {
     } catch (error) {
       log.error('Error getting all settings:', error);
       return {};
+    }
+  });
+
+  // Add handler for getting app paths (for debugging)
+  ipcMain.handle('app:getPath', async (event, name) => {
+    try {
+      const path = app.getPath(name);
+      log.debug(`App path ${name}: ${path}`);
+      return path;
+    } catch (error) {
+      log.error(`Error getting app path ${name}:`, error);
+      return null;
     }
   });
 

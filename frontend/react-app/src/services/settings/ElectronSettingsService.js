@@ -20,16 +20,15 @@ export class ElectronSettingsService extends ISettingsProvider {
         if (this.initialized) return;
 
         try {
-            // Check if electron APIs are available
-            if (!window.electronSettings) {
-                throw new Error('Electron settings API not available');
-            }
+            // Wait for electron APIs to be available
+            await this.waitForElectronAPIs();
 
             // Check if any settings exist - directly query without using this.has() to avoid recursion
             let hasAnySettings = false;
             try {
                 const value = await window.electronSettings.get('application');
                 hasAnySettings = value !== undefined;
+                console.log('Existing settings check result:', hasAnySettings);
             } catch (error) {
                 console.log('No existing settings found, will initialize defaults');
             }
@@ -45,6 +44,27 @@ export class ElectronSettingsService extends ISettingsProvider {
             console.error('Failed to initialize ElectronSettingsService:', error);
             throw error;
         }
+    }
+
+    /**
+     * Wait for electron APIs to be available
+     */
+    async waitForElectronAPIs() {
+        const maxAttempts = 50; // 5 seconds max wait
+        let attempts = 0;
+
+        while (attempts < maxAttempts) {
+            if (window.electronSettings) {
+                console.log('Electron settings API is available');
+                return;
+            }
+            
+            console.log(`Waiting for electron settings API (attempt ${attempts + 1}/${maxAttempts})`);
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
+        }
+
+        throw new Error('Electron settings API not available after waiting');
     }
 
     /**
@@ -118,11 +138,32 @@ export class ElectronSettingsService extends ISettingsProvider {
 
                 // Emit specific events for important settings
                 this.emitSpecificEvents(keyPath, value);
+            } else {
+                console.error(`[ElectronSettingsService] Failed to set ${keyPath} - checking for permission issues`);
+                
+                // Try to diagnose the issue
+                try {
+                    const testRead = await window.electronSettings.get(keyPath);
+                    console.log(`[ElectronSettingsService] Current value for ${keyPath}:`, testRead);
+                } catch (readError) {
+                    console.error(`[ElectronSettingsService] Cannot read ${keyPath}:`, readError);
+                }
             }
 
             return success;
         } catch (error) {
             console.error(`Error setting ${keyPath}:`, error);
+            
+            // Check for permission errors
+            if (error.message && error.message.includes('EPERM')) {
+                console.error('🚨 PERMISSION ERROR DETECTED:');
+                console.error('This is likely due to Windows file permissions or antivirus interference');
+                console.error('Possible solutions:');
+                console.error('1. Run the application as Administrator');
+                console.error('2. Add the app to antivirus whitelist');
+                console.error('3. Check Windows file permissions for AppData folder');
+            }
+            
             return false;
         }
     }

@@ -7,6 +7,10 @@
 import { getConfigurationService } from '../../../services/configuration/ConfigurationService.js';
 import { DEFAULT_TEMPLATE_ID, TemplateFactory } from './TemplateRegistry.js';
 
+// Simple cache to prevent redundant API calls
+const CONFIG_CACHE = new Map();
+const CACHE_DURATION = 3000; // 3 seconds
+
 /**
  * Configuration Manager - Bridge between old template system and new configuration service
  * Provides backward compatibility while using the new decoupled architecture
@@ -16,12 +20,49 @@ export class ConfigurationManager {
     static _migrationCompleted = false;
 
     /**
+     * Get cached value or fetch fresh
+     */
+    static getCachedValue(key, fetchFunction) {
+        const now = Date.now();
+        const cached = CONFIG_CACHE.get(key);
+        
+        if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+            console.log(`[ConfigManager] Using cached value for ${key}`);
+            return Promise.resolve(cached.value);
+        }
+        
+        console.log(`[ConfigManager] Fetching fresh value for ${key}`);
+        const promise = fetchFunction();
+        
+        // Cache the promise result
+        promise.then(value => {
+            CONFIG_CACHE.set(key, { value, timestamp: now });
+        }).catch(() => {
+            // Remove failed entries from cache
+            CONFIG_CACHE.delete(key);
+        });
+        
+        return promise;
+    }
+
+    /**
+     * Clear cache for specific key or all
+     */
+    static clearCache(key = null) {
+        if (key) {
+            CONFIG_CACHE.delete(key);
+        } else {
+            CONFIG_CACHE.clear();
+        }
+    }
+
+    /**
      * Get configuration service instance
      * @returns {Promise<ConfigurationService>} Configuration service
      */
     static async getConfigService() {
         if (!this._configService) {
-            this._configService = getConfigurationService();
+            this._configService = await getConfigurationService();
             await this._configService.ensureInitialized();
 
             // Run migration on first access
@@ -87,19 +128,21 @@ export class ConfigurationManager {
      * @returns {Promise<string>} Selected template ID
      */
     static async getSelectedTemplate() {
-        try {
-            const configService = await this.getConfigService();
-            const templateId = await configService.getSelectedTemplate();
+        return this.getCachedValue('selectedTemplate', async () => {
+            try {
+                const configService = await this.getConfigService();
+                const templateId = await configService.getSelectedTemplate();
 
-            // Validate template exists
-            if (templateId && TemplateFactory.getTemplate(templateId)) {
-                return templateId;
+                // Validate template exists
+                if (templateId && TemplateFactory.getTemplate(templateId)) {
+                    return templateId;
+                }
+                return DEFAULT_TEMPLATE_ID;
+            } catch (error) {
+                console.error('Error getting selected template:', error);
+                return DEFAULT_TEMPLATE_ID;
             }
-            return DEFAULT_TEMPLATE_ID;
-        } catch (error) {
-            console.error('Error getting selected template:', error);
-            return DEFAULT_TEMPLATE_ID;
-        }
+        });
     }
 
     /**
@@ -119,6 +162,9 @@ export class ConfigurationManager {
             const success = await configService.setSelectedTemplate(templateId);
 
             if (success) {
+                // Clear cache to ensure fresh data on next get
+                this.clearCache('selectedTemplate');
+                
                 // Emit legacy event for backward compatibility
                 window.dispatchEvent(new CustomEvent('templateChanged', {
                     detail: { templateId, timestamp: Date.now() }
@@ -137,23 +183,25 @@ export class ConfigurationManager {
      * @returns {Promise<Object>} Template settings object
      */
     static async getTemplateSettings() {
-        try {
-            const configService = await this.getConfigService();
-            const settings = await configService.getTemplateSettings();
+        return this.getCachedValue('templateSettings', async () => {
+            try {
+                const configService = await this.getConfigService();
+                const settings = await configService.getTemplateSettings();
 
-            // Merge with defaults to ensure all properties exist
-            return {
-                pageSize: 'A4',
-                orientation: 'portrait',
-                fontSize: 'normal',
-                margins: 'normal',
-                colorScheme: 'default',
-                ...settings
-            };
-        } catch (error) {
-            console.error('Error getting template settings:', error);
-            return this.getDefaultConfiguration().templateSettings;
-        }
+                // Merge with defaults to ensure all properties exist
+                return {
+                    pageSize: 'A4',
+                    orientation: 'portrait',
+                    fontSize: 'normal',
+                    margins: 'normal',
+                    colorScheme: 'default',
+                    ...settings
+                };
+            } catch (error) {
+                console.error('Error getting template settings:', error);
+                return this.getDefaultConfiguration().templateSettings;
+            }
+        });
     }
 
     /**
@@ -167,6 +215,9 @@ export class ConfigurationManager {
             const success = await configService.updateTemplateSettings(settings);
 
             if (success) {
+                // Clear cache to ensure fresh data on next get
+                this.clearCache('templateSettings');
+                
                 // Emit legacy event for backward compatibility
                 const newSettings = await this.getTemplateSettings();
                 window.dispatchEvent(new CustomEvent('templateSettingsChanged', {
