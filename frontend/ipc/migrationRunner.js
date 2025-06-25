@@ -1,4 +1,5 @@
 const { ipcMain } = require("electron");
+const log = require('electron-log/main');
 const fs = require("fs");
 const path = require("path");
 const DatabaseManager = require("../db/db");
@@ -14,7 +15,8 @@ class MigrationRunner {
         this.db = this.dbManager.getDatabase();
         // this.sqlite = this.dbManager.getSqliteInstance();
         this.migrationsFolder = path.resolve(__dirname, "../drizzle");
-        console.log("migrationsFolder:", this.migrationsFolder);
+        log.info("MigrationRunner initialized");
+        log.debug("migrationsFolder:", this.migrationsFolder);
     }
 
     /**
@@ -23,23 +25,23 @@ class MigrationRunner {
      */
     async runDrizzleMigrations() {
         try {
-            console.log('🔄 Running Drizzle migrations...');
-            console.log('Database instance:', !!this.db);
-            console.log('Migrations folder:', this.migrationsFolder);
+            log.info('🔄 Running Drizzle migrations...');
+            log.debug('Database instance:', !!this.db);
+            log.debug('Migrations folder:', this.migrationsFolder);
 
             // Use Drizzle's built-in migrate function
             await migrate(this.db, {
                 migrationsFolder: this.migrationsFolder
             });
 
-            console.log('✅ Drizzle migrations completed successfully');
+            log.info('✅ Drizzle migrations completed successfully');
             return {
                 success: true,
                 message: 'All migrations applied successfully',
                 method: 'drizzle-migrate'
             };
         } catch (error) {
-            console.error('❌ Drizzle migration failed:', error);
+            log.error('❌ Drizzle migration failed:', error);
             throw new Error(`Migration failed: ${error.message}`);
         }
     }
@@ -58,7 +60,7 @@ class MigrationRunner {
                     path: path.join(this.migrationsFolder, file)
                 }));
         } catch (error) {
-            console.error('Error reading migrations directory:', error);
+            log.error('Error reading migrations directory:', error);
             return [];
         }
     }
@@ -74,7 +76,7 @@ class MigrationRunner {
             `).get();
             return !!result;
         } catch (error) {
-            console.error('Error checking Drizzle migrations table:', error);
+            log.error('Error checking Drizzle migrations table:', error);
             return false;
         }
     }
@@ -97,7 +99,7 @@ class MigrationRunner {
 
             return result;
         } catch (error) {
-            console.error('Error getting applied migrations:', error);
+            log.error('Error getting applied migrations:', error);
             return [];
         }
     }
@@ -121,7 +123,7 @@ class MigrationRunner {
                 timestamp: new Date().toISOString()
             };
         } catch (error) {
-            console.error('Error running migrations:', error);
+            log.error('Error running migrations:', error);
             return {
                 success: false,
                 message: `Migration failed: ${error.message}`,
@@ -153,7 +155,7 @@ class MigrationRunner {
                 timestamp: new Date().toISOString()
             };
         } catch (error) {
-            console.error('Error getting migration status:', error);
+            log.error('Error getting migration status:', error);
             throw error;
         }
     }
@@ -176,7 +178,7 @@ class MigrationRunner {
             // assume we're up to date. Drizzle handles the detailed checking.
             return appliedMigrations.length > 0 && availableMigrations.length > 0;
         } catch (error) {
-            console.error('Error checking schema status:', error);
+            log.error('Error checking schema status:', error);
             return false;
         }
     }
@@ -189,12 +191,17 @@ const migrationRunner = new MigrationRunner();
  * Register migration IPC handlers
  */
 function registerMigrationIpc() {
+    log.info('Registering Migration IPC handlers...');
+
     // Run pending migrations
     ipcMain.handle("migration:runPending", async (event) => {
         try {
-            return await migrationRunner.runPendingMigrations();
+            log.info('Processing migration:runPending request');
+            const result = await migrationRunner.runPendingMigrations();
+            log.info(`Migration completed: ${result.success ? 'SUCCESS' : 'FAILED'}`);
+            return result;
         } catch (error) {
-            console.error('IPC Error - runPending:', error);
+            log.error('IPC Error - runPending:', error);
             throw error;
         }
     });
@@ -202,9 +209,12 @@ function registerMigrationIpc() {
     // Get migration status
     ipcMain.handle("migration:getStatus", async (event) => {
         try {
-            return await migrationRunner.getMigrationStatus();
+            log.debug('Processing migration:getStatus request');
+            const result = await migrationRunner.getMigrationStatus();
+            log.debug(`Migration status: ${result.applied}/${result.total} applied`);
+            return result;
         } catch (error) {
-            console.error('IPC Error - getStatus:', error);
+            log.error('IPC Error - getStatus:', error);
             throw error;
         }
     });
@@ -212,14 +222,17 @@ function registerMigrationIpc() {
     // Check if schema is up to date
     ipcMain.handle("migration:isUpToDate", async (event) => {
         try {
-            return await migrationRunner.isSchemaUpToDate();
+            log.debug('Processing migration:isUpToDate request');
+            const result = await migrationRunner.isSchemaUpToDate();
+            log.debug(`Schema up to date: ${result}`);
+            return result;
         } catch (error) {
-            console.error('IPC Error - isUpToDate:', error);
+            log.error('IPC Error - isUpToDate:', error);
             throw error;
         }
     });
 
-    console.log('Migration IPC handlers registered successfully');
+    log.info('Migration IPC handlers registered successfully');
 }
 
 module.exports = { registerMigrationIpc, MigrationRunner }; 

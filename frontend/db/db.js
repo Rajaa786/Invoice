@@ -2,6 +2,7 @@ require("dotenv").config();
 const { drizzle } = require("drizzle-orm/better-sqlite3");
 const Database = require("better-sqlite3");
 const path = require("path");
+const log = require('electron-log/main');
 
 class DatabaseManager {
   static #instance = null;
@@ -11,7 +12,8 @@ class DatabaseManager {
       // Use DB_FILE_NAME from env or default to local database
       const dbPath = process.env.DB_FILE_NAME || path.join(__dirname, '../database.db');
 
-      console.log('Database path:', dbPath);
+      log.info('Initializing database connection...');
+      log.debug('Database path:', dbPath);
 
       try {
         // Create better-sqlite3 database instance
@@ -26,9 +28,9 @@ class DatabaseManager {
         const db = drizzle(dbPath);
 
         DatabaseManager.#instance = new DatabaseManager(db);
-        console.log('Database connected successfully');
+        log.info('Database connected successfully');
       } catch (error) {
-        console.error('Database connection failed:', error);
+        log.error('Database connection failed:', error);
         throw new Error(`Failed to connect to database: ${error.message}`);
       }
     }
@@ -38,6 +40,7 @@ class DatabaseManager {
   constructor(db) {
     this.db = db;
     // this.sqlite = sqlite;
+    log.debug('DatabaseManager instance created');
   }
 
   getDatabase() {

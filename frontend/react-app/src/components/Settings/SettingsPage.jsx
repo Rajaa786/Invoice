@@ -26,7 +26,8 @@ import InvoiceTemplateSettings from './InvoiceTemplateSettings';
 import {
     useTemplateConfiguration,
     useAppConfiguration,
-    useInvoiceConfiguration
+    useInvoiceConfiguration,
+    useUIConfiguration
 } from '../../hooks/useConfiguration';
 
 const SettingsPage = () => {
@@ -57,23 +58,26 @@ const SettingsPage = () => {
         loading: templateLoading
     } = useTemplateConfiguration();
 
-    // Local UI settings (these could be moved to configuration service later)
-    const [uiSettings, setUiSettings] = useState({
-        autoSave: true,
-        notifications: true,
-        compactMode: false,
-        showPreview: true
-    });
+    // UI settings from configuration service
+    const {
+        uiPreferences,
+        setAutoSave,
+        setCompactMode,
+        setShowPreview,
+        setNotifications,
+        loading: uiLoading
+    } = useUIConfiguration();
 
     const handleSaveSettings = async (section) => {
         setIsLoading(true);
         setSaveStatus(null);
 
         try {
-            // Settings are auto-saved through our hooks, just show success
+            console.log(`Settings for section '${section}' are auto-saved through configuration hooks`);
             setSaveStatus('success');
             setTimeout(() => setSaveStatus(null), 3000);
         } catch (error) {
+            console.error('Settings save confirmation error:', error);
             setSaveStatus('error');
             setTimeout(() => setSaveStatus(null), 3000);
         } finally {
@@ -171,8 +175,9 @@ const SettingsPage = () => {
                                 <p className="text-sm text-gray-500">Automatically save changes as you work</p>
                             </div>
                             <Switch
-                                checked={uiSettings.autoSave}
-                                onCheckedChange={(checked) => setUiSettings({ ...uiSettings, autoSave: checked })}
+                                checked={uiPreferences?.autoSave || false}
+                                onCheckedChange={(checked) => setAutoSave(checked)}
+                                disabled={uiLoading}
                             />
                         </div>
 
@@ -182,8 +187,9 @@ const SettingsPage = () => {
                                 <p className="text-sm text-gray-500">Use a more compact interface layout</p>
                             </div>
                             <Switch
-                                checked={uiSettings.compactMode}
-                                onCheckedChange={(checked) => setUiSettings({ ...uiSettings, compactMode: checked })}
+                                checked={uiPreferences?.compactMode || false}
+                                onCheckedChange={(checked) => setCompactMode(checked)}
+                                disabled={uiLoading}
                             />
                         </div>
 
@@ -193,8 +199,9 @@ const SettingsPage = () => {
                                 <p className="text-sm text-gray-500">Preview invoices before downloading</p>
                             </div>
                             <Switch
-                                checked={uiSettings.showPreview}
-                                onCheckedChange={(checked) => setUiSettings({ ...uiSettings, showPreview: checked })}
+                                checked={uiPreferences?.showPreview || false}
+                                onCheckedChange={(checked) => setShowPreview(checked)}
+                                disabled={uiLoading}
                             />
                         </div>
                     </div>
@@ -215,8 +222,9 @@ const SettingsPage = () => {
                             <p className="text-sm text-gray-500">Receive notifications for important events</p>
                         </div>
                         <Switch
-                            checked={uiSettings.notifications}
-                            onCheckedChange={(checked) => setUiSettings({ ...uiSettings, notifications: checked })}
+                            checked={uiPreferences?.notifications || false}
+                            onCheckedChange={(checked) => setNotifications(checked)}
+                            disabled={uiLoading}
                         />
                     </div>
                 </CardContent>

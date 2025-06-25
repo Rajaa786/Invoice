@@ -99,6 +99,8 @@ export class ElectronSettingsService extends ISettingsProvider {
                 await this.init();
             }
 
+            console.log(`[ElectronSettingsService] Setting ${keyPath} to:`, value);
+
             // Validate the value
             const validation = validateSetting(keyPath, value);
             if (!validation.valid) {
@@ -108,6 +110,7 @@ export class ElectronSettingsService extends ISettingsProvider {
 
             // Set the value
             const success = await window.electronSettings.set(keyPath, value);
+            console.log(`[ElectronSettingsService] Set ${keyPath} result:`, success);
 
             if (success) {
                 // Emit change event

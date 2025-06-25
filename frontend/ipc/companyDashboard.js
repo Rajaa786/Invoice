@@ -1,4 +1,5 @@
 const { ipcMain } = require("electron");
+const log = require('electron-log/main');
 const DatabaseManager = require("../db/db");
 const { companies } = require("../db/schema/Company");
 const path = require("path");
@@ -6,9 +7,10 @@ const fs = require("fs");
 
 function registerCompanyDashboardIpc() {
   try {
+    log.info('Registering Company Dashboard IPC handlers...');
     const dbManager = DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
-    console.log("Database instance initialized:", !!db);
+    log.debug("Database instance initialized:", !!db);
 
     // Import tmpDir from main.js
     const { tmpDir } = require("../main");
@@ -16,7 +18,7 @@ function registerCompanyDashboardIpc() {
     // Helper function to save files to tmp directory
     const saveFileToCompanyTmpFolder = (base64Data, companyName, type) => {
       if (!base64Data || typeof base64Data !== "string") {
-        console.warn(`${type} data is invalid or not a base64 string.`);
+        log.warn(`${type} data is invalid or not a base64 string.`);
         return null;
       }
 
@@ -42,19 +44,20 @@ function registerCompanyDashboardIpc() {
 
         // Write the file
         fs.writeFileSync(filePath, fileBuffer);
-        console.log(`${type} saved at: ${filePath}`);
+        log.info(`${type} saved at: ${filePath}`);
 
         return filePath;
       }
 
-      console.warn(`Invalid base64 format for ${type}`);
+      log.warn(`Invalid base64 format for ${type}`);
       return null;
     };
 
     // Register the IPC handler to add a company
     ipcMain.handle("add-company", async (event, data) => {
       try {
-        console.log("Received add-company request with data:", {
+        log.info("Received add-company request for:", data.companyName);
+        log.debug("Company data:", {
           ...data,
           logo: data.logo ? "[LOGO DATA]" : null,
           signature: data.signature ? "[SIGNATURE DATA]" : null,
@@ -67,10 +70,10 @@ function registerCompanyDashboardIpc() {
 
         const signaturePath = data.signature
           ? saveFileToCompanyTmpFolder(
-              data.signature,
-              data.companyName,
-              "signature"
-            )
+            data.signature,
+            data.companyName,
+            "signature"
+          )
           : null;
 
         const gstin = data.gstApplicable === true ? data.gstin : null;
@@ -95,13 +98,14 @@ function registerCompanyDashboardIpc() {
           signaturePath,
         });
 
+        log.info(`Company '${data.companyName}' added successfully`);
         return { success: true, result };
       } catch (err) {
-        console.error("Insert error:", err);
+        log.error("Company insert error:", err);
         return { success: false, error: err.message };
       }
     });
-    console.log("IPC handler 'add-company' registered successfully");
+    log.info("IPC handler 'add-company' registered successfully");
 
     // Add an IPC handler to get company images
     ipcMain.handle("get-company-image", async (event, imagePath) => {
@@ -125,23 +129,24 @@ function registerCompanyDashboardIpc() {
           mimeType = "image/svg+xml";
         }
 
+        log.debug(`Company image retrieved successfully: ${imagePath}`);
         return {
           success: true,
           data: `data:${mimeType};base64,${base64Image}`,
         };
       } catch (err) {
-        console.error("Get image error:", err);
+        log.error("Get company image error:", err);
         return { success: false, error: err.message };
       }
     });
-    console.log("IPC handler 'get-company-image' registered successfully");
+    log.info("IPC handler 'get-company-image' registered successfully");
 
     // Register the IPC handler to get all companies
     ipcMain.handle("get-company", async (event) => {
       try {
-        console.log("Received get-company request");
+        log.debug("Received get-company request");
         const result = await db.select().from(companies);
-        console.log(`Retrieved ${result.length} companies from database`);
+        log.info(`Retrieved ${result.length} companies from database`);
 
         // Process each company to add base64 encoded logo/signature
         const companiesWithImages = await Promise.all(
@@ -161,16 +166,16 @@ function registerCompanyDashboardIpc() {
                   ext === "png"
                     ? "image/png"
                     : ext === "svg"
-                    ? "image/svg+xml"
-                    : ext === "gif"
-                    ? "image/gif"
-                    : "image/jpeg";
+                      ? "image/svg+xml"
+                      : ext === "gif"
+                        ? "image/gif"
+                        : "image/jpeg";
 
                 enhancedCompany.logo = `data:${mimeType};base64,${logoBuffer.toString(
                   "base64"
                 )}`;
               } catch (e) {
-                console.error("Error loading logo:", e);
+                log.error("Error loading company logo:", e);
               }
             }
 
@@ -186,16 +191,16 @@ function registerCompanyDashboardIpc() {
                   ext === "png"
                     ? "image/png"
                     : ext === "svg"
-                    ? "image/svg+xml"
-                    : ext === "gif"
-                    ? "image/gif"
-                    : "image/jpeg";
+                      ? "image/svg+xml"
+                      : ext === "gif"
+                        ? "image/gif"
+                        : "image/jpeg";
 
                 enhancedCompany.signature = `data:${mimeType};base64,${sigBuffer.toString(
                   "base64"
                 )}`;
               } catch (e) {
-                console.error("Error loading signature:", e);
+                log.error("Error loading company signature:", e);
               }
             }
 
@@ -203,15 +208,17 @@ function registerCompanyDashboardIpc() {
           })
         );
 
+        log.debug(`Processed ${companiesWithImages.length} companies with images`);
         return { success: true, companies: companiesWithImages };
       } catch (err) {
-        console.error("Get company error:", err);
+        log.error("Get company error:", err);
         return { success: false, error: err.message };
       }
     });
-    console.log("IPC handler 'get-company' registered successfully");
+    log.info("IPC handler 'get-company' registered successfully");
+    log.info("Company Dashboard IPC handlers registration completed");
   } catch (err) {
-    console.error("Failed to initialize company dashboard IPC:", err);
+    log.error("Failed to initialize company dashboard IPC:", err);
   }
 }
 

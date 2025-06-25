@@ -1,4 +1,5 @@
 const { ipcMain } = require("electron");
+const log = require('electron-log/main');
 const DatabaseManager = require("../db/db");
 const { invoices } = require("../db/schema/Invoice");
 const { invoiceItems } = require("../db/schema/InvoiceItems");
@@ -16,6 +17,7 @@ class AnalyticsService {
         this.db = DatabaseManager.getInstance().getDatabase();
         this.cache = new Map();
         this.cacheTimeout = 5 * 60 * 1000; // 5 minutes cache
+        log.info('AnalyticsService initialized with cache timeout:', this.cacheTimeout);
     }
 
     /**
@@ -24,9 +26,13 @@ class AnalyticsService {
     getCached(key) {
         const cached = this.cache.get(key);
         if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+            log.debug(`Cache hit for key: ${key}`);
             return cached.data;
         }
-        this.cache.delete(key);
+        if (cached) {
+            log.debug(`Cache expired for key: ${key}`);
+            this.cache.delete(key);
+        }
         return null;
     }
 
@@ -35,6 +41,7 @@ class AnalyticsService {
             data,
             timestamp: Date.now()
         });
+        log.debug(`Cached data for key: ${key}`);
     }
 
     /**
@@ -89,9 +96,10 @@ class AnalyticsService {
             };
 
             this.setCache(cacheKey, metrics);
+            log.debug(`Summary metrics calculated successfully: ${Object.keys(metrics).length} metrics`);
             return metrics;
         } catch (error) {
-            console.error('Error fetching summary metrics:', error);
+            log.error('Error fetching summary metrics:', error);
             throw new Error(`Failed to fetch summary metrics: ${error.message}`);
         }
     }
@@ -3486,12 +3494,17 @@ const analyticsService = new AnalyticsService();
  * Register all analytics IPC handlers
  */
 function registerAnalyticsDashboardIpc() {
+    log.info('Registering Analytics Dashboard IPC handlers...');
+
     // Summary Metrics
     ipcMain.handle("analytics:getSummaryMetrics", async (event, filters) => {
         try {
-            return await analyticsService.getSummaryMetrics(filters);
+            log.debug('Processing getSummaryMetrics request with filters:', filters);
+            const result = await analyticsService.getSummaryMetrics(filters);
+            log.debug('getSummaryMetrics completed successfully');
+            return result;
         } catch (error) {
-            console.error('IPC Error - getSummaryMetrics:', error);
+            log.error('IPC Error - getSummaryMetrics:', error);
             throw error;
         }
     });
@@ -3499,9 +3512,12 @@ function registerAnalyticsDashboardIpc() {
     // Revenue Over Time
     ipcMain.handle("analytics:getRevenueOverTime", async (event, filters) => {
         try {
-            return await analyticsService.getRevenueOverTime(filters);
+            log.debug('Processing getRevenueOverTime request with filters:', filters);
+            const result = await analyticsService.getRevenueOverTime(filters);
+            log.debug(`getRevenueOverTime completed successfully with ${result.length} data points`);
+            return result;
         } catch (error) {
-            console.error('IPC Error - getRevenueOverTime:', error);
+            log.error('IPC Error - getRevenueOverTime:', error);
             throw error;
         }
     });
@@ -3509,9 +3525,12 @@ function registerAnalyticsDashboardIpc() {
     // Invoice Status Distribution
     ipcMain.handle("analytics:getInvoiceStatusDistribution", async (event, filters) => {
         try {
-            return await analyticsService.getInvoiceStatusDistribution(filters);
+            log.debug('Processing getInvoiceStatusDistribution request with filters:', filters);
+            const result = await analyticsService.getInvoiceStatusDistribution(filters);
+            log.debug('getInvoiceStatusDistribution completed successfully');
+            return result;
         } catch (error) {
-            console.error('IPC Error - getInvoiceStatusDistribution:', error);
+            log.error('IPC Error - getInvoiceStatusDistribution:', error);
             throw error;
         }
     });
@@ -3589,15 +3608,18 @@ function registerAnalyticsDashboardIpc() {
     // Cache management
     ipcMain.handle("analytics:clearCache", async (event) => {
         try {
+            log.info('Clearing analytics cache...');
+            const cacheSize = analyticsService.cache.size;
             analyticsService.cache.clear();
+            log.info(`Analytics cache cleared successfully (${cacheSize} entries removed)`);
             return { success: true, message: 'Cache cleared successfully' };
         } catch (error) {
-            console.error('IPC Error - clearCache:', error);
+            log.error('IPC Error - clearCache:', error);
             throw error;
         }
     });
 
-    console.log('Analytics Dashboard IPC handlers registered successfully');
+    log.info('Analytics Dashboard IPC handlers registered successfully');
 }
 
 module.exports = { registerAnalyticsDashboardIpc }; 

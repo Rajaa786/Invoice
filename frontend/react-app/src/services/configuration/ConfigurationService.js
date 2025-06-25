@@ -290,7 +290,12 @@ export class ConfigurationService {
             tablePageSize: await this.settingsService.get(SETTINGS_KEYS.UI_TABLE_PAGE_SIZE),
             dateFormat: await this.settingsService.get(SETTINGS_KEYS.UI_DATE_FORMAT),
             numberFormat: await this.settingsService.get(SETTINGS_KEYS.UI_NUMBER_FORMAT),
-            showTooltips: await this.settingsService.get(SETTINGS_KEYS.UI_SHOW_TOOLTIPS)
+            showTooltips: await this.settingsService.get(SETTINGS_KEYS.UI_SHOW_TOOLTIPS),
+            // Additional UI preferences that may not be in SETTINGS_KEYS
+            autoSave: await this.settingsService.get('ui.autoSave'),
+            compactMode: await this.settingsService.get('ui.compactMode'),
+            showPreview: await this.settingsService.get('ui.showPreview'),
+            notifications: await this.settingsService.get('ui.notifications')
         };
     }
 
@@ -303,12 +308,36 @@ export class ConfigurationService {
         await this.ensureInitialized();
         const updates = [];
 
-        Object.entries(preferences).forEach(([key, value]) => {
-            const settingKey = `ui.${key}`;
-            if (SETTINGS_KEYS[`UI_${key.toUpperCase()}`]) {
-                updates.push(this.settingsService.set(settingKey, value));
-            }
-        });
+        // Handle specific known UI preferences
+        if (preferences.sidebarCollapsed !== undefined) {
+            updates.push(this.settingsService.set(SETTINGS_KEYS.UI_SIDEBAR_COLLAPSED, preferences.sidebarCollapsed));
+        }
+        if (preferences.tablePageSize !== undefined) {
+            updates.push(this.settingsService.set(SETTINGS_KEYS.UI_TABLE_PAGE_SIZE, preferences.tablePageSize));
+        }
+        if (preferences.dateFormat !== undefined) {
+            updates.push(this.settingsService.set(SETTINGS_KEYS.UI_DATE_FORMAT, preferences.dateFormat));
+        }
+        if (preferences.numberFormat !== undefined) {
+            updates.push(this.settingsService.set(SETTINGS_KEYS.UI_NUMBER_FORMAT, preferences.numberFormat));
+        }
+        if (preferences.showTooltips !== undefined) {
+            updates.push(this.settingsService.set(SETTINGS_KEYS.UI_SHOW_TOOLTIPS, preferences.showTooltips));
+        }
+
+        // Handle additional UI preferences that may not be in SETTINGS_KEYS
+        if (preferences.autoSave !== undefined) {
+            updates.push(this.settingsService.set('ui.autoSave', preferences.autoSave));
+        }
+        if (preferences.compactMode !== undefined) {
+            updates.push(this.settingsService.set('ui.compactMode', preferences.compactMode));
+        }
+        if (preferences.showPreview !== undefined) {
+            updates.push(this.settingsService.set('ui.showPreview', preferences.showPreview));
+        }
+        if (preferences.notifications !== undefined) {
+            updates.push(this.settingsService.set('ui.notifications', preferences.notifications));
+        }
 
         const results = await Promise.all(updates);
         return results.every(result => result === true);

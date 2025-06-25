@@ -402,4 +402,75 @@ export const useBulkConfiguration = () => {
         resetSection,
         isInitialized
     };
+};
+
+/**
+ * Hook for UI Configuration
+ */
+export const useUIConfiguration = () => {
+    const { configService, isInitialized } = useConfiguration();
+    const [uiPreferences, setUIPreferencesState] = useState({});
+    const [loading, setLoading] = useState(true);
+
+    // Load initial UI configuration
+    useEffect(() => {
+        if (!isInitialized || !configService) return;
+
+        const loadUIConfig = async () => {
+            try {
+                setLoading(true);
+                const preferences = await configService.getUIPreferences();
+                setUIPreferencesState(preferences);
+            } catch (error) {
+                console.error('Error loading UI configuration:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadUIConfig();
+    }, [isInitialized, configService]);
+
+    // Update UI preferences
+    const updateUIPreferences = useCallback(async (newPreferences) => {
+        if (!configService) return false;
+        try {
+            const success = await configService.updateUIPreferences(newPreferences);
+            if (success) {
+                setUIPreferencesState(prev => ({ ...prev, ...newPreferences }));
+            }
+            return success;
+        } catch (error) {
+            console.error('Error updating UI preferences:', error);
+            return false;
+        }
+    }, [configService]);
+
+    // Individual setter methods for convenience
+    const setAutoSave = useCallback(async (autoSave) => {
+        return await updateUIPreferences({ autoSave });
+    }, [updateUIPreferences]);
+
+    const setCompactMode = useCallback(async (compactMode) => {
+        return await updateUIPreferences({ compactMode });
+    }, [updateUIPreferences]);
+
+    const setShowPreview = useCallback(async (showPreview) => {
+        return await updateUIPreferences({ showPreview });
+    }, [updateUIPreferences]);
+
+    const setNotifications = useCallback(async (notifications) => {
+        return await updateUIPreferences({ notifications });
+    }, [updateUIPreferences]);
+
+    return {
+        uiPreferences,
+        loading,
+        updateUIPreferences,
+        setAutoSave,
+        setCompactMode,
+        setShowPreview,
+        setNotifications,
+        isInitialized
+    };
 }; 
