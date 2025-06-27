@@ -27,6 +27,7 @@ const RISK_COLORS = {
 const PAGE_SIZE = 50;
 const ROW_HEIGHT = 80;
 const TABLE_HEIGHT = 600;
+const VIRTUAL_SCROLL_THRESHOLD = 10; // Use virtual scrolling only when more than 10 customers
 
 // Debounced search hook
 function useDebounce(value, delay) {
@@ -103,6 +104,88 @@ const CustomerRow = memo(({ index, style, data }) => {
         <div
             style={style}
             className={`border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
+                }`}
+            onClick={() => onCustomerClick && onCustomerClick(customer)}
+        >
+            <div className="flex items-center h-full px-4 py-2">
+                {/* Customer Info */}
+                <div className="flex-1 min-w-0 pr-4">
+                    <div className="font-semibold text-gray-900 truncate">
+                        {customerName}
+                    </div>
+                    <div className="text-xs text-gray-500 flex items-center gap-2">
+                        <span>{customer.invoiceCount || 0} invoices</span>
+                        <span>•</span>
+                        <span>Last: {customer.lastInvoiceDate ? new Date(customer.lastInvoiceDate).toLocaleDateString() : 'N/A'}</span>
+                    </div>
+                </div>
+
+                {/* Segment */}
+                <div className="w-24 px-2">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium border ${SEGMENT_COLORS[customer.segment] || SEGMENT_COLORS['Bronze']
+                        }`}>
+                        {customer.segment || 'Bronze'}
+                    </span>
+                </div>
+
+                {/* Revenue */}
+                <div className="w-32 px-2 text-right">
+                    <div className="font-semibold text-gray-900">
+                        ₹{((customer.totalRevenue || 0) / 100000).toFixed(1)}L
+                    </div>
+                    <div className="text-xs text-gray-500">
+                        Avg: ₹{((customer.avgInvoiceValue || 0) / 1000).toFixed(0)}K
+                    </div>
+                </div>
+
+                {/* Payment Stats */}
+                <div className="w-28 px-2 text-center">
+                    <div className="text-sm font-medium">
+                        {customer.paymentRate || 0}%
+                    </div>
+                    <div className="text-xs text-gray-500">
+                        reliability
+                    </div>
+                </div>
+
+                {/* Risk Level */}
+                <div className="w-20 px-2">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${RISK_COLORS[customer.riskLevel] || RISK_COLORS['Medium']
+                        }`}>
+                        {customer.riskLevel || 'Medium'}
+                    </span>
+                </div>
+
+                {/* Outstanding */}
+                <div className="w-28 px-2 text-right">
+                    <div className="font-medium">
+                        ₹{((customer.pendingAmount + customer.overdueAmount || 0) / 1000).toFixed(0)}K
+                    </div>
+                    {(customer.pendingAmount + customer.overdueAmount) > 0 && (
+                        <div className="text-xs text-red-600">pending</div>
+                    )}
+                </div>
+
+                {/* Actions */}
+                <div className="w-16 px-2 flex justify-center">
+                    <button className="p-1 hover:bg-gray-200 rounded transition-colors">
+                        <MoreHorizontal className="w-4 h-4 text-gray-400" />
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+});
+
+// Regular Customer Row Component for Small Datasets
+const RegularCustomerRow = memo(({ customer, index, onCustomerClick }) => {
+    const customerName = customer.customerName ||
+        `${customer.firstName || ''} ${customer.lastName || ''}`.trim() ||
+        'Unknown Customer';
+
+    return (
+        <div
+            className={`border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer h-20 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
                 }`}
             onClick={() => onCustomerClick && onCustomerClick(customer)}
         >
@@ -299,6 +382,13 @@ export default function CustomerRevenueTable() {
         setCurrentPage(0);
     }, [debouncedSearchTerm, selectedSegment, selectedRisk]);
 
+    // Determine if we should use virtual scrolling and calculate adaptive sizing
+    const shouldUseVirtualScrolling = customers.length > VIRTUAL_SCROLL_THRESHOLD;
+    const isVerySmallDataset = customers.length <= 3;
+    const dynamicTableHeight = shouldUseVirtualScrolling
+        ? TABLE_HEIGHT
+        : Math.min(customers.length * ROW_HEIGHT + 48, TABLE_HEIGHT); // +48 for header
+
     // Loading state
     if (loading && customers.length === 0) {
         return (
@@ -360,7 +450,10 @@ export default function CustomerRevenueTable() {
                         )}
                     </h3>
                     <p className="text-sm text-gray-600 mt-1">
-                        Advanced customer analytics with AI-powered insights, risk assessment, and revenue optimization • Auto-refreshes every 2 minutes
+                        {isVerySmallDataset
+                            ? "Early-stage customer analytics • Optimized for small datasets • Grow your customer base for advanced insights"
+                            : "Advanced customer analytics with AI-powered insights, risk assessment, and revenue optimization • Auto-refreshes every 2 minutes"
+                        }
                     </p>
                 </div>
 
@@ -472,7 +565,7 @@ export default function CustomerRevenueTable() {
                 </div>
             </div>
 
-            {/* Data Table with Virtual Scrolling */}
+            {/* Data Table - Adaptive Rendering */}
             {customers.length === 0 ? (
                 <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg p-8 border-2 border-dashed border-gray-300">
                     <div className="flex flex-col items-center gap-4 text-center max-w-md mx-auto">
@@ -536,20 +629,35 @@ export default function CustomerRevenueTable() {
                         </div>
                     </div>
 
-                    {/* Virtual Scrolling Table Body */}
-                    <List
-                        height={TABLE_HEIGHT}
-                        itemCount={customers.length}
-                        itemSize={ROW_HEIGHT}
-                        itemData={{ customers, onCustomerClick: handleCustomerClick }}
-                    >
-                        {CustomerRow}
-                    </List>
+                    {/* Conditional Table Body Rendering */}
+                    {shouldUseVirtualScrolling ? (
+                        /* Virtual Scrolling for Large Datasets */
+                        <List
+                            height={dynamicTableHeight}
+                            itemCount={customers.length}
+                            itemSize={ROW_HEIGHT}
+                            itemData={{ customers, onCustomerClick: handleCustomerClick }}
+                        >
+                            {CustomerRow}
+                        </List>
+                    ) : (
+                        /* Regular Rendering for Small Datasets */
+                        <div style={{ height: dynamicTableHeight, overflowY: 'auto' }}>
+                            {customers.map((customer, index) => (
+                                <RegularCustomerRow
+                                    key={customer.id || `customer-${index}`}
+                                    customer={customer}
+                                    index={index}
+                                    onCustomerClick={handleCustomerClick}
+                                />
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
 
-            {/* Pagination */}
-            {customers.length > 0 && (
+            {/* Pagination - Only show for larger datasets */}
+            {customers.length > 0 && shouldUseVirtualScrolling && (
                 <div className="flex items-center justify-between">
                     <div className="text-sm text-gray-600">
                         Showing {currentPage * PAGE_SIZE + 1} to {Math.min((currentPage + 1) * PAGE_SIZE, customers.length)} of {customers.length} customers
@@ -573,36 +681,113 @@ export default function CustomerRevenueTable() {
                 </div>
             )}
 
-            {/* AI Insights */}
+            {/* Small Dataset Info */}
+            {customers.length > 0 && !shouldUseVirtualScrolling && (
+                <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-600">
+                        Showing all {customers.length} customer{customers.length !== 1 ? 's' : ''}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {isVerySmallDataset && (
+                            <div className="text-xs text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-200">
+                                🌱 Growing Business
+                            </div>
+                        )}
+                        <div className="text-xs text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+                            Optimized for small dataset
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Growth Tips for Very Small Datasets */}
+            {isVerySmallDataset && customers.length > 0 && (
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
+                    <div className="flex items-center gap-2 mb-3">
+                        <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                            <span className="text-sm">💡</span>
+                        </div>
+                        <h4 className="font-semibold text-gray-900">Growth Tips for Your Business</h4>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div className="flex items-start gap-2">
+                            <Users className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                            <span className="text-gray-700">
+                                <strong>Personal Touch:</strong> With few customers, you can provide exceptional personalized service that larger businesses can't match.
+                            </span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                            <Target className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                            <span className="text-gray-700">
+                                <strong>Referral Focus:</strong> Ask satisfied customers for referrals - word-of-mouth is powerful for growing businesses.
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* AI Insights - Adaptive based on dataset size */}
             {customers.length > 0 && (
                 <div className="bg-gradient-to-r from-indigo-50 to-indigo-100 rounded-lg p-4 border border-indigo-200">
                     <div className="flex items-center gap-2 mb-3">
                         <Zap className="w-5 h-5 text-indigo-600" />
                         <h4 className="font-semibold text-gray-900">Customer Intelligence Insights</h4>
+                        {isVerySmallDataset && (
+                            <span className="ml-2 px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded-full border border-amber-200">
+                                Early Stage
+                            </span>
+                        )}
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-                        <div className="flex items-start gap-2">
-                            <Star className="w-4 h-4 text-emerald-600 mt-0.5" />
-                            <span className="text-gray-700">
-                                <strong>Revenue Concentration:</strong> Top 20% of customers driving {
-                                    customers.length > 0 ?
-                                        Math.round((customers.slice(0, Math.ceil(customers.length * 0.2))
-                                            .reduce((sum, c) => sum + (c.totalRevenue || 0), 0) / summaryMetrics.totalRevenue) * 100) : 0
-                                }% of total revenue.
-                            </span>
-                        </div>
-                        <div className="flex items-start gap-2">
-                            <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5" />
-                            <span className="text-gray-700">
-                                <strong>Risk Alert:</strong> {summaryMetrics.highRiskCustomers} high-risk customers with ₹{(summaryMetrics.totalOutstanding / 100000).toFixed(1)}L outstanding.
-                            </span>
-                        </div>
-                        <div className="flex items-start gap-2">
-                            <TrendingUp className="w-4 h-4 text-blue-600 mt-0.5" />
-                            <span className="text-gray-700">
-                                <strong>Opportunity:</strong> Focus on premium customers for upselling and cross-selling opportunities.
-                            </span>
-                        </div>
+                        {isVerySmallDataset ? (
+                            /* Insights for very small datasets */
+                            <>
+                                <div className="flex items-start gap-2">
+                                    <Star className="w-4 h-4 text-blue-600 mt-0.5" />
+                                    <span className="text-gray-700">
+                                        <strong>Growth Opportunity:</strong> You're in the early stages. Focus on acquiring more customers to unlock deeper analytics.
+                                    </span>
+                                </div>
+                                <div className="flex items-start gap-2">
+                                    <Target className="w-4 h-4 text-emerald-600 mt-0.5" />
+                                    <span className="text-gray-700">
+                                        <strong>Customer Focus:</strong> With {customers.length} customer{customers.length !== 1 ? 's' : ''}, maintain personal relationships and ensure excellent service.
+                                    </span>
+                                </div>
+                                <div className="flex items-start gap-2">
+                                    <TrendingUp className="w-4 h-4 text-purple-600 mt-0.5" />
+                                    <span className="text-gray-700">
+                                        <strong>Next Steps:</strong> Aim for 5-10 customers to unlock advanced segmentation and predictive insights.
+                                    </span>
+                                </div>
+                            </>
+                        ) : (
+                            /* Regular insights for larger datasets */
+                            <>
+                                <div className="flex items-start gap-2">
+                                    <Star className="w-4 h-4 text-emerald-600 mt-0.5" />
+                                    <span className="text-gray-700">
+                                        <strong>Revenue Concentration:</strong> Top 20% of customers driving {
+                                            customers.length > 0 ?
+                                                Math.round((customers.slice(0, Math.ceil(customers.length * 0.2))
+                                                    .reduce((sum, c) => sum + (c.totalRevenue || 0), 0) / summaryMetrics.totalRevenue) * 100) : 0
+                                        }% of total revenue.
+                                    </span>
+                                </div>
+                                <div className="flex items-start gap-2">
+                                    <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5" />
+                                    <span className="text-gray-700">
+                                        <strong>Risk Alert:</strong> {summaryMetrics.highRiskCustomers} high-risk customers with ₹{(summaryMetrics.totalOutstanding / 100000).toFixed(1)}L outstanding.
+                                    </span>
+                                </div>
+                                <div className="flex items-start gap-2">
+                                    <TrendingUp className="w-4 h-4 text-blue-600 mt-0.5" />
+                                    <span className="text-gray-700">
+                                        <strong>Opportunity:</strong> Focus on premium customers for upselling and cross-selling opportunities.
+                                    </span>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             )}

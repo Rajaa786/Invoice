@@ -149,8 +149,49 @@ export default function InvoiceStatusPie() {
     } = useInvoiceStatusDistribution(filters);
 
     // Enhanced data validation and fallbacks
-    const statusDataArray = statusData && Array.isArray(statusData) ? statusData : [];
-    const agingAnalysisData = agingData && Array.isArray(agingData) ? agingData : [];
+    let statusDataArray = statusData && Array.isArray(statusData) ? statusData : [];
+    let agingAnalysisData = agingData && Array.isArray(agingData) ? agingData : [];
+
+    // TEMPORARY: Add test data if no real data exists (for debugging UI)
+    if (statusDataArray.length === 0 && !loading && !error) {
+        console.log('🔍 InvoiceStatusPie Debug - Using test data fallback');
+        statusDataArray = [
+            {
+                name: 'Pending',
+                status: 'pending',
+                value: 5,
+                amount: 50000,
+                percentage: 50,
+                avgDays: 15,
+                avgAmount: 10000,
+                trend: 10,
+                risk: 'Low'
+            },
+            {
+                name: 'Paid',
+                status: 'paid',
+                value: 3,
+                amount: 30000,
+                percentage: 30,
+                avgDays: 8,
+                avgAmount: 10000,
+                trend: 5,
+                risk: 'None'
+            },
+            {
+                name: 'Overdue',
+                status: 'overdue',
+                value: 2,
+                amount: 20000,
+                percentage: 20,
+                avgDays: 45,
+                avgAmount: 10000,
+                trend: -5,
+                risk: 'High'
+            }
+        ];
+    }
+
     const hasValidData = statusDataArray.length > 0;
     const hasValidAgingData = agingAnalysisData.length > 0;
 
@@ -161,6 +202,36 @@ export default function InvoiceStatusPie() {
     const collectionRate = summaryMetrics?.collectionRate || 0;
     const avgDSO = summaryMetrics?.avgDSO || 0;
 
+    // Check if we have no data at all - but still maintain component structure
+    const hasNoData = !hasValidData && totalInvoices === 0;
+
+    // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
+    // Add comprehensive debugging
+    useEffect(() => {
+        console.log('🔍 InvoiceStatusPie Debug - Raw data from hook:', {
+            data,
+            loading,
+            error,
+            statusData,
+            summaryMetrics,
+            filters
+        });
+    }, [data, loading, error, statusData, summaryMetrics, filters]);
+
+    // Debug totals calculation
+    useEffect(() => {
+        console.log('🔍 InvoiceStatusPie Debug - Calculated values:', {
+            statusDataArray,
+            hasValidData,
+            totalInvoices,
+            totalAmount,
+            overduePercentage,
+            collectionRate,
+            avgDSO,
+            hasNoData
+        });
+    }, [statusDataArray, hasValidData, totalInvoices, totalAmount, overduePercentage, collectionRate, avgDSO, hasNoData]);
+
     // Auto-refresh every 30 seconds
     useEffect(() => {
         const interval = setInterval(() => {
@@ -169,6 +240,36 @@ export default function InvoiceStatusPie() {
 
         return () => clearInterval(interval);
     }, [refetch]);
+
+    // Add debug output for no data condition
+    useEffect(() => {
+        if (hasNoData) {
+            console.log('🔍 InvoiceStatusPie Debug - No data condition met:', {
+                hasValidData,
+                totalInvoices,
+                statusDataArray,
+                data
+            });
+        }
+    }, [hasNoData, hasValidData, totalInvoices, statusDataArray, data]);
+
+    // Force show some debug info even when data exists but might be malformed
+    useEffect(() => {
+        console.log('🔍 InvoiceStatusPie Debug - Current component state:', {
+            loading,
+            error,
+            hasValidData,
+            statusDataArrayLength: statusDataArray.length,
+            totalInvoices,
+            totalAmount,
+            hasNoData,
+            dataStructure: {
+                data: data ? Object.keys(data) : null,
+                statusData: statusData ? statusData.length : null,
+                summaryMetrics: summaryMetrics ? Object.keys(summaryMetrics) : null
+            }
+        });
+    }, [loading, error, hasValidData, statusDataArray, totalInvoices, totalAmount, hasNoData, data, statusData, summaryMetrics]);
 
     // Loading state
     if (loading) {
@@ -212,8 +313,7 @@ export default function InvoiceStatusPie() {
         );
     }
 
-    // Check if we have no data at all - but still maintain component structure
-    const hasNoData = !hasValidData && totalInvoices === 0;
+
 
     return (
         <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 space-y-6">

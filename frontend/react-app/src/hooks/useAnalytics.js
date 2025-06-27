@@ -345,16 +345,20 @@ export function useInvoiceStatusDistribution(filters = {}) {
     const { makeApiCall, handleError } = useAnalytics();
 
     const fetchData = useCallback(async () => {
+        console.log('🔍 Hook Debug - fetchData called with filters:', filters);
         setLoading(true);
         setError(null);
 
         try {
+            console.log('🔍 Hook Debug - Making API call...');
             const result = await makeApiCall(
                 window.electron.analytics.getInvoiceStatusDistribution,
                 filters
             );
+            console.log('🔍 Hook Debug - API call result:', result);
             setData(result);
         } catch (err) {
+            console.log('🔍 Hook Debug - API call error:', err);
             setError(err.message);
             handleError(err, 'Invoice Status Distribution');
         } finally {
