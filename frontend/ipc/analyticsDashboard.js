@@ -799,6 +799,9 @@ class AnalyticsService {
         };
 
         // Performance Category
+        console.log("paymentRate", paymentRate);
+        console.log("totalRevenue", totalRevenue);
+        console.log("operationalEfficiency", operationalEfficiency);
         let performance = 'Unknown';
         if (paymentRate >= 90 && totalRevenue > 500000 && operationalEfficiency > 80) {
             performance = 'Excellent';
@@ -2536,7 +2539,7 @@ class AnalyticsService {
 
             console.log('🔍 PaymentDelayAnalysis Debug - Invoice count check:', invoiceCountCheck);
 
-            // 1. Get monthly payment trends (last 12 months)
+            // 1. Get monthly payment trends (last 12 months) - Fixed for Unix timestamps
             const monthlyTrends = await this.db
                 .select({
                     month: sql`strftime('%m', datetime(${invoices.invoiceDate}, 'unixepoch'))`,
@@ -2592,10 +2595,10 @@ class AnalyticsService {
                 sample: monthlyTrends[0]
             });
 
-            // If no recent data, try with a broader date range (last 24 months)
+            // If no recent data, try with a broader date range (all available data)
             let fallbackMonthlyTrends = [];
             if (monthlyTrends.length === 0) {
-                console.log('🔍 PaymentDelayAnalysis Debug - No recent data, trying broader range...');
+                console.log('🔍 PaymentDelayAnalysis Debug - No recent data, trying broader range with all available invoices...');
 
                 fallbackMonthlyTrends = await this.db
                     .select({
@@ -2717,14 +2720,53 @@ class AnalyticsService {
                 .innerJoin(customers, eq(invoices.customerId, customers.id))
                 .where(whereClause || sql`1=1`)
                 .groupBy(customers.id, customers.companyName)
-                .having(sql`COUNT(${invoices.id}) >= 3`)
+                .having(sql`COUNT(${invoices.id}) >= 1`) // Changed from 3 to 1 to include all customers with invoices
                 .orderBy(desc(sql`COALESCE(SUM(${invoices.totalAmount}), 0)`))
                 .limit(20);
 
             console.log('🔍 PaymentDelayAnalysis Debug - Customer behavior query result:', {
                 length: customerBehavior.length,
-                sample: customerBehavior[0]
+                sample: customerBehavior[0],
+                allCustomers: customerBehavior.map(c => ({
+                    customer: c.customer,
+                    invoicesCount: c.invoicesCount,
+                    totalValue: c.totalValue,
+                    avgDelay: c.avgDelay
+                }))
             });
+
+            // Additional debug: Check total customer count without filters
+            if (customerBehavior.length === 0) {
+                const debugCustomerCount = await this.db
+                    .select({
+                        totalCustomers: sql`COUNT(DISTINCT ${invoices.customerId})`,
+                        totalInvoices: sql`COUNT(${invoices.id})`,
+                        avgInvoicesPerCustomer: sql`ROUND(CAST(COUNT(${invoices.id}) AS FLOAT) / COUNT(DISTINCT ${invoices.customerId}), 2)`
+                    })
+                    .from(invoices)
+                    .where(whereClause || sql`1=1`)
+                    .get();
+
+                console.log('🔍 PaymentDelayAnalysis Debug - No customers found, investigating:', {
+                    debugCustomerCount,
+                    whereClauseExists: !!whereClause,
+                    filters
+                });
+
+                // Test simple customer join
+                const testCustomerJoin = await this.db
+                    .select({
+                        customerCount: sql`COUNT(DISTINCT ${customers.id})`,
+                        sampleCustomer: sql`MAX(${customers.companyName})`,
+                        invoiceCount: sql`COUNT(${invoices.id})`
+                    })
+                    .from(invoices)
+                    .innerJoin(customers, eq(invoices.customerId, customers.id))
+                    .where(whereClause || sql`1=1`)
+                    .get();
+
+                console.log('🔍 PaymentDelayAnalysis Debug - Customer join test:', testCustomerJoin);
+            }
 
             // 3. Generate optimization opportunities based on real data
             const optimizationOpportunities = this.generatePaymentOptimizations(finalMonthlyTrends, customerBehavior);

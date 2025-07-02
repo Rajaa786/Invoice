@@ -68,8 +68,11 @@ const CompanyTable = ({ data = [], loading = false }) => {
             cell: (row) => (
                 <div className="space-y-1">
                     <Badge
-                        variant={row.gstApplicable === "Yes" ? "success" : "secondary"}
-                        className="text-xs whitespace-nowrap px-1 py-0"
+                        variant={row.gstApplicable === "Yes" ? "default" : "secondary"}
+                        className={`text-xs whitespace-nowrap px-1 py-0 ${row.gstApplicable === "Yes"
+                            ? "bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200"
+                            : ""
+                            }`}
                     >
                         {row.gstApplicable === "Yes" ? "GST" : "No"}
                     </Badge>

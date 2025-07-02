@@ -1,4 +1,4 @@
-image.pngconst DatabaseManager = require('./db/db.js');
+const DatabaseManager = require('./db/db.js');
 const { invoices } = require('./db/schema/Invoice.js');
 const { sql, eq } = require('drizzle-orm');
 
