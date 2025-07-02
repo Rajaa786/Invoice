@@ -18,14 +18,14 @@ const invoices = sqliteTable("invoices", {
 
   // Invoice details
   invoiceNo: text("invoice_no").notNull().unique(),
-  invoiceDate: text("invoice_date").notNull(), // SQLite doesn't have a date type, use ISO string
-  dueDate: text("due_date").notNull(),
+  invoiceDate: integer("invoice_date", { mode: "timestamp" }).notNull(),
+  dueDate: integer("due_date", { mode: "timestamp" }).notNull(),
   terms: text("terms").notNull(),
   ledger: text("ledger"),
 
   // Status tracking - Enhanced for analytics
   status: text("status").notNull().default("pending"), // 'pending', 'paid', 'overdue', 'cancelled', 'draft'
-  paidDate: text("paid_date"), // Date when invoice was paid
+  paidDate: integer("paid_date", { mode: "timestamp" }), // When invoice was paid
   paymentMethod: text("payment_method"), // 'cash', 'bank_transfer', 'cheque', 'card', 'upi'
   paymentReference: text("payment_reference"), // Reference number for payment
 
@@ -44,8 +44,8 @@ const invoices = sqliteTable("invoices", {
   discountPercentage: real("discount_percentage").default(0),
 
   // Tracking fields
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
   createdBy: text("created_by"), // User who created the invoice
 
   // Additional fields
@@ -54,9 +54,9 @@ const invoices = sqliteTable("invoices", {
 
   // Customer communication tracking
   emailSent: integer("email_sent").default(0), // Boolean: 0 = false, 1 = true
-  emailSentDate: text("email_sent_date"),
+  emailSentDate: integer("email_sent_date", { mode: "timestamp" }),
   reminderCount: integer("reminder_count").default(0),
-  lastReminderDate: text("last_reminder_date"),
+  lastReminderDate: integer("last_reminder_date", { mode: "timestamp" }),
 
   // Financial tracking
   partialPaymentAmount: real("partial_payment_amount").default(0),
@@ -68,7 +68,7 @@ const invoices = sqliteTable("invoices", {
 
   // Notes and follow-up
   internalNotes: text("internal_notes"),
-  followUpDate: text("follow_up_date"),
+  followUpDate: integer("follow_up_date", { mode: "timestamp" }),
 
   // Location tracking (for multi-location businesses)
   branchId: text("branch_id"),

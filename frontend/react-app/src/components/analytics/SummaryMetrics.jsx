@@ -208,19 +208,8 @@ export default function SummaryMetrics() {
     const [autoRefresh, setAutoRefresh] = useState(true);
     const { filters } = useAnalyticsFilters();
 
-    // Fetch real-time data
-    const { data, loading, error, refetch, kpiMetrics } = useSummaryMetrics(filters);
-
-    // Auto-refresh functionality
-    useEffect(() => {
-        if (!autoRefresh) return;
-
-        const interval = setInterval(() => {
-            refetch();
-        }, 30000); // Refresh every 30 seconds
-
-        return () => clearInterval(interval);
-    }, [autoRefresh, refetch]);
+    // Fetch real-time data with coordinated auto-refresh
+    const { data, loading, error, refetch, kpiMetrics } = useSummaryMetrics(filters, autoRefresh);
 
     // Transform real data into enhanced metrics
     const enhancedMetrics = useMemo(() => {

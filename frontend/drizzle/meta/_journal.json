@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1750578430188,
-      "tag": "0000_flashy_shard",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1750598884776,
-      "tag": "0001_orange_hex",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1750614879963,
-      "tag": "0002_panoramic_wonder_man",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1750654868934,
-      "tag": "0003_puzzling_archangel",
+      "when": 1751135149068,
+      "tag": "0000_futuristic_kree",
       "breakpoints": true
     }
   ]

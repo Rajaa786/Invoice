@@ -30,16 +30,24 @@ function registerInvoiceGeneratorIpc() {
         };
       }
 
-      // Convert dates to ISO strings for SQLite storage
-      const invoiceDateISO =
+      // Convert dates to Date objects for Drizzle ORM timestamp mode
+      const invoiceDateObj =
         invoiceData.invoiceDate instanceof Date
-          ? invoiceData.invoiceDate.toISOString()
-          : new Date(invoiceData.invoiceDate).toISOString();
+          ? invoiceData.invoiceDate
+          : new Date(invoiceData.invoiceDate);
 
-      const dueDateISO =
+      const dueDateObj =
         invoiceData.dueDate instanceof Date
-          ? invoiceData.dueDate.toISOString()
-          : new Date(invoiceData.dueDate).toISOString();
+          ? invoiceData.dueDate
+          : new Date(invoiceData.dueDate);
+
+      // Validate that dates are valid
+      if (isNaN(invoiceDateObj.getTime())) {
+        throw new Error('Invalid invoice date provided');
+      }
+      if (isNaN(dueDateObj.getTime())) {
+        throw new Error('Invalid due date provided');
+      }
 
       // Calculate tax amounts if not provided
       const subtotal = parseFloat(invoiceData.subtotal) || 0;
@@ -49,8 +57,8 @@ function registerInvoiceGeneratorIpc() {
       const sgstAmount = subtotal * (sgstRate / 100);
       const totalAmount = subtotal + cgstAmount + sgstAmount;
 
-      // Get current timestamp in ISO format
-      const currentTimestamp = new Date().toISOString();
+      // Get current timestamp as Date object
+      const currentTimestamp = new Date();
 
       // Create the invoice record in the database
       const insertedInvoice = await db
@@ -59,8 +67,8 @@ function registerInvoiceGeneratorIpc() {
           companyId: invoiceData.companyId,
           customerId: invoiceData.customerId,
           invoiceNo: invoiceData.invoiceNumber,
-          invoiceDate: invoiceDateISO,
-          dueDate: dueDateISO,
+          invoiceDate: invoiceDateObj,
+          dueDate: dueDateObj,
           terms: invoiceData.paymentTerms || "0",
           ledger: invoiceData.incomeLedger || "",
           status: invoiceData.status || "pending",

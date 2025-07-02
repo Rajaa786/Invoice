@@ -10,7 +10,7 @@ class DatabaseManager {
   static getInstance() {
     if (!DatabaseManager.#instance) {
       // Use DB_FILE_NAME from env or default to local database
-      const dbPath = process.env.DB_FILE_NAME || path.join(__dirname, '../database.db');
+      const dbPath = process.env.DB_FILE_NAME || path.join(__dirname, '../db.sqlite3');
 
       log.info('Initializing database connection...');
       log.debug('Database path:', dbPath);

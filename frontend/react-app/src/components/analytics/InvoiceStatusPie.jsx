@@ -1,6 +1,6 @@
 import React, { useState, useContext, useEffect } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
-import { Clock, AlertTriangle, CheckCircle, TrendingDown, TrendingUp, Eye, Filter, Calendar, DollarSign, Loader, RefreshCw, FileX, Plus } from "lucide-react";
+import { Clock, AlertTriangle, CheckCircle, TrendingDown, TrendingUp, Eye, Filter, Calendar, DollarSign, Loader, RefreshCw, FileX, Plus, Target } from "lucide-react";
 import { useInvoiceStatusDistribution } from "../../hooks/useAnalytics";
 import AnalyticsContext from "../../contexts/AnalyticsContext";
 
@@ -146,51 +146,51 @@ export default function InvoiceStatusPie() {
         summaryMetrics,
         statusData,
         refetch
-    } = useInvoiceStatusDistribution(filters);
+    } = useInvoiceStatusDistribution(filters, true); // Enable auto-refresh
 
     // Enhanced data validation and fallbacks
     let statusDataArray = statusData && Array.isArray(statusData) ? statusData : [];
     let agingAnalysisData = agingData && Array.isArray(agingData) ? agingData : [];
 
     // TEMPORARY: Add test data if no real data exists (for debugging UI)
-    if (statusDataArray.length === 0 && !loading && !error) {
-        console.log('🔍 InvoiceStatusPie Debug - Using test data fallback');
-        statusDataArray = [
-            {
-                name: 'Pending',
-                status: 'pending',
-                value: 5,
-                amount: 50000,
-                percentage: 50,
-                avgDays: 15,
-                avgAmount: 10000,
-                trend: 10,
-                risk: 'Low'
-            },
-            {
-                name: 'Paid',
-                status: 'paid',
-                value: 3,
-                amount: 30000,
-                percentage: 30,
-                avgDays: 8,
-                avgAmount: 10000,
-                trend: 5,
-                risk: 'None'
-            },
-            {
-                name: 'Overdue',
-                status: 'overdue',
-                value: 2,
-                amount: 20000,
-                percentage: 20,
-                avgDays: 45,
-                avgAmount: 10000,
-                trend: -5,
-                risk: 'High'
-            }
-        ];
-    }
+    // if (statusDataArray.length === 0 && !loading && !error) {
+    //     console.log('🔍 InvoiceStatusPie Debug - Using test data fallback');
+    //     statusDataArray = [
+    //         {
+    //             name: 'Pending',
+    //             status: 'pending',
+    //             value: 5,
+    //             amount: 50000,
+    //             percentage: 50,
+    //             avgDays: 15,
+    //             avgAmount: 10000,
+    //             trend: 10,
+    //             risk: 'Low'
+    //         },
+    //         {
+    //             name: 'Paid',
+    //             status: 'paid',
+    //             value: 3,
+    //             amount: 30000,
+    //             percentage: 30,
+    //             avgDays: 8,
+    //             avgAmount: 10000,
+    //             trend: 5,
+    //             risk: 'None'
+    //         },
+    //         {
+    //             name: 'Overdue',
+    //             status: 'overdue',
+    //             value: 2,
+    //             amount: 20000,
+    //             percentage: 20,
+    //             avgDays: 45,
+    //             avgAmount: 10000,
+    //             trend: -5,
+    //             risk: 'High'
+    //         }
+    //     ];
+    // }
 
     const hasValidData = statusDataArray.length > 0;
     const hasValidAgingData = agingAnalysisData.length > 0;
@@ -204,6 +204,13 @@ export default function InvoiceStatusPie() {
 
     // Check if we have no data at all - but still maintain component structure
     const hasNoData = !hasValidData && totalInvoices === 0;
+
+    console.log('🔍 InvoiceStatusPie Debug - Component state:', {
+        hasNoData,
+        hasValidData,
+        statusDataArrayLength: statusDataArray.length,
+        totalInvoices,
+    })
 
     // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
     // Add comprehensive debugging
@@ -232,14 +239,7 @@ export default function InvoiceStatusPie() {
         });
     }, [statusDataArray, hasValidData, totalInvoices, totalAmount, overduePercentage, collectionRate, avgDSO, hasNoData]);
 
-    // Auto-refresh every 30 seconds
-    useEffect(() => {
-        const interval = setInterval(() => {
-            refetch();
-        }, 30000);
-
-        return () => clearInterval(interval);
-    }, [refetch]);
+    // Auto-refresh is now handled by the hook with coordinated timing
 
     // Add debug output for no data condition
     useEffect(() => {
@@ -437,12 +437,13 @@ export default function InvoiceStatusPie() {
                                 <RefreshCw className="w-4 h-4" />
                                 Refresh
                             </button>
-                            {(!filters || !Object.keys(filters).some(key => filters[key] && filters[key] !== '')) && (
-                                <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                                    <Plus className="w-4 h-4" />
-                                    Create Invoice
-                                </button>
-                            )}
+                            <button
+                                onClick={() => window.location.hash = '#/invoice'}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                                <Target className="w-4 h-4" />
+                                Create Invoice
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -592,21 +593,27 @@ export default function InvoiceStatusPie() {
                     <AlertTriangle className="w-5 h-5 text-purple-600" />
                     <h4 className="font-semibold text-gray-900">Status Intelligence</h4>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div className="flex items-start gap-2">
-                        <CheckCircle className="w-4 h-4 text-emerald-600 mt-0.5" />
-                        <span className="text-gray-700">
-                            <strong>Collection Efficiency:</strong> {collectionRate > 0 ? `${collectionRate.toFixed(0)}% collection rate` : 'No collection data available'} {collectionRate > 70 ? '- above industry average' : collectionRate > 0 ? '- needs improvement' : ''}.
-                        </span>
+                {!hasNoData ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div className="flex items-start gap-2">
+                            <CheckCircle className="w-4 h-4 text-emerald-600 mt-0.5" />
+                            <span className="text-gray-700">
+                                <strong>Collection Efficiency:</strong> {collectionRate > 0 ? `${collectionRate.toFixed(0)}% collection rate` : 'No collection data available'} {collectionRate > 70 ? '- above industry average' : collectionRate > 0 ? '- needs improvement' : ''}.
+                            </span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                            <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5" />
+                            <span className="text-gray-700">
+                                <strong>Risk Alert:</strong> {statusDataArray.find(s => s.name === 'Overdue')?.value || 0} invoices overdue with {summaryMetrics?.totalAmountFormatted ? summaryMetrics.totalAmountFormatted.split('.')[0] : '₹0'} at risk. {overduePercentage > 5 ? 'Immediate follow-up recommended' : 'Risk levels manageable'}.
+                            </span>
+                        </div>
                     </div>
-                    <div className="flex items-start gap-2">
-                        <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5" />
-                        <span className="text-gray-700">
-                            <strong>Risk Alert:</strong> {statusDataArray.find(s => s.name === 'Overdue')?.value || 0} invoices overdue with {summaryMetrics?.totalAmountFormatted ? summaryMetrics.totalAmountFormatted.split('.')[0] : '₹0'} at risk. {overduePercentage > 5 ? 'Immediate follow-up recommended' : 'Risk levels manageable'}.
-                        </span>
+                ) : (
+                    <div className="text-center text-gray-600">
+                        <p>Status intelligence insights will appear when you have invoice data available.</p>
                     </div>
-                </div>
+                )}
             </div>
         </div>
     );
-} 
+}

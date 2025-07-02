@@ -1,191 +1,204 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 
-// Modern Green Template - Fresh and vibrant design
+// Modern Green Template - Fresh and professional design
 const colors = {
-    primary: '#16a34a',      // Green-600
-    secondary: '#22c55e',    // Green-500
-    accent: '#84cc16',       // Lime-500
-    text: '#0f172a',         // Slate-900
-    textSecondary: '#64748b', // Slate-500
-    border: '#e2e8f0',       // Slate-200
-    background: '#f1f5f9',   // Slate-100
+    primary: '#10b981',      // Emerald Green
+    secondary: '#059669',    // Forest Green
+    accent: '#34d399',       // Light Green
+    text: '#111827',         // Near Black
+    textSecondary: '#4b5563', // Gray
+    border: '#d1d5db',       // Light Gray
+    background: '#f9fafb',   // Off White
     white: '#ffffff',
-    success: '#15803d',      // Green-700
-    light: '#dcfce7'         // Green-100
+    success: '#059669',      // Forest Green
+    warning: '#f59e0b'       // Amber
 };
 
 const styles = StyleSheet.create({
     page: {
         fontFamily: 'Helvetica',
-        fontSize: 10,
+        fontSize: 8.5,
         color: colors.text,
         backgroundColor: colors.white,
         padding: 20,
+        lineHeight: 1.3,
     },
 
-    // Modern Header with gradient-like effect
+    // Modern Header Styles
     header: {
-        backgroundColor: colors.primary,
-        padding: 25,
-        marginBottom: 25,
-        borderRadius: 12,
-        position: 'relative',
-    },
-
-    headerAccent: {
-        position: 'absolute',
-        top: 0,
-        right: 0,
-        width: '100%',
-        height: '100%',
-        backgroundColor: colors.secondary,
-        borderRadius: 12,
-        opacity: 0.1,
-    },
-
-    headerTitle: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: colors.white,
-        textAlign: 'left',
-        marginBottom: 8,
-        letterSpacing: 1,
-    },
-
-    headerSubtitle: {
-        fontSize: 16,
-        color: colors.white,
-        textAlign: 'left',
-        opacity: 0.9,
-    },
-
-    // Modern card-based layout
-    cardContainer: {
-        marginBottom: 20,
-        borderRadius: 12,
-        overflow: 'hidden',
-        border: `1pt solid ${colors.border}`,
         backgroundColor: colors.white,
+        marginBottom: 12,
+        borderBottom: `2pt solid ${colors.primary}`,
+        paddingBottom: 12,
     },
 
-    cardHeader: {
-        backgroundColor: colors.light,
-        padding: 12,
-        borderBottom: `1pt solid ${colors.border}`,
-    },
-
-    cardTitle: {
-        fontSize: 12,
-        fontWeight: 'bold',
-        color: colors.primary,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-    },
-
-    cardContent: {
-        padding: 15,
-    },
-
-    // Company info with modern layout
-    companySection: {
+    headerContent: {
         flexDirection: 'row',
-        gap: 20,
-        marginBottom: 25,
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+    },
+
+    headerLeft: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+
+    logoContainer: {
+        width: 80,
+        height: 40,
+        marginRight: 15,
     },
 
     companyInfo: {
-        flex: 2,
+        flex: 1,
     },
 
-    invoiceInfo: {
+    headerCompanyName: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: colors.primary,
+        marginBottom: 2,
+        letterSpacing: 0.5,
+    },
+
+    headerTagline: {
+        fontSize: 8,
+        color: colors.textSecondary,
+        fontStyle: 'italic',
+    },
+
+    headerRight: {
+        alignItems: 'flex-end',
+    },
+
+    taxInvoiceTitle: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: colors.primary,
+        marginBottom: 5,
+        letterSpacing: 1,
+    },
+
+    invoiceNumberText: {
+        fontSize: 11,
+        color: colors.textSecondary,
+        fontWeight: 'bold',
+    },
+
+    // Company and Invoice Info Section
+    infoSection: {
+        flexDirection: 'row',
+        marginBottom: 10,
+        justifyContent: 'space-between',
+    },
+
+    companyInfoSection: {
+        flex: 1.5,
+        marginRight: 15,
+    },
+
+    invoiceInfoSection: {
         flex: 1,
         backgroundColor: colors.background,
-        padding: 15,
-        borderRadius: 8,
+        padding: 8,
+        borderRadius: 4,
         border: `1pt solid ${colors.border}`,
     },
 
-    companyName: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: colors.text,
-        marginBottom: 8,
-    },
-
-    addressText: {
-        fontSize: 10,
-        color: colors.textSecondary,
-        lineHeight: 1.5,
-        marginBottom: 4,
-    },
-
-    gstinText: {
+    sectionTitle: {
         fontSize: 11,
         fontWeight: 'bold',
         color: colors.primary,
-        marginTop: 8,
-        padding: 4,
-        backgroundColor: colors.light,
-        borderRadius: 4,
-        textAlign: 'center',
+        marginBottom: 8,
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+        borderBottom: `1pt solid ${colors.border}`,
+        paddingBottom: 3,
     },
 
-    // Modern info rows
-    infoGrid: {
+    companyName: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: colors.text,
+        marginBottom: 6,
+    },
+
+    addressText: {
+        fontSize: 9,
+        color: colors.textSecondary,
+        lineHeight: 1.3,
+        marginBottom: 2,
+    },
+
+    gstinText: {
+        fontSize: 9,
+        fontWeight: 'bold',
+        color: colors.primary,
+        marginTop: 4,
+        backgroundColor: colors.background,
+        padding: 3,
+        borderRadius: 3,
+    },
+
+    infoRow: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 10,
-    },
-
-    infoItem: {
-        backgroundColor: colors.white,
-        padding: 8,
-        borderRadius: 6,
-        border: `1pt solid ${colors.border}`,
-        flex: 1,
-        minWidth: '45%',
+        justifyContent: 'space-between',
+        marginBottom: 6,
+        alignItems: 'center',
     },
 
     infoLabel: {
         fontSize: 9,
+        fontWeight: 'bold',
         color: colors.textSecondary,
-        marginBottom: 2,
-        textTransform: 'uppercase',
-        letterSpacing: 0.3,
+        flex: 1,
     },
 
     infoValue: {
-        fontSize: 11,
+        fontSize: 9,
         color: colors.text,
         fontWeight: 'bold',
+        textAlign: 'right',
+        flex: 1,
     },
 
-    // Customer section
+    // Customer Section
+    customerSection: {
+        backgroundColor: colors.background,
+        padding: 8,
+        marginBottom: 10,
+        borderRadius: 4,
+        border: `1pt solid ${colors.border}`,
+        borderLeft: `3pt solid ${colors.primary}`,
+    },
+
     customerName: {
-        fontSize: 18,
+        fontSize: 12,
         fontWeight: 'bold',
         color: colors.text,
-        marginBottom: 8,
+        marginBottom: 4,
     },
 
-    // Modern table design
+    // Table Styles
     tableContainer: {
-        marginBottom: 25,
-        borderRadius: 12,
+        marginBottom: 8,
+        borderRadius: 4,
         overflow: 'hidden',
         border: `1pt solid ${colors.border}`,
+        backgroundColor: colors.white,
     },
 
     tableHeader: {
         flexDirection: 'row',
         backgroundColor: colors.primary,
-        padding: 15,
+        padding: 6,
     },
 
     tableHeaderCell: {
         color: colors.white,
-        fontSize: 10,
+        fontSize: 8,
         fontWeight: 'bold',
         textAlign: 'center',
         textTransform: 'uppercase',
@@ -194,9 +207,9 @@ const styles = StyleSheet.create({
 
     tableRow: {
         flexDirection: 'row',
-        padding: 12,
+        padding: 3,
         borderBottom: `0.5pt solid ${colors.border}`,
-        minHeight: 40,
+        minHeight: 16,
         alignItems: 'center',
     },
 
@@ -205,9 +218,13 @@ const styles = StyleSheet.create({
     },
 
     tableCell: {
-        fontSize: 9,
+        fontSize: 8,
         color: colors.text,
-        paddingHorizontal: 6,
+        paddingHorizontal: 3,
+        paddingVertical: 1,
+        display: 'flex',
+        alignItems: 'center',
+        lineHeight: 1.2,
     },
 
     tableCellCenter: {
@@ -219,31 +236,31 @@ const styles = StyleSheet.create({
     },
 
     // Column widths
-    col1: { width: '6%' },
-    col2: { width: '36%' },
-    col3: { width: '12%' },
-    col4: { width: '8%' },
-    col5: { width: '14%' },
-    col6: { width: '8%' },
-    col7: { width: '16%' },
+    col1: { width: '5%' },   // Sl.
+    col2: { width: '40%' },  // Description
+    col3: { width: '10%' },  // HSN/SAC
+    col4: { width: '7%' },   // Qty
+    col5: { width: '12%' },  // Rate
+    col6: { width: '8%' },   // Unit
+    col7: { width: '18%' },  // Amount
 
-    // Modern tax and total design
+    // Tax and Total Rows
     taxRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        padding: 12,
-        backgroundColor: colors.light,
+        padding: 8,
+        backgroundColor: colors.background,
         borderBottom: `0.5pt solid ${colors.border}`,
     },
 
     taxLabel: {
-        fontSize: 10,
+        fontSize: 9,
         color: colors.text,
         fontWeight: 'bold',
     },
 
     taxAmount: {
-        fontSize: 10,
+        fontSize: 9,
         color: colors.text,
         fontWeight: 'bold',
     },
@@ -252,150 +269,144 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 18,
-        backgroundColor: colors.primary,
+        padding: 10,
+        backgroundColor: colors.success,
     },
 
     totalLabel: {
-        fontSize: 16,
+        fontSize: 11,
         color: colors.white,
         fontWeight: 'bold',
-        textTransform: 'uppercase',
-        letterSpacing: 1,
-    },
-
-    totalAmount: {
-        fontSize: 18,
-        color: colors.white,
-        fontWeight: 'bold',
-    },
-
-    // Amount in words with modern styling
-    amountWordsContainer: {
-        backgroundColor: colors.light,
-        padding: 18,
-        marginBottom: 25,
-        borderRadius: 10,
-        border: `1pt solid ${colors.border}`,
-    },
-
-    amountWordsTitle: {
-        fontSize: 12,
-        fontWeight: 'bold',
-        color: colors.primary,
-        marginBottom: 8,
         textTransform: 'uppercase',
         letterSpacing: 0.5,
     },
 
-    amountWordsText: {
+    totalAmount: {
         fontSize: 12,
-        color: colors.text,
+        color: colors.white,
         fontWeight: 'bold',
+    },
+
+    // Amount in Words
+    amountWordsSection: {
+        backgroundColor: colors.background,
+        padding: 8,
+        marginBottom: 8,
+        borderRadius: 4,
+        border: `1pt solid ${colors.border}`,
+        borderLeft: `3pt solid ${colors.primary}`,
+    },
+
+    amountWordsTitle: {
+        fontSize: 9,
+        fontWeight: 'bold',
+        color: colors.primary,
+        marginBottom: 4,
+    },
+
+    amountWordsText: {
+        fontSize: 9,
+        color: colors.text,
         fontStyle: 'italic',
+        fontWeight: 'bold',
     },
 
-    // Modern footer design
-    footerContainer: {
+    // Footer Section
+    footerSection: {
         flexDirection: 'row',
-        gap: 20,
-        marginBottom: 25,
+        marginBottom: 6,
+        gap: 8,
     },
 
-    declarationCard: {
+    declarationBox: {
         flex: 2,
         backgroundColor: colors.background,
-        padding: 18,
-        borderRadius: 10,
+        padding: 8,
+        borderRadius: 4,
         border: `1pt solid ${colors.border}`,
     },
 
-    signatureCard: {
+    signatureBox: {
         flex: 1,
         backgroundColor: colors.white,
-        padding: 18,
-        borderRadius: 10,
-        border: `2pt solid ${colors.primary}`,
+        padding: 8,
+        borderRadius: 4,
+        border: `1pt solid ${colors.border}`,
         alignItems: 'center',
     },
 
     declarationTitle: {
-        fontSize: 12,
+        fontSize: 9,
         fontWeight: 'bold',
         color: colors.primary,
-        marginBottom: 10,
+        marginBottom: 6,
         textTransform: 'uppercase',
-        letterSpacing: 0.5,
     },
 
     declarationText: {
-        fontSize: 10,
+        fontSize: 8,
         color: colors.textSecondary,
-        lineHeight: 1.5,
+        lineHeight: 1.3,
     },
 
     signatureArea: {
-        minHeight: 60,
-        marginBottom: 12,
+        minHeight: 20,
+        marginBottom: 6,
         alignItems: 'center',
         justifyContent: 'center',
-        border: `1pt dashed ${colors.border}`,
-        borderRadius: 6,
-        width: '100%',
+        borderBottom: `1pt solid ${colors.border}`,
+        width: '80%',
     },
 
     signatureText: {
-        fontSize: 10,
+        fontSize: 8,
         color: colors.textSecondary,
         textAlign: 'center',
-        marginBottom: 6,
+        marginBottom: 3,
     },
 
     authorizedSignatory: {
-        fontSize: 11,
+        fontSize: 8,
         fontWeight: 'bold',
-        color: colors.primary,
+        color: colors.text,
         textAlign: 'center',
     },
 
-    // Modern footer
+    // Footer
     footer: {
         textAlign: 'center',
-        fontSize: 9,
+        fontSize: 7,
         color: colors.textSecondary,
-        paddingTop: 20,
-        borderTop: `1pt solid ${colors.border}`,
-        backgroundColor: colors.background,
-        padding: 15,
-        borderRadius: 8,
         fontStyle: 'italic',
+        paddingTop: 6,
+        borderTop: `0.5pt solid ${colors.border}`,
     },
 
-    // Notes section
-    notesContainer: {
-        marginBottom: 20,
-        padding: 15,
-        backgroundColor: colors.light,
-        borderRadius: 8,
-        border: `1pt solid ${colors.border}`,
+    // Notes
+    notesSection: {
+        marginBottom: 6,
+        padding: 6,
+        backgroundColor: colors.background,
+        borderRadius: 4,
+        border: `0.5pt solid ${colors.border}`,
+        borderLeft: `3pt solid ${colors.primary}`,
     },
 
     notesTitle: {
-        fontSize: 11,
+        fontSize: 9,
         fontWeight: 'bold',
         color: colors.primary,
-        marginBottom: 8,
-        textTransform: 'uppercase',
+        marginBottom: 4,
     },
 
     notesText: {
-        fontSize: 10,
-        color: colors.text,
-        lineHeight: 1.4,
+        fontSize: 8,
+        color: colors.textSecondary,
+        lineHeight: 1.3,
     },
 });
 
-// Helper functions (same as Classic Blue)
+// Helper functions (shared across all templates)
 const formatCurrency = (value) => {
     const numericValue = parseFloat(value) || 0;
     return "₹" + numericValue.toLocaleString("en-IN", {
@@ -478,92 +489,121 @@ const calculateTotals = (items, invoice) => {
     return { subtotal, cgstRate, sgstRate, cgstAmount, sgstAmount, grandTotal };
 };
 
-// Modern Green Template Components
-const ModernHeader = ({ invoice }) => (
+// Template Components
+const ModernHeader = ({ invoice, dynamicStyles }) => (
     <View style={styles.header}>
-        <Text style={styles.headerTitle}>INVOICE</Text>
-        <Text style={styles.headerSubtitle}>
-            #{invoice.invoiceNumber || "INV-001"}
-        </Text>
-    </View>
-);
-
-const ModernCompanyInfo = ({ invoice }) => (
-    <View style={styles.companySection}>
-        <View style={styles.companyInfo}>
-            <View style={styles.cardContainer}>
-                <View style={styles.cardHeader}>
-                    <Text style={styles.cardTitle}>Bill From</Text>
-                </View>
-                <View style={styles.cardContent}>
-                    <Text style={styles.companyName}>
-                        {invoice.company?.companyName || "Company Name"}
+        <View style={styles.headerContent}>
+            <View style={styles.headerLeft}>
+                <View style={styles.companyInfo}>
+                    <View style={{ width: 120, height: 'auto', marginBottom: 8 }}>
+                        <Image
+                            src={invoice.company?.logo || "/cyphersol-logo.png"}
+                        />
+                    </View>
+                    <Text style={styles.headerTagline}>
+                        {invoice.company?.companyName || "Cyphersol Technologies"}
                     </Text>
-                    {invoice.company?.addressLine1 && (
-                        <Text style={styles.addressText}>{invoice.company.addressLine1}</Text>
-                    )}
-                    {invoice.company?.city && (
-                        <Text style={styles.addressText}>{invoice.company.city}</Text>
-                    )}
-                    {invoice.company?.gstin && (
-                        <Text style={styles.gstinText}>GSTIN: {invoice.company.gstin}</Text>
-                    )}
                 </View>
             </View>
-        </View>
 
-        <View style={styles.invoiceInfo}>
-            <View style={styles.infoGrid}>
-                <View style={styles.infoItem}>
-                    <Text style={styles.infoLabel}>Invoice No</Text>
-                    <Text style={styles.infoValue}>{invoice.invoiceNumber || "INV-001"}</Text>
-                </View>
-                <View style={styles.infoItem}>
-                    <Text style={styles.infoLabel}>Date</Text>
-                    <Text style={styles.infoValue}>{formatDate(invoice.invoiceDate)}</Text>
-                </View>
-                <View style={styles.infoItem}>
-                    <Text style={styles.infoLabel}>Due Date</Text>
-                    <Text style={styles.infoValue}>{formatDate(invoice.dueDate)}</Text>
-                </View>
-                <View style={styles.infoItem}>
-                    <Text style={styles.infoLabel}>Terms</Text>
-                    <Text style={styles.infoValue}>30 Days</Text>
-                </View>
+            <View style={styles.headerRight}>
+                <Text style={dynamicStyles?.taxInvoiceTitle || styles.taxInvoiceTitle}>
+                    TAX INVOICE
+                </Text>
+                <Text style={styles.invoiceNumberText}>
+                    {invoice.invoiceNumber || "INV-001"}
+                </Text>
             </View>
         </View>
     </View>
 );
 
-const ModernCustomerInfo = ({ invoice }) => (
-    <View style={styles.cardContainer}>
-        <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Bill To</Text>
-        </View>
-        <View style={styles.cardContent}>
-            <Text style={styles.customerName}>
-                {invoice.customer?.name || invoice.customerName || "Customer Name"}
+const ModernCompanyInfo = ({ invoice, dynamicStyles }) => (
+    <View style={styles.infoSection}>
+        <View style={styles.companyInfoSection}>
+            <Text style={dynamicStyles?.sectionTitle || styles.sectionTitle}>Bill From</Text>
+            <Text style={dynamicStyles?.companyName || styles.companyName}>
+                {invoice.company?.companyName || "Cyphersol Technologies"}
             </Text>
-            {invoice.customer?.addressLine1 && (
-                <Text style={styles.addressText}>{invoice.customer.addressLine1}</Text>
+            {invoice.company?.addressLine1 && (
+                <Text style={styles.addressText}>{invoice.company.addressLine1}</Text>
+            )}
+            <Text style={styles.addressText}>
+                {invoice.company?.city && `${invoice.company.city}, `}
+                {invoice.company?.state && `${invoice.company.state} `}
+                {invoice.company?.zip}
+            </Text>
+            {invoice.company?.phone && (
+                <Text style={styles.addressText}>Ph: {invoice.company.phone}</Text>
+            )}
+            {invoice.company?.email && (
+                <Text style={styles.addressText}>Email: {invoice.company.email}</Text>
+            )}
+            {invoice.company?.gstin && (
+                <Text style={styles.gstinText}>GSTIN: {invoice.company.gstin}</Text>
             )}
         </View>
+
+        <View style={styles.invoiceInfoSection}>
+            <Text style={dynamicStyles?.sectionTitle || styles.sectionTitle}>Invoice Details</Text>
+            <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Invoice No:</Text>
+                <Text style={styles.infoValue}>{invoice.invoiceNumber || "INV-001"}</Text>
+            </View>
+            <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Date:</Text>
+                <Text style={styles.infoValue}>{formatDate(invoice.invoiceDate)}</Text>
+            </View>
+            <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Due Date:</Text>
+                <Text style={styles.infoValue}>{formatDate(invoice.dueDate)}</Text>
+            </View>
+            <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Terms:</Text>
+                <Text style={styles.infoValue}>Net 30</Text>
+            </View>
+        </View>
     </View>
 );
 
-const ModernItemsTable = ({ invoice, totals }) => {
+const ModernCustomerInfo = ({ invoice, dynamicStyles }) => (
+    <View style={styles.customerSection}>
+        <Text style={dynamicStyles?.sectionTitle || styles.sectionTitle}>Bill To</Text>
+        <Text style={styles.customerName}>
+            {invoice.customer?.name || invoice.customerName || "Customer Name"}
+        </Text>
+        {invoice.customer?.addressLine1 && (
+            <Text style={styles.addressText}>{invoice.customer.addressLine1}</Text>
+        )}
+        <Text style={styles.addressText}>
+            {invoice.customer?.city && `${invoice.customer.city}, `}
+            {invoice.customer?.state && `${invoice.customer.state} `}
+            {invoice.customer?.zip}
+        </Text>
+        {invoice.customer?.phone && (
+            <Text style={styles.addressText}>Ph: {invoice.customer.phone}</Text>
+        )}
+        {invoice.customer?.email && (
+            <Text style={styles.addressText}>Email: {invoice.customer.email}</Text>
+        )}
+    </View>
+);
+
+const ModernItemsTable = ({ invoice, totals, dynamicStyles }) => {
     const items = invoice.items || [];
+    const tableHeaderCellStyle = dynamicStyles?.tableHeaderCell || styles.tableHeaderCell;
+    const tableCellStyle = dynamicStyles?.tableCell || styles.tableCell;
 
     return (
         <View style={styles.tableContainer}>
             <View style={styles.tableHeader}>
-                <Text style={[styles.tableHeaderCell, styles.col1]}>Sl.</Text>
-                <Text style={[styles.tableHeaderCell, styles.col2]}>Description</Text>
-                <Text style={[styles.tableHeaderCell, styles.col3]}>HSN/SAC</Text>
-                <Text style={[styles.tableHeaderCell, styles.col4]}>Qty</Text>
-                <Text style={[styles.tableHeaderCell, styles.col5]}>Rate</Text>
-                <Text style={[styles.tableHeaderCell, styles.col6]}>Unit</Text>
-                <Text style={[styles.tableHeaderCell, styles.col7]}>Amount</Text>
+                <Text style={[tableHeaderCellStyle, styles.col1]}>Sl.</Text>
+                <Text style={[tableHeaderCellStyle, styles.col2]}>Description</Text>
+                <Text style={[tableHeaderCellStyle, styles.col3]}>HSN/SAC</Text>
+                <Text style={[tableHeaderCellStyle, styles.col4]}>Qty</Text>
+                <Text style={[tableHeaderCellStyle, styles.col5]}>Rate</Text>
+                <Text style={[tableHeaderCellStyle, styles.col6]}>Unit</Text>
+                <Text style={[tableHeaderCellStyle, styles.col7]}>Amount</Text>
             </View>
 
             {items.map((item, index) => {
@@ -573,37 +613,37 @@ const ModernItemsTable = ({ invoice, totals }) => {
                 return (
                     <View key={index} style={[styles.tableRow, !isEven && styles.tableRowAlt]}>
                         <View style={[styles.col1]}>
-                            <Text style={[styles.tableCell, styles.tableCellCenter]}>
+                            <Text style={[tableCellStyle, styles.tableCellCenter]}>
                                 {index + 1}
                             </Text>
                         </View>
                         <View style={[styles.col2]}>
-                            <Text style={[styles.tableCell]}>
+                            <Text style={[tableCellStyle]}>
                                 {item.details || item.name || "Item"}
                             </Text>
                         </View>
                         <View style={[styles.col3]}>
-                            <Text style={[styles.tableCell, styles.tableCellCenter]}>
+                            <Text style={[tableCellStyle, styles.tableCellCenter]}>
                                 {item.hsn || ""}
                             </Text>
                         </View>
                         <View style={[styles.col4]}>
-                            <Text style={[styles.tableCell, styles.tableCellCenter]}>
+                            <Text style={[tableCellStyle, styles.tableCellCenter]}>
                                 {qty}
                             </Text>
                         </View>
                         <View style={[styles.col5]}>
-                            <Text style={[styles.tableCell, styles.tableCellRight]}>
+                            <Text style={[tableCellStyle, styles.tableCellRight]}>
                                 {formatCurrency(item.rate || 0).replace('₹', '')}
                             </Text>
                         </View>
                         <View style={[styles.col6]}>
-                            <Text style={[styles.tableCell, styles.tableCellCenter]}>
+                            <Text style={[tableCellStyle, styles.tableCellCenter]}>
                                 {item.per || "Nos"}
                             </Text>
                         </View>
                         <View style={[styles.col7]}>
-                            <Text style={[styles.tableCell, styles.tableCellRight]}>
+                            <Text style={[tableCellStyle, styles.tableCellRight]}>
                                 {formatCurrency(item.amount || (qty * (item.rate || 0))).replace('₹', '')}
                             </Text>
                         </View>
@@ -629,8 +669,8 @@ const ModernItemsTable = ({ invoice, totals }) => {
     );
 };
 
-const ModernAmountInWords = ({ amount }) => (
-    <View style={styles.amountWordsContainer}>
+const ModernAmountInWords = ({ amount, dynamicStyles }) => (
+    <View style={styles.amountWordsSection}>
         <Text style={styles.amountWordsTitle}>Amount in Words:</Text>
         <Text style={styles.amountWordsText}>
             INR {numberToWords(amount)}
@@ -638,18 +678,17 @@ const ModernAmountInWords = ({ amount }) => (
     </View>
 );
 
-const ModernFooter = ({ invoice }) => (
-    <View style={styles.footerContainer}>
-        <View style={styles.declarationCard}>
+const ModernFooter = ({ invoice, dynamicStyles }) => (
+    <View style={styles.footerSection}>
+        <View style={styles.declarationBox}>
             <Text style={styles.declarationTitle}>Declaration</Text>
             <Text style={styles.declarationText}>
                 We declare that this invoice shows the actual price of the goods described
-                and that all particulars are true and correct. This invoice is generated
-                electronically and is valid without signature.
+                and that all particulars are true and correct.
             </Text>
         </View>
 
-        <View style={styles.signatureCard}>
+        <View style={styles.signatureBox}>
             <View style={styles.signatureArea}>
                 {invoice.signature && (
                     <Image
@@ -668,31 +707,138 @@ const ModernFooter = ({ invoice }) => (
 
 // Main Modern Green Template Component
 export const ModernGreenTemplate = (invoice) => {
+    // Add debug logging
+    console.log('🔍 ModernGreenTemplate - Invoice Data:', {
+        fullInvoice: invoice,
+        company: invoice?.company,
+        logo: invoice?.company?.logo,
+        companyName: invoice?.company?.companyName
+    });
+
     const totals = calculateTotals(invoice.items || [], invoice);
 
-    return (
-        <Document>
-            <Page size="A4" style={styles.page}>
-                <ModernHeader invoice={invoice} />
-                <ModernCompanyInfo invoice={invoice} />
-                <ModernCustomerInfo invoice={invoice} />
-                <ModernItemsTable invoice={invoice} totals={totals} />
-                <ModernAmountInWords amount={totals.grandTotal} />
-                <ModernFooter invoice={invoice} />
+    // Get dynamic settings from invoice data
+    const pageSize = invoice.pageSize || invoice.templateSettings?.pageSize || 'A4';
+    const fontSize = invoice.templateSettings?.fontSize || 'normal';
 
-                {invoice.customerNotes && (
-                    <View style={styles.notesContainer}>
-                        <Text style={styles.notesTitle}>Notes:</Text>
-                        <Text style={styles.notesText}>{invoice.customerNotes}</Text>
+    // Calculate font scale based on fontSize setting
+    const getFontScale = () => {
+        switch (fontSize) {
+            case 'small': return 0.85;
+            case 'large': return 1.15;
+            case 'normal':
+            default: return 1.0;
+        }
+    };
+
+    const fontScale = getFontScale();
+
+    // Create dynamic styles based on settings with safe property access
+    let dynamicStyles;
+    try {
+        dynamicStyles = StyleSheet.create({
+            page: {
+                ...styles.page,
+                fontSize: (styles.page?.fontSize || 9) * fontScale,
+            },
+            headerCompanyName: {
+                ...styles.headerCompanyName,
+                fontSize: (styles.headerCompanyName?.fontSize || 20) * fontScale,
+            },
+            taxInvoiceTitle: {
+                ...styles.taxInvoiceTitle,
+                fontSize: (styles.taxInvoiceTitle?.fontSize || 24) * fontScale,
+            },
+            companyName: {
+                ...styles.companyName,
+                fontSize: (styles.companyName?.fontSize || 14) * fontScale,
+            },
+            sectionTitle: {
+                ...styles.sectionTitle,
+                fontSize: (styles.sectionTitle?.fontSize || 11) * fontScale,
+            },
+            tableHeaderCell: {
+                ...styles.tableHeaderCell,
+                fontSize: (styles.tableHeaderCell?.fontSize || 8) * fontScale,
+            },
+            tableCell: {
+                ...styles.tableCell,
+                fontSize: (styles.tableCell?.fontSize || 8) * fontScale,
+            }
+        });
+    } catch (error) {
+        console.warn('⚠️ [ModernGreenTemplate] Failed to create dynamic styles, using fallback:', error);
+        // Fallback to static styles
+        dynamicStyles = styles;
+    }
+
+    console.log(`🎨 [ModernGreenTemplate] Rendering with settings:`, {
+        pageSize,
+        fontSize,
+        fontScale,
+        hasTemplateSettings: !!invoice.templateSettings,
+        companyName: invoice.company?.companyName,
+        hasLogo: !!invoice.company?.logo,
+        logoPath: invoice.company?.logo,
+        itemCount: invoice.items?.length,
+        hasDynamicStyles: !!dynamicStyles,
+        invoiceStructure: {
+            hasInvoiceNumber: !!invoice.invoiceNumber,
+            hasCompany: !!invoice.company,
+            hasCustomer: !!invoice.customer,
+            hasItems: !!invoice.items,
+            totalsCalculated: !!totals
+        }
+    });
+
+    try {
+        return (
+            <Document>
+                <Page size={pageSize} style={dynamicStyles.page}>
+                    <ModernHeader invoice={invoice} dynamicStyles={dynamicStyles} />
+                    <ModernCompanyInfo invoice={invoice} dynamicStyles={dynamicStyles} />
+                    <ModernCustomerInfo invoice={invoice} dynamicStyles={dynamicStyles} />
+                    <ModernItemsTable invoice={invoice} totals={totals} dynamicStyles={dynamicStyles} />
+                    <ModernAmountInWords amount={totals.grandTotal} dynamicStyles={dynamicStyles} />
+                    <ModernFooter invoice={invoice} dynamicStyles={dynamicStyles} />
+
+                    {invoice.customerNotes && (
+                        <View style={styles.notesSection}>
+                            <Text style={[styles.notesTitle, { fontSize: (styles.notesTitle?.fontSize || 9) * fontScale }]}>Notes:</Text>
+                            <Text style={[styles.notesText, { fontSize: (styles.notesText?.fontSize || 8) * fontScale }]}>{invoice.customerNotes}</Text>
+                        </View>
+                    )}
+
+                    <Text style={[styles.footer, { fontSize: (styles.footer?.fontSize || 7) * fontScale }]}>
+                        This is a Computer Generated Invoice
+                    </Text>
+                </Page>
+            </Document>
+        );
+    } catch (error) {
+        console.error('❌ [ModernGreenTemplate] Failed to create PDF document:', error);
+
+        // Return a simple fallback document
+        return (
+            <Document>
+                <Page size="A4" style={{ padding: 30, fontFamily: 'Helvetica' }}>
+                    <View style={{ textAlign: 'center', marginBottom: 20 }}>
+                        <Text style={{ fontSize: 24, color: '#e74c3c', marginBottom: 10 }}>Template Error</Text>
+                        <Text style={{ fontSize: 12 }}>Unable to render the full template.</Text>
+                        <Text style={{ fontSize: 10, marginTop: 10 }}>
+                            Error: {error.message || 'Unknown PDF rendering error'}
+                        </Text>
                     </View>
-                )}
-
-                <View style={styles.footer}>
-                    <Text>This is a Computer Generated Invoice • Generated on {new Date().toLocaleDateString()}</Text>
-                </View>
-            </Page>
-        </Document>
-    );
+                    <View style={{ marginTop: 20 }}>
+                        <Text style={{ fontSize: 12, marginBottom: 5 }}>Invoice: {invoice.invoiceNumber}</Text>
+                        <Text style={{ fontSize: 12, marginBottom: 5 }}>Company: {invoice.company?.companyName}</Text>
+                        <Text style={{ fontSize: 12, marginBottom: 5 }}>Customer: {invoice.customer?.name}</Text>
+                        <Text style={{ fontSize: 12 }}>Total: ₹{totals.grandTotal?.toLocaleString('en-IN')}</Text>
+                    </View>
+                </Page>
+            </Document>
+        );
+    }
 };
 
-export default ModernGreenTemplate; 
+export default ModernGreenTemplate;

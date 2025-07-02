@@ -44,8 +44,6 @@ import {
     Monitor,
     Smartphone,
     Printer,
-    ZoomIn,
-    ZoomOut,
     Maximize,
     Maximize2,
     RotateCcw,
@@ -60,37 +58,128 @@ import {
     DialogHeader,
     DialogTitle,
 } from '../ui/dialog';
+import { PDFViewer, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 
 // Import our template system
 import { TemplateFactory, TEMPLATE_CATEGORIES } from '../Elements/InvoiceTemplates/TemplateRegistry';
 import { ConfigurationManager, InvoiceConfigHelpers } from '../Elements/InvoiceTemplates/ConfigurationManager';
 import Loader from '../Elements/Loader';
 import ReactPerformanceMonitor from './ReactPerformanceMonitor';
+import { templateLogger } from '../../utils/templateLogger';
 
-// Sample invoice data for preview - matching actual template data structure
+// Simple test template for debugging
+const createTestTemplate = (invoiceData) => {
+    // Get dynamic settings from invoice data
+    const pageSize = invoiceData?.pageSize || invoiceData?.templateSettings?.pageSize || 'A4';
+    const fontSize = invoiceData?.templateSettings?.fontSize || 'normal';
+
+    // Calculate font scale
+    const getFontScale = () => {
+        switch (fontSize) {
+            case 'small': return 0.8;
+            case 'large': return 1.2;
+            case 'normal':
+            default: return 1.0;
+        }
+    };
+
+    const fontScale = getFontScale();
+
+    const testStyles = StyleSheet.create({
+        page: {
+            flexDirection: 'column',
+            backgroundColor: '#FFFFFF',
+            padding: 30,
+        },
+        section: {
+            margin: 10,
+            padding: 10,
+            flexGrow: 1,
+        },
+        title: {
+            fontSize: 24 * fontScale,
+            marginBottom: 10,
+            textAlign: 'center',
+            color: '#e74c3c',
+        },
+        text: {
+            fontSize: 12 * fontScale,
+            marginBottom: 5,
+        },
+        debugText: {
+            fontSize: 10 * fontScale,
+            marginBottom: 3,
+            color: '#666',
+        },
+        warningText: {
+            fontSize: 14 * fontScale,
+            marginBottom: 10,
+            color: '#e74c3c',
+            textAlign: 'center',
+            backgroundColor: '#fff2f0',
+            padding: 10,
+        }
+    });
+
+    return (
+        <Document>
+            <Page size={pageSize} style={testStyles.page}>
+                <View style={testStyles.section}>
+                    <Text style={testStyles.warningText}>⚠️ FALLBACK TEST TEMPLATE ⚠️</Text>
+                    <Text style={testStyles.title}>TEST INVOICE</Text>
+
+                    <Text style={testStyles.debugText}>--- PREVIEW SETTINGS ---</Text>
+                    <Text style={testStyles.debugText}>Page Size: {pageSize}</Text>
+                    <Text style={testStyles.debugText}>Font Size: {fontSize} (scale: {fontScale})</Text>
+                    <Text style={testStyles.debugText}>Template Settings: {invoiceData?.templateSettings ? 'Present' : 'Missing'}</Text>
+
+                    <Text style={testStyles.debugText}>--- INVOICE DATA ---</Text>
+                    <Text style={testStyles.text}>Invoice Number: {invoiceData?.invoiceNumber || 'TEST-001'}</Text>
+                    <Text style={testStyles.text}>Company: {invoiceData?.company?.companyName || 'Test Company'}</Text>
+                    <Text style={testStyles.text}>Customer: {invoiceData?.customer?.name || 'Test Customer'}</Text>
+                    <Text style={testStyles.text}>Date: {invoiceData?.invoiceDate || new Date().toLocaleDateString()}</Text>
+                    <Text style={testStyles.text}>Items: {invoiceData?.items?.length || 0}</Text>
+                    <Text style={testStyles.text}>Total: ₹{invoiceData?.grandTotal || '0.00'}</Text>
+
+                    <Text style={testStyles.debugText}>--- TEMPLATE DEBUG ---</Text>
+                    <Text style={testStyles.debugText}>This test template proves that:</Text>
+                    <Text style={testStyles.debugText}>• PDFViewer can render PDF components</Text>
+                    <Text style={testStyles.debugText}>• Page size changes work: {pageSize}</Text>
+                    <Text style={testStyles.debugText}>• Font scaling works: {fontScale}x</Text>
+                    <Text style={testStyles.debugText}>• Data is being passed correctly</Text>
+                </View>
+            </Page>
+        </Document>
+    );
+};
+
+// Sample invoice data for preview - Fixed to match template expectations exactly
 const SAMPLE_INVOICE_DATA = {
     invoiceNumber: 'INV-2024-001',
-    date: new Date().toLocaleDateString('en-GB'),
+    invoiceDate: new Date().toLocaleDateString('en-GB'),  // ✅ Fixed: was 'date', now 'invoiceDate'
+    date: new Date().toLocaleDateString('en-GB'),  // Keep both for compatibility
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB'),
 
     // Company info - matches template expectations
     company: {
-        companyName: 'Your Company Name',  // Changed from 'name' to 'companyName'
-        addressLine1: '123 Business Street',  // Changed from 'address' to 'addressLine1'
+        companyName: 'Cyphersol Fintech India Pvt. Ltd.',
+        logo: '/cyphersol-logo.png',  // Add logo path
+        addressLine1: '123 Business Street',
         city: 'Business City',
         state: 'BC',
         zip: '12345',
         phone: '+1 (555) 123-4567',
         email: 'hello@yourcompany.com',
         website: 'www.yourcompany.com',
-        gstin: 'GST123456789012345'  // Added GSTIN for India compliance
+        gstin: 'GST123456789012345'
     },
 
-    // Customer info - matches template expectations
+    // Customer info - Fixed to match template expectations
     customer: {
-        customerName: 'Customer Company Ltd.',  // Changed from 'name' to 'customerName'
+        name: 'Customer Company Ltd.',  // ✅ Fixed: was 'customerName', now 'name'
+        customerName: 'Customer Company Ltd.',  // Keep both for compatibility
         contactPerson: 'John Smith',
-        addressLine1: '456 Client Avenue',  // Changed from 'address' to 'addressLine1'
+        addressLine1: '456 Client Avenue',
         city: 'Client City',
         state: 'CC',
         zip: '67890',
@@ -98,27 +187,143 @@ const SAMPLE_INVOICE_DATA = {
         email: 'john@customer.com'
     },
 
-    // Items - matching invoice template structure
+    // Items - Fixed to match template field names
     items: [
         {
             id: 1,
-            description: 'Professional Consulting Services',
-            hsnSac: '998314',  // Added HSN/SAC code
+            details: 'Professional Consulting Services',  // ✅ Added 'details' field
+            description: 'Professional Consulting Services',  // Keep both for compatibility
+            name: 'Professional Consulting Services',  // Keep both for compatibility
+            hsn: '998314',  // ✅ Fixed: was 'hsnSac', now 'hsn'
+            hsnSac: '998314',  // Keep both for compatibility
             quantity: 2,
             rate: 2000.00,
-            amount: 4000.00
+            amount: 4000.00,
+            per: 'Nos'  // ✅ Added 'per' field for unit
         },
         {
             id: 2,
-            description: 'Software Development Services',
-            hsnSac: '998313',
+            details: 'Software Development Services',  // ✅ Added 'details' field
+            description: 'Software Development Services',  // Keep both for compatibility
+            name: 'Software Development Services',  // Keep both for compatibility
+            hsn: '998313',  // ✅ Fixed: was 'hsnSac', now 'hsn'
+            hsnSac: '998313',  // Keep both for compatibility
             quantity: 1,
             rate: 1500.00,
-            amount: 1500.00
-        }
+            amount: 1500.00,
+            per: 'Nos'  // ✅ Added 'per' field for unit
+        },
+        {
+            id: 3,
+            details: 'Software Development Services',  // ✅ Added 'details' field
+            description: 'Software Development Services',  // Keep both for compatibility
+            name: 'Software Development Services',  // Keep both for compatibility 
+            hsn: '998312',  // ✅ Fixed: was 'hsnSac', now 'hsn'
+            hsnSac: '998313',  // Keep both for compatibility
+            quantity: 1,
+            rate: 1500.00,
+            amount: 1500.00,
+            per: 'Nos'  // ✅ Added 'per' field for unit
+        },
+        {
+            id: 4,
+            details: 'Software Development Services',  // ✅ Added 'details' field
+            description: 'Software Development Services',  // Keep both for compatibility
+            name: 'Software Development Services',  // Keep both for compatibility 
+            hsn: '998312',  // ✅ Fixed: was 'hsnSac', now 'hsn'
+            hsnSac: '998313',  // Keep both for compatibility
+            quantity: 1,
+            rate: 1500.00,
+            amount: 1500.00,
+            per: 'Nos'  // ✅ Added 'per' field for unit
+        },
+        {
+            id: 5,
+            details: 'Software Development Services',  // ✅ Added 'details' field
+            description: 'Software Development Services',  // Keep both for compatibility
+            name: 'Software Development Services',  // Keep both for compatibility 
+            hsn: '998312',  // ✅ Fixed: was 'hsnSac', now 'hsn'
+            hsnSac: '998313',  // Keep both for compatibility
+            quantity: 1,
+            rate: 1500.00,
+            amount: 1500.00,
+            per: 'Nos'  // ✅ Added 'per' field for unit
+        },
+        {
+            id: 4,
+            details: 'Software Development Services',  // ✅ Added 'details' field
+            description: 'Software Development Services',  // Keep both for compatibility
+            name: 'Software Development Services',  // Keep both for compatibility 
+            hsn: '998312',  // ✅ Fixed: was 'hsnSac', now 'hsn'
+            hsnSac: '998313',  // Keep both for compatibility
+            quantity: 1,
+            rate: 1500.00,
+            amount: 1500.00,
+            per: 'Nos'  // ✅ Added 'per' field for unit
+        },
+        // {
+        //     id: 6,
+        //     details: 'Software Development Services',  // ✅ Added 'details' field
+        //     description: 'Software Development Services',  // Keep both for compatibility
+        //     name: 'Software Development Services',  // Keep both for compatibility 
+        //     hsn: '998312',  // ✅ Fixed: was 'hsnSac', now 'hsn'
+        //     hsnSac: '998313',  // Keep both for compatibility
+        //     quantity: 1,
+        //     rate: 1500.00,
+        //     amount: 1500.00,
+        //     per: 'Nos'  // ✅ Added 'per' field for unit
+        // },
+        // {
+        //     id: 7,
+        //     details: 'Software Development Services',  // ✅ Added 'details' field
+        //     description: 'Software Development Services',  // Keep both for compatibility
+        //     name: 'Software Development Services',  // Keep both for compatibility 
+        //     hsn: '998312',  // ✅ Fixed: was 'hsnSac', now 'hsn'
+        //     hsnSac: '998313',  // Keep both for compatibility
+        //     quantity: 1,
+        //     rate: 1500.00,
+        //     amount: 1500.00,
+        //     per: 'Nos'  // ✅ Added 'per' field for unit
+        // },
+        // {
+        //     id: 8,
+        //     details: 'Software Development Services',  // ✅ Added 'details' field
+        //     description: 'Software Development Services',  // Keep both for compatibility
+        //     name: 'Software Development Services',  // Keep both for compatibility 
+        //     hsn: '998312',  // ✅ Fixed: was 'hsnSac', now 'hsn'
+        //     hsnSac: '998313',  // Keep both for compatibility
+        //     quantity: 1,
+        //     rate: 1500.00,
+        //     amount: 1500.00,
+        //     per: 'Nos'  // ✅ Added 'per' field for unit
+        // },
+        // {
+        //     id: 9,
+        //     details: 'Software Development Services',  // ✅ Added 'details' field
+        //     description: 'Software Development Services',  // Keep both for compatibility
+        //     name: 'Software Development Services',  // Keep both for compatibility 
+        //     hsn: '998312',  // ✅ Fixed: was 'hsnSac', now 'hsn'
+        //     hsnSac: '998313',  // Keep both for compatibility
+        //     quantity: 1,
+        //     rate: 1500.00,
+        //     amount: 1500.00,
+        //     per: 'Nos'  // ✅ Added 'per' field for unit
+        // },
+        // {
+        //     id: 10,
+        //     details: 'Software Development Services',  // ✅ Added 'details' field
+        //     description: 'Software Development Services',  // Keep both for compatibility
+        //     name: 'Software Development Services',  // Keep both for compatibility 
+        //     hsn: '998312',  // ✅ Fixed: was 'hsnSac', now 'hsn'
+        //     hsnSac: '998313',  // Keep both for compatibility
+        //     quantity: 1,
+        //     rate: 1500.00,
+        //     amount: 1500.00,
+        //     per: 'Nos'  // ✅ Added 'per' field for unit
+        // }
     ],
 
-    // Tax calculations - matching Indian invoice structure
+    // Tax calculations - matching template structure
     subtotal: 5500.00,
     cgstRate: 9,
     sgstRate: 9,
@@ -127,9 +332,10 @@ const SAMPLE_INVOICE_DATA = {
     grandTotal: 6490.00,
 
     notes: 'Thank you for your business! Payment is due within 30 days.',
+    customerNotes: 'Thank you for your business! Payment is due within 30 days.',  // ✅ Added customerNotes
     paymentTerms: 'Net 30',
 
-    currency: 'INR'  // Changed to Indian Rupees
+    currency: 'INR'
 };
 
 // 🔧 FIXED: Stable debounce utility outside component
@@ -185,8 +391,9 @@ const InvoiceTemplateSettings = ({ onClose }) => {
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
     // Preview state
-    const [previewMode, setPreviewMode] = useState('desktop'); // desktop, mobile, print
-    const [previewZoom, setPreviewZoom] = useState(100);
+    const [previewMode, setPreviewMode] = useState('desktop');
+    const [previewPageSize, setPreviewPageSize] = useState('A4');
+    const [previewFontSize, setPreviewFontSize] = useState('normal');
     const [showPreviewPanel, setShowPreviewPanel] = useState(true);
     const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
@@ -332,33 +539,47 @@ const InvoiceTemplateSettings = ({ onClose }) => {
 
     // Handle template selection
     const handleTemplateChange = useCallback(async (templateId) => {
+        const flowTracker = templateLogger.trackTemplateSelectionFlow(templateId);
+
         try {
             setSaving(true);
-            console.log('[InvoiceTemplateSettings] Changing template to:', templateId);
 
             // Optimistic update
             setSelectedTemplate(templateId);
+            flowTracker.uiUpdate();
 
             const success = await ConfigurationManager.setSelectedTemplate(templateId);
+            flowTracker.configSave(success);
 
             if (success) {
+                templateLogger.success('InvoiceTemplateSettings', 'Template changed successfully', {
+                    templateId,
+                    templateName: TemplateFactory.getTemplate(templateId)?.name
+                });
+
                 toastRef.current({
                     title: "Success",
                     description: `Template changed to ${templateId}`
                 });
+                flowTracker.complete(true);
             } else {
                 // Revert on failure
                 const currentTemplate = await ConfigurationManager.getSelectedTemplate();
                 setSelectedTemplate(currentTemplate);
+                flowTracker.complete(false, new Error('Configuration save failed'));
                 throw new Error('Failed to change template');
             }
         } catch (error) {
-            console.error('[InvoiceTemplateSettings] Error changing template:', error);
+            templateLogger.error('InvoiceTemplateSettings', 'Template change failed', error, {
+                templateId
+            });
+
             toastRef.current({
                 title: "Error",
                 description: "Failed to change template",
                 variant: "destructive"
             });
+            flowTracker.complete(false, error);
         } finally {
             setSaving(false);
         }
@@ -482,28 +703,38 @@ const InvoiceTemplateSettings = ({ onClose }) => {
     // Preview template
     const handlePreview = (templateId) => {
         setPreviewTemplate(templateId);
+        setPreviewPageSize(templateSettings.pageSize);
+        setPreviewFontSize(templateSettings.fontSize);
         setIsPreviewOpen(true);
     };
 
-    // Preview control handlers
-    const handleZoomIn = () => setPreviewZoom(prev => Math.min(prev + 25, 200));
-    const handleZoomOut = () => setPreviewZoom(prev => Math.max(prev - 25, 50));
-    const handleZoomReset = () => setPreviewZoom(100);
-    const handleFullscreen = () => {
-        // Implementation for fullscreen preview
-        console.log('Fullscreen preview');
-    };
-
-    // Simple error boundary component
+    // Enhanced error boundary component with better debugging
     const TemplateErrorBoundary = ({ children }) => {
         const [hasError, setHasError] = useState(false);
+        const [errorDetails, setErrorDetails] = useState(null);
 
         useEffect(() => {
             setHasError(false);
-        }, [selectedTemplate, templateSettings]);
+            setErrorDetails(null);
+        }, [children]);
 
-        const handleError = () => {
+        const handleError = (error) => {
+            console.error('❌ [TemplateErrorBoundary] Template rendering error:', error);
+            console.error('📋 [TemplateErrorBoundary] Error details:', {
+                message: error.message,
+                stack: error.stack,
+                name: error.name,
+                componentStack: error.componentStack
+            });
             setHasError(true);
+            setErrorDetails(error);
+            templateLogger.error('TemplateErrorBoundary', 'Template rendering failed', error);
+        };
+
+        // React Error Boundary methods
+        const componentDidCatch = (error, errorInfo) => {
+            console.error('❌ [TemplateErrorBoundary] React Error Boundary caught error:', error, errorInfo);
+            handleError(error);
         };
 
         if (hasError) {
@@ -512,12 +743,26 @@ const InvoiceTemplateSettings = ({ onClose }) => {
                     <div className="text-center p-6">
                         <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-500" />
                         <p className="text-red-700 font-medium mb-2">Template Rendering Error</p>
-                        <p className="text-red-600 text-sm">There was an issue rendering this template with the current settings.</p>
+                        <p className="text-red-600 text-sm mb-2">
+                            {errorDetails?.message || 'There was an issue rendering this template with the current settings.'}
+                        </p>
+                        {process.env.NODE_ENV === 'development' && (
+                            <details className="mt-3 text-left bg-red-100 p-2 rounded text-xs">
+                                <summary className="cursor-pointer font-medium text-red-800">Debug Info</summary>
+                                <pre className="mt-2 whitespace-pre-wrap text-red-700">
+                                    {errorDetails?.stack || 'No stack trace available'}
+                                </pre>
+                            </details>
+                        )}
                         <Button
                             variant="outline"
                             size="sm"
                             className="mt-3"
-                            onClick={() => setHasError(false)}
+                            onClick={() => {
+                                console.log('🔄 [TemplateErrorBoundary] Retrying template render');
+                                setHasError(false);
+                                setErrorDetails(null);
+                            }}
                         >
                             <RefreshCw className="w-4 h-4 mr-2" />
                             Retry
@@ -530,19 +775,73 @@ const InvoiceTemplateSettings = ({ onClose }) => {
         try {
             return children;
         } catch (error) {
-            console.error('Template rendering error:', error);
-            handleError();
+            handleError(error);
             return null;
         }
     };
 
-    // Template preview component - DOM-compatible version for preview
-    const TemplatePreview = ({ templateId, settings, mode, zoom }) => {
+    // Template preview component - Using actual invoice templates
+    const TemplatePreview = ({ templateId, settings, mode, previewPageSize, previewFontSize }) => {
+        const [isLoading, setIsLoading] = useState(true);
+        const [templateComponent, setTemplateComponent] = useState(null);
         const template = TemplateFactory.getTemplate(templateId);
+        const containerRef = useRef(null);
+
+        useEffect(() => {
+            const loadTemplate = async () => {
+                console.log(`🔍 [TemplatePreview] Loading template "${templateId}" with settings:`, {
+                    templateId,
+                    pageSize: previewPageSize,
+                    fontSize: previewFontSize,
+                    orientation: settings.orientation
+                });
+
+                setIsLoading(true);
+
+                // Create preview data outside try block to avoid scope issues
+                const previewData = {
+                    ...SAMPLE_INVOICE_DATA,
+                    templateSettings: {
+                        ...settings,
+                        pageSize: previewPageSize,
+                        fontSize: previewFontSize
+                    },
+                    pageSize: previewPageSize,
+                    orientation: settings.orientation
+                };
+
+                console.log('📄 [TemplatePreview] Preview Data:', {
+                    company: previewData.company,
+                    logo: previewData.company?.logo,
+                    settings: previewData.templateSettings
+                });
+
+                try {
+                    console.log('🏭 [TemplatePreview] Creating template...');
+                    let component = await TemplateFactory.createTemplate(templateId, previewData);
+
+                    if (component) {
+                        console.log('✅ [TemplatePreview] Template component created successfully');
+                        setTemplateComponent(component);
+                    } else {
+                        console.warn('⚠️ [TemplatePreview] Template component is null, using test template as fallback');
+                        setTemplateComponent(createTestTemplate(previewData));
+                    }
+                } catch (error) {
+                    console.error('❌ [TemplatePreview] Error loading template:', error);
+                    setTemplateComponent(createTestTemplate(previewData));
+                    templateLogger.error('TemplatePreview', 'Failed to load template', error);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            loadTemplate();
+        }, [templateId, settings, previewPageSize, previewFontSize]);
 
         if (!template) {
             return (
-                <div className="flex items-center justify-center h-96 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-center h-full bg-gray-50 rounded-lg">
                     <div className="text-center">
                         <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
                         <p className="text-gray-500">Template not found</p>
@@ -552,19 +851,10 @@ const InvoiceTemplateSettings = ({ onClose }) => {
             );
         }
 
-        // Apply template settings to sample data
-        const previewData = {
-            ...SAMPLE_INVOICE_DATA,
-            templateSettings: settings,
-            pageSize: settings.pageSize,
-            orientation: settings.orientation
-        };
-
         const getPreviewStyles = () => {
             const baseStyles = {
-                transform: `scale(${zoom / 100})`,
-                transformOrigin: 'top left',
-                transition: 'transform 0.3s ease'
+                height: '100%',
+                transition: 'all 0.3s ease'
             };
 
             switch (mode) {
@@ -572,282 +862,64 @@ const InvoiceTemplateSettings = ({ onClose }) => {
                     return {
                         ...baseStyles,
                         width: '375px',
-                        minHeight: '667px'
+                        margin: '0 auto'
                     };
                 case 'print':
-                    // Convert mm/inches to pixels for React compatibility
-                    const printWidth = settings.pageSize === 'A4' ? '794px' : '816px'; // A4: 210mm ≈ 794px, Letter: 8.5in ≈ 816px
-                    const printHeight = settings.pageSize === 'A4' ? '1123px' : '1056px'; // A4: 297mm ≈ 1123px, Letter: 11in ≈ 1056px
                     return {
                         ...baseStyles,
-                        width: printWidth,
-                        minHeight: printHeight,
-                        backgroundColor: 'white',
-                        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                        border: '1px solid #e5e7eb'
+                        width: settings.pageSize === 'A4' ? '794px' : '816px',
+                        margin: '0 auto'
                     };
                 default: // desktop
                     return {
                         ...baseStyles,
-                        width: '100%',
-                        minHeight: '600px'
+                        width: '100%'
                     };
             }
         };
 
-        // Create DOM-compatible template preview
-        const DOMTemplatePreview = () => {
-            return (
-                <div
-                    className="template-preview bg-white p-6 font-sans text-sm"
-                    style={{
-                        fontFamily: 'Helvetica, Arial, sans-serif',
-                        color: template.colors.text || '#000'
-                    }}
-                >
-                    {/* Header Section */}
-                    <div
-                        className="header mb-6 p-6 rounded-lg text-white"
-                        style={{ backgroundColor: template.colors.primary }}
-                    >
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <h1 className="text-3xl font-bold tracking-wider">INVOICE</h1>
-                                <p className="text-lg opacity-90">#{previewData.invoiceNumber}</p>
-                            </div>
-                            <div className="text-right">
-                                <div
-                                    className="inline-block px-4 py-2 rounded"
-                                    style={{ backgroundColor: template.colors.accent }}
-                                >
-                                    <span className="font-bold">{previewData.invoiceNumber}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Company and Invoice Info */}
-                    <div className="flex gap-6 mb-6">
-                        <div className="flex-1">
-                            <div
-                                className="p-4 rounded-lg border"
-                                style={{
-                                    backgroundColor: template.colors.background || '#f8f9fa',
-                                    borderColor: template.colors.border || '#e5e7eb'
-                                }}
-                            >
-                                <h3
-                                    className="font-bold text-sm mb-3"
-                                    style={{ color: template.colors.primary }}
-                                >
-                                    FROM
-                                </h3>
-                                <div className="space-y-1">
-                                    <p className="font-bold text-lg">{previewData.company.companyName}</p>
-                                    <p className="text-gray-600">{previewData.company.addressLine1}</p>
-                                    <p className="text-gray-600">{previewData.company.city}</p>
-                                    <p
-                                        className="font-semibold text-sm mt-2"
-                                        style={{ color: template.colors.primary }}
-                                    >
-                                        GSTIN: {previewData.company.gstin}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex-1">
-                            <div className="p-4 rounded-lg border border-gray-200">
-                                <h3
-                                    className="font-bold text-sm mb-3"
-                                    style={{ color: template.colors.primary }}
-                                >
-                                    INVOICE DETAILS
-                                </h3>
-                                <div className="space-y-2">
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-600">Date:</span>
-                                        <span className="font-semibold">{previewData.date}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-600">Due Date:</span>
-                                        <span className="font-semibold">{previewData.dueDate}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-600">Page Size:</span>
-                                        <span className="font-semibold">{settings.pageSize}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Customer Info */}
-                    <div
-                        className="p-4 rounded-lg border mb-6"
-                        style={{
-                            backgroundColor: template.colors.background || '#f8f9fa',
-                            borderColor: template.colors.border || '#e5e7eb'
-                        }}
-                    >
-                        <h3
-                            className="font-bold text-sm mb-3"
-                            style={{ color: template.colors.primary }}
-                        >
-                            BILL TO
-                        </h3>
-                        <div className="space-y-1">
-                            <p className="font-bold text-lg">{previewData.customer.customerName}</p>
-                            <p className="text-gray-600">{previewData.customer.addressLine1}</p>
-                            <p className="text-gray-600">{previewData.customer.city}</p>
-                        </div>
-                    </div>
-
-                    {/* Items Table */}
-                    <div className="mb-6 rounded-lg border overflow-hidden" style={{ borderColor: template.colors.border || '#e5e7eb' }}>
-                        {/* Table Header */}
-                        <div
-                            className="p-3 text-white font-bold text-xs uppercase tracking-wide"
-                            style={{ backgroundColor: template.colors.primary }}
-                        >
-                            <div className="flex" style={{ gap: '8px' }}>
-                                <div className="text-center" style={{ width: '6%' }}>Sl.</div>
-                                <div style={{ width: '36%' }}>Description</div>
-                                <div className="text-center" style={{ width: '12%' }}>HSN</div>
-                                <div className="text-center" style={{ width: '8%' }}>Qty</div>
-                                <div className="text-right" style={{ width: '14%' }}>Rate</div>
-                                <div className="text-right" style={{ width: '16%' }}>Amount</div>
-                            </div>
-                        </div>
-
-                        {/* Table Rows */}
-                        {previewData.items.map((item, index) => (
-                            <div
-                                key={index}
-                                className={`p-3 border-b text-sm ${index % 2 === 0 ? '' : 'bg-gray-50'}`}
-                                style={{ borderColor: template.colors.border || '#e5e7eb' }}
-                            >
-                                <div className="flex items-center" style={{ gap: '8px' }}>
-                                    <div className="text-center" style={{ width: '6%' }}>{index + 1}</div>
-                                    <div style={{ width: '36%' }}>{item.description}</div>
-                                    <div className="text-center" style={{ width: '12%' }}>{item.hsnSac}</div>
-                                    <div className="text-center" style={{ width: '8%' }}>{item.quantity}</div>
-                                    <div className="text-right" style={{ width: '14%' }}>₹{item.rate}</div>
-                                    <div className="text-right font-semibold" style={{ width: '16%' }}>₹{(item.quantity * item.rate).toFixed(2)}</div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Tax Summary */}
-                    <div className="mb-6">
-                        <div
-                            className="p-4 rounded-lg border"
-                            style={{
-                                backgroundColor: template.colors.background || '#f8f9fa',
-                                borderColor: template.colors.border || '#e5e7eb'
-                            }}
-                        >
-                            <div className="space-y-2">
-                                <div className="flex justify-between">
-                                    <span>Subtotal:</span>
-                                    <span className="font-semibold">₹{previewData.subtotal}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>CGST (9%):</span>
-                                    <span className="font-semibold">₹{previewData.cgstAmount}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>SGST (9%):</span>
-                                    <span className="font-semibold">₹{previewData.sgstAmount}</span>
-                                </div>
-                                <hr className="my-2" style={{ borderColor: template.colors.border || '#e5e7eb' }} />
-                                <div
-                                    className="flex justify-between p-3 rounded font-bold text-lg text-white"
-                                    style={{ backgroundColor: template.colors.primary }}
-                                >
-                                    <span>TOTAL:</span>
-                                    <span>₹{previewData.grandTotal}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Amount in Words */}
-                    <div
-                        className="p-4 rounded-lg border mb-6"
-                        style={{
-                            backgroundColor: template.colors.light || '#f1f5f9',
-                            borderColor: template.colors.primary || '#3b82f6'
-                        }}
-                    >
-                        <h4
-                            className="font-bold mb-2"
-                            style={{ color: template.colors.primary }}
-                        >
-                            Amount in Words:
-                        </h4>
-                        <p className="italic font-semibold">Rupees Five Thousand Seven Hundred Eighty only</p>
-                    </div>
-
-                    {/* Footer */}
-                    <div className="flex gap-6">
-                        <div
-                            className="flex-1 p-4 rounded-lg border"
-                            style={{
-                                backgroundColor: template.colors.background || '#f8f9fa',
-                                borderColor: template.colors.border || '#e5e7eb'
-                            }}
-                        >
-                            <h4
-                                className="font-bold mb-2"
-                                style={{ color: template.colors.primary }}
-                            >
-                                Declaration
-                            </h4>
-                            <p className="text-sm text-gray-600">
-                                We declare that this invoice shows the actual price of the goods described
-                                and that all particulars are true and correct.
-                            </p>
-                        </div>
-
-                        <div
-                            className="w-64 p-4 rounded-lg border text-center"
-                            style={{ borderColor: template.colors.primary || '#3b82f6' }}
-                        >
-                            <div
-                                className="h-16 mb-3 border-dashed border-2 rounded flex items-center justify-center"
-                                style={{ borderColor: template.colors.border || '#e5e7eb' }}
-                            >
-                                <span className="text-gray-400 text-sm">Signature</span>
-                            </div>
-                            <p className="text-sm text-gray-600">for {previewData.company.companyName}</p>
-                            <p
-                                className="font-bold text-sm"
-                                style={{ color: template.colors.primary }}
-                            >
-                                Authorized Signatory
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Template Info Footer */}
-                    <div className="mt-6 pt-4 border-t text-center text-xs text-gray-500">
-                        <p>Template: {template.name} | Mode: {mode} | Zoom: {zoom}%</p>
-                    </div>
-                </div>
-            );
-        };
-
         return (
-            <div className="preview-container overflow-auto bg-gray-100 rounded-lg" style={{ height: '70vh' }}>
-                <div className="p-4 flex justify-center">
+            <div className="preview-container w-full h-full bg-gray-100 rounded-lg overflow-hidden">
+                <div className="h-full flex justify-center items-center">
                     <div
-                        className="preview-content bg-white rounded-lg shadow-sm"
+                        ref={containerRef}
+                        className="preview-content bg-white rounded-lg shadow-sm w-full h-full overflow-hidden"
                         style={getPreviewStyles()}
                     >
-                        <DOMTemplatePreview />
+                        {isLoading ? (
+                            <div className="flex items-center justify-center h-full">
+                                <Loader />
+                            </div>
+                        ) : templateComponent ? (
+                            <div className="w-full h-full">
+                                <PDFViewer
+                                    style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        border: 'none'
+                                    }}
+                                    showToolbar={true}
+                                >
+                                    {templateComponent}
+                                </PDFViewer>
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-center h-full">
+                                <div className="text-center text-gray-500">
+                                    <AlertCircle className="w-8 h-8 mx-auto mb-2" />
+                                    <p>Failed to load template preview</p>
+                                </div>
+                            </div>
+                        )}
                     </div>
+                </div>
+
+                {/* Template Info Footer */}
+                <div className="mt-4 text-center text-xs text-gray-500">
+                    <p>
+                        {template.name} • {mode.charAt(0).toUpperCase() + mode.slice(1)} View •
+                        {settings.pageSize} • {settings.orientation}
+                    </p>
                 </div>
             </div>
         );
@@ -1468,7 +1540,7 @@ const InvoiceTemplateSettings = ({ onClose }) => {
 
             {/* Full Preview Modal */}
             <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-                <DialogContent className="max-w-7xl h-[90vh] p-0">
+                <DialogContent className="max-w-[95vw] w-full h-[90vh] p-0">
                     <DialogHeader className="p-6 pb-0">
                         <div className="flex items-center justify-between">
                             <div>
@@ -1507,54 +1579,21 @@ const InvoiceTemplateSettings = ({ onClose }) => {
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
-
-                                {/* Zoom Controls */}
-                                <div className="flex items-center gap-1 border rounded-lg p-1">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={handleZoomOut}
-                                        disabled={previewZoom <= 50}
-                                    >
-                                        <ZoomOut className="w-4 h-4" />
-                                    </Button>
-                                    <span className="text-sm px-2 min-w-[60px] text-center">{previewZoom}%</span>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={handleZoomIn}
-                                        disabled={previewZoom >= 200}
-                                    >
-                                        <ZoomIn className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={handleZoomReset}
-                                    >
-                                        <RotateCcw className="w-4 h-4" />
-                                    </Button>
-                                </div>
-
-                                {/* Action Buttons */}
-                                <Button variant="outline" size="sm">
-                                    <Download className="w-4 h-4 mr-2" />
-                                    Export PDF
-                                </Button>
                             </div>
                         </div>
                     </DialogHeader>
 
-                    <div className="flex-1 p-6 pt-4 overflow-auto">
-                        <div className="flex justify-center">
-                            <div className="bg-gray-50 rounded-lg p-4 w-full">
+                    <div className="flex-1 p-6 pt-4 h-[calc(90vh-180px)] overflow-hidden">
+                        <div className="flex justify-center h-full">
+                            <div className="bg-gray-50 rounded-lg p-4 w-full h-full overflow-hidden">
                                 {previewTemplate && (
                                     <TemplateErrorBoundary>
                                         <TemplatePreview
                                             templateId={previewTemplate}
                                             settings={templateSettings}
                                             mode={previewMode}
-                                            zoom={previewZoom}
+                                            previewPageSize={previewPageSize}
+                                            previewFontSize={previewFontSize}
                                         />
                                     </TemplateErrorBoundary>
                                 )}
@@ -1562,15 +1601,15 @@ const InvoiceTemplateSettings = ({ onClose }) => {
                         </div>
                     </div>
 
-                    {/* Quick Settings Footer */}
+                    {/* Footer with preview controls */}
                     <div className="border-t bg-gray-50 p-4">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium">Page Size:</span>
+                                    <span className="text-sm font-medium">Preview Page Size:</span>
                                     <Select
-                                        value={templateSettings.pageSize}
-                                        onValueChange={(value) => handleSettingUpdate('pageSize', value)}
+                                        value={previewPageSize}
+                                        onValueChange={setPreviewPageSize}
                                     >
                                         <SelectTrigger className="w-24 h-8">
                                             <SelectValue />
@@ -1585,10 +1624,10 @@ const InvoiceTemplateSettings = ({ onClose }) => {
                                     </Select>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium">Font Size:</span>
+                                    <span className="text-sm font-medium">Preview Font Size:</span>
                                     <Select
-                                        value={templateSettings.fontSize}
-                                        onValueChange={(value) => handleSettingUpdate('fontSize', value)}
+                                        value={previewFontSize}
+                                        onValueChange={setPreviewFontSize}
                                     >
                                         <SelectTrigger className="w-24 h-8">
                                             <SelectValue />

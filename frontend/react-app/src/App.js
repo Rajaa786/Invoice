@@ -43,7 +43,7 @@ function App() {
       </SidebarProvider>
       <UpdateNotification />
       {/* Zoom Monitor for debugging - only shows in development */}
-      {process.env.NODE_ENV === 'development' && <ZoomMonitor position="top-right" />}
+      {process.env.NODE_ENV === 'development' && <ZoomMonitor position="top-left" />}
       {/* Zoom Debug Console - toggle with Ctrl+Shift+Z */}
       {process.env.NODE_ENV === 'development' && <ZoomDebugConsole />}
     </ThemeProvider>

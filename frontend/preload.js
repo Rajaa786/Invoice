@@ -39,6 +39,9 @@ contextBridge.exposeInMainWorld("electron", {
   getPath: (name) => ipcRenderer.invoke("app:getPath", name),
 
   analytics: {
+    debugBasicData: () =>
+      ipcRenderer.invoke("analytics:debugBasicData"),
+
     getSummaryMetrics: (filters = {}) =>
       ipcRenderer.invoke("analytics:getSummaryMetrics", filters),
 
@@ -140,4 +143,35 @@ contextBridge.exposeInMainWorld('electronSettings', {
   // Get all settings
   getAll: () =>
     ipcRenderer.invoke("settings:getAll")
+});
+
+// Expose electron-log API for renderer process
+contextBridge.exposeInMainWorld('electronLog', {
+  // Debug level logging
+  debug: (component, message, data = null) =>
+    ipcRenderer.invoke("log:debug", component, message, data),
+
+  // Info level logging
+  info: (component, message, data = null) =>
+    ipcRenderer.invoke("log:info", component, message, data),
+
+  // Warning level logging
+  warn: (component, message, data = null) =>
+    ipcRenderer.invoke("log:warn", component, message, data),
+
+  // Error level logging
+  error: (component, message, error = null, data = null) =>
+    ipcRenderer.invoke("log:error", component, message, error, data),
+
+  // Success level logging (mapped to info with success indicator)
+  success: (component, message, data = null) =>
+    ipcRenderer.invoke("log:success", component, message, data),
+
+  // Get log file paths
+  getLogPaths: () =>
+    ipcRenderer.invoke("log:getLogPaths"),
+
+  // Read log file content
+  readLogFile: (logType = 'main') =>
+    ipcRenderer.invoke("log:readLogFile", logType)
 });

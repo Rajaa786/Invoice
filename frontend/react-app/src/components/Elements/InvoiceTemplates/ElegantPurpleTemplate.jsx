@@ -24,43 +24,69 @@ const styles = StyleSheet.create({
         padding: 20,
     },
 
-    // Elegant header with sophisticated styling
+    // Elegant header with sophisticated styling and logo support
     header: {
+        marginBottom: 30,
+        padding: 25,
+        backgroundColor: colors.white,
+        borderRadius: 6,
+        position: 'relative',
+        borderBottom: `2pt solid ${colors.primary}`,
+        borderLeft: `4pt solid ${colors.accent}`,
+    },
+
+    headerContent: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 30,
-        padding: 25,
-        backgroundColor: colors.primary,
-        borderRadius: 6,
-        position: 'relative',
     },
 
     headerLeft: {
         flex: 1,
+        alignItems: 'center',
+    },
+
+    headerCenter: {
+        flex: 2,
+        alignItems: 'center',
+    },
+
+    headerRight: {
+        flex: 1,
+        alignItems: 'flex-end',
+    },
+
+    logoContainer: {
+        width: 120,
+        height: 60,
+        marginBottom: 5,
     },
 
     headerTitle: {
-        fontSize: 32,
+        fontSize: 26,
         fontWeight: 'bold',
-        color: colors.white,
+        color: colors.primary,
         letterSpacing: 2,
         marginBottom: 5,
+        textAlign: 'center',
+    },
+
+    taxInvoiceTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: colors.primary,
+        marginBottom: 5,
+        textAlign: 'center',
     },
 
     headerSubtitle: {
         fontSize: 14,
-        color: colors.white,
-        opacity: 0.9,
+        color: colors.textSecondary,
         letterSpacing: 1,
     },
 
-    headerRight: {
-        alignItems: 'flex-end',
-    },
-
     invoiceNumber: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: 'bold',
         color: colors.white,
         backgroundColor: colors.accent,
@@ -509,82 +535,89 @@ const calculateTotals = (items, invoice) => {
 };
 
 // Elegant Purple Template Components
-const ElegantHeader = ({ invoice }) => (
-    <View style={styles.header}>
-        <View style={styles.headerLeft}>
-            <Text style={styles.headerTitle}>INVOICE</Text>
-            <Text style={styles.headerSubtitle}>Professional Invoice</Text>
-        </View>
-        <View style={styles.headerRight}>
-            <Text style={styles.invoiceNumber}>
-                {invoice.invoiceNumber || "INV-001"}
-            </Text>
+const ElegantHeader = ({ invoice, dynamicStyles }) => (
+    <View style={dynamicStyles.header}>
+        <View style={dynamicStyles.headerContent}>
+            <View style={dynamicStyles.headerLeft}>
+                <View style={{ width: 120, height: 'auto', marginBottom: 8 }}>
+                    <Image
+                        src={invoice.company?.logo || "/cyphersol-logo.png"}
+                    />
+                </View>
+            </View>
+
+            <View style={dynamicStyles.headerRight}>
+                <Text style={dynamicStyles.taxInvoiceTitle}>TAX INVOICE</Text>
+                <Text style={dynamicStyles.invoiceNumber}>
+                    {invoice.invoiceNumber || "INV-001"}
+                </Text>
+            </View>
         </View>
     </View>
 );
 
-const ElegantMainSection = ({ invoice }) => (
-    <View style={styles.mainSection}>
-        <View style={styles.leftColumn}>
+const ElegantMainSection = ({ invoice, dynamicStyles }) => (
+    <View style={dynamicStyles.mainSection}>
+        <View style={dynamicStyles.leftColumn}>
             {/* Company Information */}
-            <View style={styles.sectionCard}>
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Bill From</Text>
+            <View style={dynamicStyles.sectionCard}>
+                <View style={dynamicStyles.sectionHeader}>
+                    <Text style={dynamicStyles.sectionTitle}>Bill From</Text>
                 </View>
-                <View style={styles.sectionContent}>
-                    <Text style={styles.companyName}>
+                <View style={dynamicStyles.sectionContent}>
+                    <Text style={dynamicStyles.companyName}>
                         {invoice.company?.companyName || "Company Name"}
                     </Text>
                     {invoice.company?.addressLine1 && (
-                        <Text style={styles.addressLine}>{invoice.company.addressLine1}</Text>
+                        <Text style={dynamicStyles.addressLine}>{invoice.company.addressLine1}</Text>
                     )}
                     {invoice.company?.city && (
-                        <Text style={styles.addressLine}>{invoice.company.city}</Text>
+                        <Text style={dynamicStyles.addressLine}>{invoice.company.city}</Text>
                     )}
                     {invoice.company?.gstin && (
-                        <Text style={styles.gstinBadge}>GSTIN: {invoice.company.gstin}</Text>
+                        <Text style={dynamicStyles.gstinBadge}>GSTIN: {invoice.company.gstin}</Text>
                     )}
                 </View>
             </View>
 
             {/* Customer Information */}
-            <View style={styles.sectionCard}>
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Bill To</Text>
+            <View style={dynamicStyles.sectionCard}>
+                <View style={dynamicStyles.sectionHeader}>
+                    <Text style={dynamicStyles.sectionTitle}>Bill To</Text>
                 </View>
-                <View style={styles.sectionContent}>
-                    <Text style={styles.customerName}>
+                <View style={dynamicStyles.sectionContent}>
+                    <Text style={dynamicStyles.customerName}>
                         {invoice.customer?.name || invoice.customerName || "Customer Name"}
                     </Text>
                     {invoice.customer?.addressLine1 && (
-                        <Text style={styles.customerAddress}>{invoice.customer.addressLine1}</Text>
+                        <Text style={dynamicStyles.customerAddress}>{invoice.customer.addressLine1}</Text>
                     )}
                 </View>
             </View>
         </View>
 
-        <View style={styles.rightColumn}>
+        <View style={dynamicStyles.rightColumn}>
             {/* Invoice Details */}
-            <View style={styles.sectionCard}>
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Invoice Details</Text>
+            <View style={dynamicStyles.sectionCard}>
+                <View style={dynamicStyles.sectionHeader}>
+                    <Text style={dynamicStyles.sectionTitle}>Invoice Details</Text>
                 </View>
-                <View style={styles.sectionContent}>
-                    <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Invoice No</Text>
-                        <Text style={styles.detailValue}>{invoice.invoiceNumber || "INV-001"}</Text>
+                <View style={dynamicStyles.sectionContent}>
+                    <View style={dynamicStyles.detailRow}>
+                        <Text style={dynamicStyles.detailLabel}>Invoice No</Text>
+                        <Text style={dynamicStyles.detailValue}>{invoice.invoiceNumber || "INV-001"}</Text>
                     </View>
-                    <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Date</Text>
-                        <Text style={styles.detailValue}>{formatDate(invoice.invoiceDate)}</Text>
+                    <View style={dynamicStyles.detailRow}>
+                        <Text style={dynamicStyles.detailLabel}>Date</Text>
+                        <Text style={dynamicStyles.detailValue}>{formatDate(invoice.invoiceDate)}</Text>
                     </View>
-                    <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Due Date</Text>
-                        <Text style={styles.detailValue}>{formatDate(invoice.dueDate)}</Text>
+                    <View style={dynamicStyles.detailRow}>
+                        <Text style={dynamicStyles.detailLabel}>Due Date</Text>
+                        <Text style={dynamicStyles.detailValue}>{formatDate(invoice.dueDate)}</Text>
                     </View>
-                    <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Terms</Text>
-                        <Text style={styles.detailValue}>30 Days</Text>
+                    <View style={dynamicStyles.detailRow}>
+                        <Text style={dynamicStyles.detailLabel}>Terms</Text>
+                        <Text style={dynamicStyles.detailValue}>30 Days</Text>
                     </View>
                 </View>
             </View>
@@ -592,20 +625,20 @@ const ElegantMainSection = ({ invoice }) => (
     </View>
 );
 
-const ElegantItemsTable = ({ invoice, totals }) => {
+const ElegantItemsTable = ({ invoice, totals, dynamicStyles }) => {
     const items = invoice.items || [];
 
     return (
         <View>
-            <View style={styles.tableContainer}>
-                <View style={styles.tableHeader}>
-                    <Text style={[styles.tableHeaderCell, styles.col1]}>Sl.</Text>
-                    <Text style={[styles.tableHeaderCell, styles.col2]}>Description</Text>
-                    <Text style={[styles.tableHeaderCell, styles.col3]}>HSN/SAC</Text>
-                    <Text style={[styles.tableHeaderCell, styles.col4]}>Qty</Text>
-                    <Text style={[styles.tableHeaderCell, styles.col5]}>Rate</Text>
-                    <Text style={[styles.tableHeaderCell, styles.col6]}>Unit</Text>
-                    <Text style={[styles.tableHeaderCell, styles.col7]}>Amount</Text>
+            <View style={dynamicStyles.tableContainer}>
+                <View style={dynamicStyles.tableHeader}>
+                    <Text style={[dynamicStyles.tableHeaderCell, dynamicStyles.col1]}>Sl.</Text>
+                    <Text style={[dynamicStyles.tableHeaderCell, dynamicStyles.col2]}>Description</Text>
+                    <Text style={[dynamicStyles.tableHeaderCell, dynamicStyles.col3]}>HSN/SAC</Text>
+                    <Text style={[dynamicStyles.tableHeaderCell, dynamicStyles.col4]}>Qty</Text>
+                    <Text style={[dynamicStyles.tableHeaderCell, dynamicStyles.col5]}>Rate</Text>
+                    <Text style={[dynamicStyles.tableHeaderCell, dynamicStyles.col6]}>Unit</Text>
+                    <Text style={[dynamicStyles.tableHeaderCell, dynamicStyles.col7]}>Amount</Text>
                 </View>
 
                 {items.map((item, index) => {
@@ -613,39 +646,39 @@ const ElegantItemsTable = ({ invoice, totals }) => {
                     const isEven = index % 2 === 0;
 
                     return (
-                        <View key={index} style={[styles.tableRow, !isEven && styles.tableRowAlt]}>
-                            <View style={[styles.col1]}>
-                                <Text style={[styles.tableCell, styles.tableCellCenter]}>
+                        <View key={index} style={[dynamicStyles.tableRow, !isEven && dynamicStyles.tableRowAlt]}>
+                            <View style={[dynamicStyles.col1]}>
+                                <Text style={[dynamicStyles.tableCell, dynamicStyles.tableCellCenter]}>
                                     {index + 1}
                                 </Text>
                             </View>
-                            <View style={[styles.col2]}>
-                                <Text style={[styles.tableCell]}>
+                            <View style={[dynamicStyles.col2]}>
+                                <Text style={[dynamicStyles.tableCell]}>
                                     {item.details || item.name || "Item"}
                                 </Text>
                             </View>
-                            <View style={[styles.col3]}>
-                                <Text style={[styles.tableCell, styles.tableCellCenter]}>
+                            <View style={[dynamicStyles.col3]}>
+                                <Text style={[dynamicStyles.tableCell, dynamicStyles.tableCellCenter]}>
                                     {item.hsn || ""}
                                 </Text>
                             </View>
-                            <View style={[styles.col4]}>
-                                <Text style={[styles.tableCell, styles.tableCellCenter]}>
+                            <View style={[dynamicStyles.col4]}>
+                                <Text style={[dynamicStyles.tableCell, dynamicStyles.tableCellCenter]}>
                                     {qty}
                                 </Text>
                             </View>
-                            <View style={[styles.col5]}>
-                                <Text style={[styles.tableCell, styles.tableCellRight]}>
+                            <View style={[dynamicStyles.col5]}>
+                                <Text style={[dynamicStyles.tableCell, dynamicStyles.tableCellRight]}>
                                     {formatCurrency(item.rate || 0).replace('₹', '')}
                                 </Text>
                             </View>
-                            <View style={[styles.col6]}>
-                                <Text style={[styles.tableCell, styles.tableCellCenter]}>
+                            <View style={[dynamicStyles.col6]}>
+                                <Text style={[dynamicStyles.tableCell, dynamicStyles.tableCellCenter]}>
                                     {item.per || "Nos"}
                                 </Text>
                             </View>
-                            <View style={[styles.col7]}>
-                                <Text style={[styles.tableCell, styles.tableCellRight]}>
+                            <View style={[dynamicStyles.col7]}>
+                                <Text style={[dynamicStyles.tableCell, dynamicStyles.tableCellRight]}>
                                     {formatCurrency(item.amount || (qty * (item.rate || 0))).replace('₹', '')}
                                 </Text>
                             </View>
@@ -655,51 +688,51 @@ const ElegantItemsTable = ({ invoice, totals }) => {
             </View>
 
             {/* Summary Section */}
-            <View style={styles.summarySection}>
-                <View style={styles.taxRow}>
-                    <Text style={styles.taxLabel}>Subtotal</Text>
-                    <Text style={styles.taxAmount}>{formatCurrency(totals.subtotal)}</Text>
+            <View style={dynamicStyles.summarySection}>
+                <View style={dynamicStyles.taxRow}>
+                    <Text style={dynamicStyles.taxLabel}>Subtotal</Text>
+                    <Text style={dynamicStyles.taxAmount}>{formatCurrency(totals.subtotal)}</Text>
                 </View>
-                <View style={styles.taxRow}>
-                    <Text style={styles.taxLabel}>CGST ({totals.cgstRate}%)</Text>
-                    <Text style={styles.taxAmount}>{formatCurrency(totals.cgstAmount)}</Text>
+                <View style={dynamicStyles.taxRow}>
+                    <Text style={dynamicStyles.taxLabel}>CGST ({totals.cgstRate}%)</Text>
+                    <Text style={dynamicStyles.taxAmount}>{formatCurrency(totals.cgstAmount)}</Text>
                 </View>
-                <View style={styles.taxRow}>
-                    <Text style={styles.taxLabel}>SGST ({totals.sgstRate}%)</Text>
-                    <Text style={styles.taxAmount}>{formatCurrency(totals.sgstAmount)}</Text>
+                <View style={dynamicStyles.taxRow}>
+                    <Text style={dynamicStyles.taxLabel}>SGST ({totals.sgstRate}%)</Text>
+                    <Text style={dynamicStyles.taxAmount}>{formatCurrency(totals.sgstAmount)}</Text>
                 </View>
-                <View style={styles.totalDivider} />
-                <View style={styles.totalRow}>
-                    <Text style={styles.totalLabel}>Grand Total</Text>
-                    <Text style={styles.totalAmount}>{formatCurrency(totals.grandTotal)}</Text>
+                <View style={dynamicStyles.totalDivider} />
+                <View style={dynamicStyles.totalRow}>
+                    <Text style={dynamicStyles.totalLabel}>Grand Total</Text>
+                    <Text style={dynamicStyles.totalAmount}>{formatCurrency(totals.grandTotal)}</Text>
                 </View>
             </View>
         </View>
     );
 };
 
-const ElegantAmountInWords = ({ amount }) => (
-    <View style={styles.amountWordsSection}>
-        <Text style={styles.amountWordsTitle}>Amount in Words:</Text>
-        <Text style={styles.amountWordsText}>
+const ElegantAmountInWords = ({ amount, dynamicStyles }) => (
+    <View style={dynamicStyles.amountWordsSection}>
+        <Text style={dynamicStyles.amountWordsTitle}>Amount in Words:</Text>
+        <Text style={dynamicStyles.amountWordsText}>
             INR {numberToWords(amount)}
         </Text>
     </View>
 );
 
-const ElegantFooter = ({ invoice }) => (
-    <View style={styles.footerSection}>
-        <View style={styles.declarationSection}>
-            <Text style={styles.declarationTitle}>Declaration</Text>
-            <Text style={styles.declarationText}>
+const ElegantFooter = ({ invoice, dynamicStyles }) => (
+    <View style={dynamicStyles.footerSection}>
+        <View style={dynamicStyles.declarationSection}>
+            <Text style={dynamicStyles.declarationTitle}>Declaration</Text>
+            <Text style={dynamicStyles.declarationText}>
                 We declare that this invoice shows the actual price of the goods described
                 and that all particulars are true and correct. This document is electronically
                 generated and constitutes a valid tax invoice under applicable regulations.
             </Text>
         </View>
 
-        <View style={styles.signatureSection}>
-            <View style={styles.signatureArea}>
+        <View style={dynamicStyles.signatureSection}>
+            <View style={dynamicStyles.signatureArea}>
                 {invoice.signature && (
                     <Image
                         src={invoice.signature}
@@ -707,40 +740,142 @@ const ElegantFooter = ({ invoice }) => (
                     />
                 )}
             </View>
-            <Text style={styles.signatureText}>
+            <Text style={dynamicStyles.signatureText}>
                 for {invoice.company?.companyName || "Company Name"}
             </Text>
-            <Text style={styles.authorizedSignatory}>Authorized Signatory</Text>
+            <Text style={dynamicStyles.authorizedSignatory}>Authorized Signatory</Text>
         </View>
     </View>
 );
 
 // Main Elegant Purple Template Component
 export const ElegantPurpleTemplate = (invoice) => {
+    // Add debug logging
+    console.log('🔍 ElegantPurpleTemplate - Invoice Data:', {
+        fullInvoice: invoice,
+        company: invoice?.company,
+        logo: invoice?.company?.logo,
+        companyName: invoice?.company?.companyName
+    });
+
     const totals = calculateTotals(invoice.items || [], invoice);
 
-    return (
-        <Document>
-            <Page size="A4" style={styles.page}>
-                <ElegantHeader invoice={invoice} />
-                <ElegantMainSection invoice={invoice} />
-                <ElegantItemsTable invoice={invoice} totals={totals} />
-                <ElegantAmountInWords amount={totals.grandTotal} />
-                <ElegantFooter invoice={invoice} />
+    // Get dynamic settings from invoice data
+    const pageSize = invoice.pageSize || invoice.templateSettings?.pageSize || 'A4';
+    const fontSize = invoice.templateSettings?.fontSize || 'normal';
 
-                {invoice.customerNotes && (
-                    <View style={styles.notesSection}>
-                        <Text style={styles.notesTitle}>Notes:</Text>
-                        <Text style={styles.notesText}>{invoice.customerNotes}</Text>
+    // Calculate font scale based on fontSize setting
+    const getFontScale = () => {
+        switch (fontSize) {
+            case 'small': return 0.85;
+            case 'large': return 1.15;
+            case 'normal':
+            default: return 1.0;
+        }
+    };
+
+    const fontScale = getFontScale();
+
+    // Create dynamic styles based on settings
+    let dynamicStyles;
+    try {
+        dynamicStyles = StyleSheet.create({
+            page: {
+                ...styles.page,
+                fontSize: (styles.page?.fontSize || 10) * fontScale,
+            },
+            headerTitle: {
+                ...styles.headerTitle,
+                fontSize: (styles.headerTitle?.fontSize || 26) * fontScale,
+            },
+            taxInvoiceTitle: {
+                ...styles.taxInvoiceTitle,
+                fontSize: (styles.taxInvoiceTitle?.fontSize || 18) * fontScale,
+            },
+            companyName: {
+                ...styles.companyName,
+                fontSize: (styles.companyName?.fontSize || 20) * fontScale,
+            },
+            sectionTitle: {
+                ...styles.sectionTitle,
+                fontSize: (styles.sectionTitle?.fontSize || 11) * fontScale,
+            }
+        });
+    } catch (error) {
+        console.warn('⚠️ [ElegantPurpleTemplate] Failed to create dynamic styles, using fallback:', error);
+        dynamicStyles = styles;
+    }
+
+    console.log(`🎨 [ElegantPurpleTemplate] Rendering with settings:`, {
+        pageSize,
+        fontSize,
+        fontScale,
+        hasTemplateSettings: !!invoice.templateSettings,
+        companyName: invoice.company?.companyName,
+        hasLogo: !!invoice.company?.logo,
+        logoPath: invoice.company?.logo,
+        itemCount: invoice.items?.length,
+        hasDynamicStyles: !!dynamicStyles,
+        invoiceStructure: {
+            hasInvoiceNumber: !!invoice.invoiceNumber,
+            hasCompany: !!invoice.company,
+            hasCustomer: !!invoice.customer,
+            hasItems: !!invoice.items,
+            totalsCalculated: !!totals
+        }
+    });
+
+    try {
+        return (
+            <Document>
+                <Page size={pageSize} style={dynamicStyles.page}>
+                    <ElegantHeader invoice={invoice} dynamicStyles={dynamicStyles} />
+                    <ElegantMainSection invoice={invoice} dynamicStyles={dynamicStyles} />
+                    <ElegantItemsTable invoice={invoice} totals={totals} dynamicStyles={dynamicStyles} />
+                    <ElegantAmountInWords amount={totals.grandTotal} dynamicStyles={dynamicStyles} />
+                    <ElegantFooter invoice={invoice} dynamicStyles={dynamicStyles} />
+
+                    {invoice.customerNotes && (
+                        <View style={dynamicStyles.notesSection}>
+                            <Text style={[dynamicStyles.notesTitle, { fontSize: (dynamicStyles.notesTitle?.fontSize || 10) * fontScale }]}>
+                                Notes:
+                            </Text>
+                            <Text style={[dynamicStyles.notesText, { fontSize: (dynamicStyles.notesText?.fontSize || 9) * fontScale }]}>
+                                {invoice.customerNotes}
+                            </Text>
+                        </View>
+                    )}
+
+                    <Text style={[dynamicStyles.pageFooter, { fontSize: (dynamicStyles.pageFooter?.fontSize || 8) * fontScale }]}>
+                        This is a Computer Generated Invoice
+                    </Text>
+                </Page>
+            </Document>
+        );
+    } catch (error) {
+        console.error('❌ [ElegantPurpleTemplate] Failed to create PDF document:', error);
+
+        // Return a simple fallback document
+        return (
+            <Document>
+                <Page size="A4" style={{ padding: 30, fontFamily: 'Helvetica' }}>
+                    <View style={{ textAlign: 'center', marginBottom: 20 }}>
+                        <Text style={{ fontSize: 24, color: colors.primary, marginBottom: 10 }}>Template Error</Text>
+                        <Text style={{ fontSize: 12 }}>Unable to render the full template.</Text>
+                        <Text style={{ fontSize: 10, marginTop: 10 }}>
+                            Error: {error.message || 'Unknown PDF rendering error'}
+                        </Text>
                     </View>
-                )}
-
-                <View style={styles.pageFooter}>
-                    <Text>This is a Computer Generated Invoice • Processed with Care</Text>
-                </View>
-            </Page>
-        </Document>
-    );
+                    <View style={{ marginTop: 20 }}>
+                        <Text style={{ fontSize: 12, marginBottom: 5 }}>Invoice: {invoice.invoiceNumber}</Text>
+                        <Text style={{ fontSize: 12, marginBottom: 5 }}>Company: {invoice.company?.companyName}</Text>
+                        <Text style={{ fontSize: 12, marginBottom: 5 }}>Customer: {invoice.customer?.name}</Text>
+                        <Text style={{ fontSize: 12 }}>Total: ₹{totals.grandTotal?.toLocaleString('en-IN')}</Text>
+                    </View>
+                </Page>
+            </Document>
+        );
+    }
 };
 
-export default ElegantPurpleTemplate; 
+export default ElegantPurpleTemplate;

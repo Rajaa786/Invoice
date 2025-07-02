@@ -25,15 +25,15 @@ export class ConfigurationManager {
     static getCachedValue(key, fetchFunction) {
         const now = Date.now();
         const cached = CONFIG_CACHE.get(key);
-        
+
         if (cached && (now - cached.timestamp) < CACHE_DURATION) {
             console.log(`[ConfigManager] Using cached value for ${key}`);
             return Promise.resolve(cached.value);
         }
-        
+
         console.log(`[ConfigManager] Fetching fresh value for ${key}`);
         const promise = fetchFunction();
-        
+
         // Cache the promise result
         promise.then(value => {
             CONFIG_CACHE.set(key, { value, timestamp: now });
@@ -41,7 +41,7 @@ export class ConfigurationManager {
             // Remove failed entries from cache
             CONFIG_CACHE.delete(key);
         });
-        
+
         return promise;
     }
 
@@ -128,52 +128,79 @@ export class ConfigurationManager {
      * @returns {Promise<string>} Selected template ID
      */
     static async getSelectedTemplate() {
+        console.log('🔍 [ConfigurationManager] === GETTING SELECTED TEMPLATE ===');
         return this.getCachedValue('selectedTemplate', async () => {
             try {
+                console.log('📡 [ConfigurationManager] Fetching template from config service...');
                 const configService = await this.getConfigService();
+                console.log('✅ [ConfigurationManager] Config service obtained, calling getSelectedTemplate()...');
                 const templateId = await configService.getSelectedTemplate();
+                console.log('📋 [ConfigurationManager] Retrieved template ID from storage:', templateId);
+                console.log('🔍 [ConfigurationManager] Template ID type:', typeof templateId);
+                console.log('🔍 [ConfigurationManager] Template ID value:', JSON.stringify(templateId));
 
                 // Validate template exists
-                if (templateId && TemplateFactory.getTemplate(templateId)) {
+                console.log('🔍 [ConfigurationManager] Validating template exists in registry...');
+                const templateExists = TemplateFactory.getTemplate(templateId);
+                console.log('🔍 [ConfigurationManager] Template exists check result:', !!templateExists);
+
+                if (templateId && templateExists) {
+                    console.log('✅ [ConfigurationManager] Template validated and exists:', templateId);
+                    console.log('🏁 [ConfigurationManager] === RETURNING VALIDATED TEMPLATE ===');
                     return templateId;
                 }
+                console.log('⚠️ [ConfigurationManager] Template not found or invalid, using default:', DEFAULT_TEMPLATE_ID);
+                console.log('🔄 [ConfigurationManager] Reason: templateId =', templateId, ', exists =', !!templateExists);
+                console.log('🏁 [ConfigurationManager] === RETURNING DEFAULT TEMPLATE ===');
                 return DEFAULT_TEMPLATE_ID;
             } catch (error) {
-                console.error('Error getting selected template:', error);
+                console.error('❌ [ConfigurationManager] Error getting selected template:', error);
+                console.error('❌ [ConfigurationManager] Error details:', {
+                    message: error.message,
+                    stack: error.stack
+                });
+                console.log('🔄 [ConfigurationManager] Falling back to default template:', DEFAULT_TEMPLATE_ID);
+                console.log('🏁 [ConfigurationManager] === RETURNING DEFAULT DUE TO ERROR ===');
                 return DEFAULT_TEMPLATE_ID;
             }
         });
     }
 
     /**
-     * Set selected template ID
-     * @param {string} templateId - Template ID to set
-     * @returns {Promise<boolean>} True if successfully set
-     */
+ * Set selected template ID
+ * @param {string} templateId - Template ID to set
+ * @returns {Promise<boolean>} True if successfully set
+ */
     static async setSelectedTemplate(templateId) {
+        console.log('[ConfigurationManager] 💾 Setting selected template to:', templateId);
         try {
             // Validate template exists
             if (!TemplateFactory.getTemplate(templateId)) {
-                console.warn(`Template "${templateId}" not found`);
+                console.warn(`[ConfigurationManager] ⚠️ Template "${templateId}" not found in registry`);
                 return false;
             }
+            console.log('[ConfigurationManager] ✅ Template exists in registry, proceeding to save...');
 
             const configService = await this.getConfigService();
+            console.log('[ConfigurationManager] 📡 Saving template to config service...');
             const success = await configService.setSelectedTemplate(templateId);
+            console.log('[ConfigurationManager] 💾 Save result:', success);
 
             if (success) {
                 // Clear cache to ensure fresh data on next get
                 this.clearCache('selectedTemplate');
-                
+                console.log('[ConfigurationManager] 🗑️ Cleared template cache');
+
                 // Emit legacy event for backward compatibility
                 window.dispatchEvent(new CustomEvent('templateChanged', {
                     detail: { templateId, timestamp: Date.now() }
                 }));
+                console.log('[ConfigurationManager] 📢 Emitted templateChanged event');
             }
 
             return success;
         } catch (error) {
-            console.error('Error setting selected template:', error);
+            console.error('[ConfigurationManager] ❌ Error setting selected template:', error);
             return false;
         }
     }
@@ -217,7 +244,7 @@ export class ConfigurationManager {
             if (success) {
                 // Clear cache to ensure fresh data on next get
                 this.clearCache('templateSettings');
-                
+
                 // Emit legacy event for backward compatibility
                 const newSettings = await this.getTemplateSettings();
                 window.dispatchEvent(new CustomEvent('templateSettingsChanged', {

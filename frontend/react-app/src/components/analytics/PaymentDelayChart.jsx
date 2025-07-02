@@ -488,7 +488,7 @@ export default function PaymentDelayChart() {
                         className="flex items-center gap-2 px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
                     >
                         <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                        Refresh
+                        {loading ? 'Loading...' : 'Refresh'}
                     </button>
 
                     <div className="flex bg-gray-100 rounded-lg p-1">

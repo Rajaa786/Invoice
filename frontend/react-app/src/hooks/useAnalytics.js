@@ -2,6 +2,25 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useToast } from './use-toast';
 
 /**
+ * Debounce hook to prevent excessive API calls
+ */
+function useDebounce(value, delay) {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [value, delay]);
+
+    return debouncedValue;
+}
+
+/**
  * 🚀 Comprehensive Analytics Hook with Advanced Features
  * 
  * Features:
@@ -14,18 +33,18 @@ import { useToast } from './use-toast';
  * - Automatic cache invalidation
  */
 
-// Cache configuration
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+// Configuration constants
+const CACHE_DURATION = 2 * 60 * 1000; // Reduced to 2 minutes to prevent stale data
 const RETRY_ATTEMPTS = 3;
-const RETRY_DELAY = 1000; // 1 second
+const RETRY_DELAY = 1000; // Base delay for exponential backoff
+const REQUEST_TIMEOUT = 10000; // 10 second timeout
 
-
-
-// In-memory cache with TTL
+// In-memory cache with TTL and request deduplication
 class AnalyticsCache {
     constructor() {
         this.cache = new Map();
         this.timers = new Map();
+        this.pendingRequests = new Map(); // For request deduplication
     }
 
     set(key, data, ttl = CACHE_DURATION) {
@@ -64,10 +83,30 @@ class AnalyticsCache {
         return data;
     }
 
+    // Check if request is already pending
+    isPending(key) {
+        return this.pendingRequests.has(key);
+    }
+
+    // Add pending request
+    setPending(key, promise) {
+        this.pendingRequests.set(key, promise);
+        // Clean up after request completes
+        promise.finally(() => {
+            this.pendingRequests.delete(key);
+        });
+    }
+
+    // Get pending request
+    getPending(key) {
+        return this.pendingRequests.get(key);
+    }
+
     clear() {
         this.timers.forEach(timer => clearTimeout(timer));
         this.cache.clear();
         this.timers.clear();
+        this.pendingRequests.clear();
     }
 
     invalidate(pattern) {
@@ -87,6 +126,87 @@ class AnalyticsCache {
 // Global cache instance
 const analyticsCache = new AnalyticsCache();
 
+// Global auto-refresh coordinator
+class AutoRefreshCoordinator {
+    constructor() {
+        this.intervals = new Map();
+        this.callbacks = new Map();
+        this.isRefreshing = false;
+    }
+
+    register(componentId, callback, interval = 30000) {
+        // Clear existing interval if any
+        this.unregister(componentId);
+
+        this.callbacks.set(componentId, callback);
+
+        // Use a shared interval to synchronize all components
+        if (!this.intervals.has(interval)) {
+            const intervalId = setInterval(() => {
+                this.triggerRefresh(interval);
+            }, interval);
+            this.intervals.set(interval, intervalId);
+        }
+    }
+
+    unregister(componentId) {
+        this.callbacks.delete(componentId);
+
+        // Clean up intervals if no components are using them
+        for (const [interval, intervalId] of this.intervals.entries()) {
+            const hasCallbacks = Array.from(this.callbacks.values()).length > 0;
+            if (!hasCallbacks) {
+                clearInterval(intervalId);
+                this.intervals.delete(interval);
+            }
+        }
+    }
+
+    async triggerRefresh(interval) {
+        if (this.isRefreshing) {
+            console.log('🔄 AutoRefresh: Skipping refresh - already in progress');
+            return;
+        }
+
+        this.isRefreshing = true;
+        console.log('🔄 AutoRefresh: Starting coordinated refresh');
+
+        try {
+            const refreshPromises = Array.from(this.callbacks.values()).map(async (callback) => {
+                try {
+                    await callback();
+                } catch (error) {
+                    console.warn('🔄 AutoRefresh: Component refresh failed:', error);
+                }
+            });
+
+            await Promise.all(refreshPromises);
+            console.log('🔄 AutoRefresh: Coordinated refresh completed');
+        } catch (error) {
+            console.error('🔄 AutoRefresh: Global refresh error:', error);
+        } finally {
+            this.isRefreshing = false;
+        }
+    }
+
+    cleanup() {
+        this.intervals.forEach(intervalId => clearInterval(intervalId));
+        this.intervals.clear();
+        this.callbacks.clear();
+        this.isRefreshing = false;
+    }
+}
+
+// Global refresh coordinator
+const refreshCoordinator = new AutoRefreshCoordinator();
+
+// Cleanup on page unload
+if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', () => {
+        refreshCoordinator.cleanup();
+    });
+}
+
 /**
  * Custom hook for analytics data management
  */
@@ -98,9 +218,9 @@ export function useAnalytics() {
 
     // Check if we're in an Electron environment
     const isElectronAvailable = useMemo(() => {
-        return typeof window !== 'undefined' && 
-               window.electron && 
-               window.electron.analytics;
+        return typeof window !== 'undefined' &&
+            window.electron &&
+            window.electron.analytics;
     }, []);
 
     // Cleanup on unmount
@@ -112,20 +232,30 @@ export function useAnalytics() {
         };
     }, []);
 
-    // Generic API call with retry logic
-    const makeApiCall = useCallback(async (apiMethod, filters = {}, retryCount = 0) => {
+    // Generic API call with retry logic and request deduplication
+    const makeApiCall = useCallback(async (apiMethod, filters = {}, retryCount = 0, methodName = null) => {
         // Safety check for apiMethod
         if (!apiMethod || typeof apiMethod !== 'function') {
             throw new Error('API method is not available. Make sure Electron is properly loaded.');
         }
 
-        const methodName = apiMethod.name || 'unknown';
-        const cacheKey = `${methodName}_${JSON.stringify(filters)}`;
+        // Use provided method name or try to determine it
+        const finalMethodName = methodName || apiMethod.name || 'unknown';
+        console.log(`🔍 API Call Debug - Method: ${finalMethodName}, Has explicit name: ${!!methodName}`);
+
+        const cacheKey = `${finalMethodName}_${JSON.stringify(filters)}`;
 
         // Check cache first
         const cached = analyticsCache.get(cacheKey);
         if (cached) {
+            console.log(`📋 Cache hit for ${finalMethodName}`);
             return cached;
+        }
+
+        // Check if request is already pending (deduplication)
+        if (analyticsCache.isPending(cacheKey)) {
+            console.log(`⏳ Request deduplication for ${finalMethodName}`);
+            return await analyticsCache.getPending(cacheKey);
         }
 
         // Abort previous request
@@ -133,43 +263,82 @@ export function useAnalytics() {
             abortControllerRef.current.abort();
         }
 
-        // Create new abort controller
+        // Create new abort controller with timeout
         abortControllerRef.current = new AbortController();
+        const timeoutId = setTimeout(() => {
+            abortControllerRef.current.abort();
+        }, REQUEST_TIMEOUT);
 
-        try {
-            const result = await apiMethod(filters);
+        const requestPromise = (async () => {
+            try {
+                console.log(`🔄 Making API call for ${finalMethodName} with filters:`, filters);
+                const result = await apiMethod(filters);
 
-            // Cache the result
-            analyticsCache.set(cacheKey, result);
+                // Clear timeout since request completed
+                clearTimeout(timeoutId);
 
-            return result;
-        } catch (error) {
-            if (error.name === 'AbortError') {
-                throw new Error('Request was cancelled');
+                // Validate result
+                if (result === null || result === undefined) {
+                    console.warn(`⚠️ API call for ${finalMethodName} returned null/undefined`);
+                    return null;
+                }
+
+                // Cache the result
+                analyticsCache.set(cacheKey, result);
+                console.log(`✅ API call for ${finalMethodName} completed successfully`);
+
+                return result;
+            } catch (error) {
+                clearTimeout(timeoutId);
+
+                if (error.name === 'AbortError') {
+                    throw new Error('Request was cancelled or timed out');
+                }
+
+                // Enhanced error logging
+                console.error(`❌ API call for ${finalMethodName} failed:`, {
+                    error: error.message,
+                    retryCount,
+                    filters
+                });
+
+                // Exponential backoff retry logic
+                if (retryCount < RETRY_ATTEMPTS) {
+                    const delay = RETRY_DELAY * Math.pow(2, retryCount);
+                    console.log(`🔄 Retrying ${finalMethodName} in ${delay}ms (attempt ${retryCount + 1}/${RETRY_ATTEMPTS})`);
+
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    return makeApiCall(apiMethod, filters, retryCount + 1, methodName);
+                }
+
+                throw error;
             }
+        })();
 
-            // Retry logic
-            if (retryCount < RETRY_ATTEMPTS) {
-                await new Promise(resolve =>
-                    setTimeout(resolve, RETRY_DELAY * (retryCount + 1))
-                );
-                return makeApiCall(apiMethod, filters, retryCount + 1);
-            }
+        // Register pending request for deduplication
+        analyticsCache.setPending(cacheKey, requestPromise);
 
-            throw error;
-        }
+        return requestPromise;
     }, []);
 
-    // Error handler
+    // Error handler with enhanced logging
     const handleError = useCallback((error, context) => {
-        console.error(`Analytics Error [${context}]:`, error);
+        console.error(`❌ Analytics Error [${context}]:`, {
+            message: error.message,
+            stack: error.stack,
+            timestamp: new Date().toISOString()
+        });
+
         setGlobalError(error.message || 'An unexpected error occurred');
 
-        toast({
-            title: "Analytics Error",
-            description: error.message || 'Failed to fetch analytics data',
-            variant: "destructive",
-        });
+        // Only show toast for critical errors, not temporary network issues
+        if (!error.message?.includes('timeout') && !error.message?.includes('cancelled')) {
+            toast({
+                title: "Analytics Error",
+                description: error.message || 'Failed to fetch analytics data',
+                variant: "destructive",
+            });
+        }
     }, [toast]);
 
     return {
@@ -179,20 +348,30 @@ export function useAnalytics() {
         handleError,
         clearCache: analyticsCache.clear.bind(analyticsCache),
         invalidateCache: analyticsCache.invalidate.bind(analyticsCache),
-        isElectronAvailable
+        isElectronAvailable,
+        refreshCoordinator
     };
 }
 
 /**
- * Hook for Summary Metrics
+ * Hook for Summary Metrics with coordinated auto-refresh
  */
-export function useSummaryMetrics(filters = {}) {
+export function useSummaryMetrics(filters = {}, autoRefresh = false) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const { makeApiCall, handleError } = useAnalytics();
+    const { makeApiCall, handleError, refreshCoordinator } = useAnalytics();
+    const componentId = useRef(`summary-metrics-${Math.random()}`).current;
+
+    // Serialize filters to avoid dependency issues
+    const filtersString = JSON.stringify(filters);
 
     const fetchData = useCallback(async () => {
+        if (loading) {
+            console.log('📊 SummaryMetrics: Skipping fetch - already loading');
+            return;
+        }
+
         setLoading(true);
         setError(null);
 
@@ -202,22 +381,52 @@ export function useSummaryMetrics(filters = {}) {
                 throw new Error('Summary Metrics API is not available. Please ensure Electron is properly loaded.');
             }
 
+            const parsedFilters = JSON.parse(filtersString);
+            console.log('📊 SummaryMetrics: Fetching data with filters:', parsedFilters);
+
             const result = await makeApiCall(
                 window.electron.analytics.getSummaryMetrics,
-                filters
+                parsedFilters,
+                0, // retryCount
+                'getSummaryMetrics' // explicit method name
             );
-            setData(result);
+
+            if (result) {
+                setData(result);
+                console.log('📊 SummaryMetrics: Data updated successfully');
+            } else {
+                console.warn('📊 SummaryMetrics: Received null/undefined result');
+                setData(null);
+            }
         } catch (err) {
+            console.error('📊 SummaryMetrics: Fetch failed:', err);
             setError(err.message);
             handleError(err, 'Summary Metrics');
+
+            // Don't clear data on error - keep showing last known good data
+            // setData(null);
         } finally {
             setLoading(false);
         }
-    }, [filters, makeApiCall, handleError]);
+    }, [filtersString, makeApiCall, handleError, loading]);
 
+    // Initial fetch
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+
+    // Register with auto-refresh coordinator
+    useEffect(() => {
+        if (autoRefresh) {
+            console.log('📊 SummaryMetrics: Registering for auto-refresh');
+            refreshCoordinator.register(componentId, fetchData);
+
+            return () => {
+                console.log('📊 SummaryMetrics: Unregistering from auto-refresh');
+                refreshCoordinator.unregister(componentId);
+            };
+        }
+    }, [autoRefresh, fetchData, componentId, refreshCoordinator]);
 
     return {
         data,
@@ -276,6 +485,9 @@ export function useRevenueOverTime(filters = {}) {
     const [error, setError] = useState(null);
     const { makeApiCall, handleError } = useAnalytics();
 
+    // Serialize filters to avoid dependency issues
+    const filtersString = JSON.stringify(filters);
+
     const fetchData = useCallback(async () => {
         setLoading(true);
         setError(null);
@@ -286,9 +498,10 @@ export function useRevenueOverTime(filters = {}) {
                 throw new Error('Revenue Over Time API is not available. Please ensure Electron is properly loaded.');
             }
 
+            const parsedFilters = JSON.parse(filtersString);
             const result = await makeApiCall(
                 window.electron.analytics.getRevenueOverTime,
-                filters
+                parsedFilters
             );
             setData(result);
         } catch (err) {
@@ -297,7 +510,7 @@ export function useRevenueOverTime(filters = {}) {
         } finally {
             setLoading(false);
         }
-    }, [filters, makeApiCall, handleError]);
+    }, [filtersString, makeApiCall, handleError]);
 
     useEffect(() => {
         fetchData();
@@ -336,39 +549,93 @@ export function useRevenueOverTime(filters = {}) {
 }
 
 /**
- * Hook for Invoice Status Distribution with Enhanced Analytics
+ * Hook for Invoice Status Distribution with Enhanced Analytics and coordinated auto-refresh
  */
-export function useInvoiceStatusDistribution(filters = {}) {
+export function useInvoiceStatusDistribution(filters = {}, autoRefresh = false) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const { makeApiCall, handleError } = useAnalytics();
+    const { makeApiCall, handleError, refreshCoordinator } = useAnalytics();
+    const componentId = useRef(`invoice-status-${Math.random()}`).current;
+
+    // Serialize filters to avoid dependency issues
+    const filtersString = JSON.stringify(filters);
 
     const fetchData = useCallback(async () => {
-        console.log('🔍 Hook Debug - fetchData called with filters:', filters);
+        if (loading) {
+            console.log('📈 InvoiceStatus: Skipping fetch - already loading');
+            return;
+        }
+
+        const parsedFilters = JSON.parse(filtersString);
+        console.log('📈 InvoiceStatus: Fetching data with filters:', parsedFilters);
+        console.log('📈 InvoiceStatus: About to call makeApiCall...');
         setLoading(true);
         setError(null);
 
         try {
-            console.log('🔍 Hook Debug - Making API call...');
+            // console.log('📈 InvoiceStatus: Calling window.electron.analytics.getInvoiceStatusDistribution directly...');
+
+            // // Debug: Try direct call first
+            // const directResult = await window.electron.analytics.getInvoiceStatusDistribution(parsedFilters);
+            // console.log('📈 InvoiceStatus: Direct call result:', directResult);
+
+            // Now try through makeApiCall
+            console.log('📈 InvoiceStatus: Now trying through makeApiCall...');
             const result = await makeApiCall(
                 window.electron.analytics.getInvoiceStatusDistribution,
-                filters
+                parsedFilters,
+                0, // retryCount
+                'getInvoiceStatusDistribution' // explicit method name
             );
-            console.log('🔍 Hook Debug - API call result:', result);
-            setData(result);
+            console.log('📈 InvoiceStatus: makeApiCall result:', result);
+
+            if (result) {
+                setData(result);
+                console.log('📈 InvoiceStatus: Data updated successfully', {
+                    statusCount: result.statusData?.length || 0,
+                    totalInvoices: result.summary?.totalInvoices || 0
+                });
+            } else {
+                console.warn('📈 InvoiceStatus: Received null/undefined result');
+                setData(null);
+            }
         } catch (err) {
-            console.log('🔍 Hook Debug - API call error:', err);
+            console.error('📈 InvoiceStatus: Fetch failed:', err);
             setError(err.message);
             handleError(err, 'Invoice Status Distribution');
+
+            // Don't clear data on error - keep showing last known good data
+            // setData(null);
         } finally {
             setLoading(false);
         }
-    }, [filters, makeApiCall, handleError]);
+    }, [filtersString, makeApiCall, handleError, loading]);
 
+    // Clear cache when filters change to prevent stale data
+    useEffect(() => {
+        const parsed = JSON.parse(filtersString);
+        console.log('📈 InvoiceStatus: Filters changed, clearing related cache for filters:', parsed);
+        analyticsCache.invalidate('invoice_status');
+    }, [filtersString]);
+
+    // Initial fetch
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+
+    // Register with auto-refresh coordinator
+    useEffect(() => {
+        if (autoRefresh) {
+            console.log('📈 InvoiceStatus: Registering for auto-refresh');
+            refreshCoordinator.register(componentId, fetchData);
+
+            return () => {
+                console.log('📈 InvoiceStatus: Unregistering from auto-refresh');
+                refreshCoordinator.unregister(componentId);
+            };
+        }
+    }, [autoRefresh, fetchData, componentId, refreshCoordinator]);
 
     // Status colors
     const statusColors = {
@@ -474,14 +741,18 @@ export function useCustomerRevenueAnalysis(filters = {}) {
     const [error, setError] = useState(null);
     const { makeApiCall, handleError } = useAnalytics();
 
+    // Serialize filters to avoid dependency issues
+    const filtersString = JSON.stringify(filters);
+
     const fetchData = useCallback(async () => {
         setLoading(true);
         setError(null);
 
         try {
+            const parsedFilters = JSON.parse(filtersString);
             const result = await makeApiCall(
                 window.electron.analytics.getCustomerRevenueAnalysis,
-                filters
+                parsedFilters
             );
             setData(result);
         } catch (err) {
@@ -490,7 +761,7 @@ export function useCustomerRevenueAnalysis(filters = {}) {
         } finally {
             setLoading(false);
         }
-    }, [filters, makeApiCall, handleError]);
+    }, [filtersString, makeApiCall, handleError]);
 
     useEffect(() => {
         fetchData();
@@ -533,14 +804,20 @@ export function useCompanySplit(filters = {}) {
     const [summary, setSummary] = useState(null);
     const { makeApiCall, handleError } = useAnalytics();
 
+    // Serialize filters to avoid dependency issues
+    const filtersString = JSON.stringify(filters);
+
     const fetchData = useCallback(async () => {
         setLoading(true);
         setError(null);
 
         try {
+            const parsedFilters = JSON.parse(filtersString);
             const result = await makeApiCall(
                 window.electron.analytics.getCompanySplit,
-                filters
+                parsedFilters,
+                0, // retryCount
+                'getCompanySplit' // explicit method name
             );
 
             // Handle the enhanced data structure
@@ -560,7 +837,7 @@ export function useCompanySplit(filters = {}) {
         } finally {
             setLoading(false);
         }
-    }, [filters, makeApiCall, handleError]);
+    }, [filtersString, makeApiCall, handleError]);
 
     useEffect(() => {
         fetchData();
@@ -589,14 +866,20 @@ export function useTopItemsAnalysis(filters = {}) {
     const [error, setError] = useState(null);
     const { makeApiCall, handleError } = useAnalytics();
 
+    // Serialize filters to avoid dependency issues
+    const filtersString = JSON.stringify(filters);
+
     const fetchData = useCallback(async () => {
         setLoading(true);
         setError(null);
 
         try {
+            const parsedFilters = JSON.parse(filtersString);
             const result = await makeApiCall(
                 window.electron.analytics.getTopItemsAnalysis,
-                filters
+                parsedFilters,
+                0, // retryCount
+                'getTopItemsAnalysis' // explicit method name
             );
             setData(result);
         } catch (err) {
@@ -605,7 +888,7 @@ export function useTopItemsAnalysis(filters = {}) {
         } finally {
             setLoading(false);
         }
-    }, [filters, makeApiCall, handleError]);
+    }, [filtersString, makeApiCall, handleError]);
 
     useEffect(() => {
         fetchData();
@@ -628,14 +911,21 @@ export function useTaxLiabilityReport(filters = {}) {
     const [error, setError] = useState(null);
     const { makeApiCall, handleError } = useAnalytics();
 
+    // Serialize and debounce filters to avoid dependency issues and excessive API calls
+    const filtersString = JSON.stringify(filters);
+    const debouncedFiltersString = useDebounce(filtersString, 300);
+
     const fetchData = useCallback(async () => {
         setLoading(true);
         setError(null);
 
         try {
+            const parsedFilters = JSON.parse(debouncedFiltersString);
             const result = await makeApiCall(
                 window.electron.analytics.getTaxLiabilityReport,
-                filters
+                parsedFilters,
+                0, // retryCount
+                'getTaxLiabilityReport' // explicit method name
             );
             setData(result);
         } catch (err) {
@@ -644,7 +934,7 @@ export function useTaxLiabilityReport(filters = {}) {
         } finally {
             setLoading(false);
         }
-    }, [filters, makeApiCall, handleError]);
+    }, [debouncedFiltersString, makeApiCall, handleError]);
 
     useEffect(() => {
         fetchData();
@@ -662,28 +952,52 @@ export function useTaxLiabilityReport(filters = {}) {
  * Hook for Invoice Aging Report
  */
 export function useInvoiceAgingReport(filters = {}) {
-    const [data, setData] = useState({ invoices: [], summary: {} });
+    const [data, setData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const { makeApiCall, handleError } = useAnalytics();
+    const { makeApiCall, handleError, isElectronAvailable } = useAnalytics();
+
+    // Serialize and debounce filters to avoid dependency issues and excessive API calls
+    const filtersString = JSON.stringify(filters);
+    const debouncedFiltersString = useDebounce(filtersString, 300);
 
     const fetchData = useCallback(async () => {
+        if (!isElectronAvailable) {
+            console.warn('Electron API not available for Invoice Aging Report');
+            setError('Electron API not available');
+            return;
+        }
+
         setLoading(true);
         setError(null);
 
         try {
+            const parsedFilters = JSON.parse(debouncedFiltersString);
+            console.log('🔍 useInvoiceAgingReport - Fetching data with filters:', parsedFilters);
+
             const result = await makeApiCall(
                 window.electron.analytics.getInvoiceAgingReport,
-                filters
+                parsedFilters,
+                0, // retryCount
+                'getInvoiceAgingReport' // explicit method name
             );
+
+            console.log('🔍 useInvoiceAgingReport - Received result:', {
+                hasResult: !!result,
+                resultKeys: result ? Object.keys(result) : null,
+                agingBucketsLength: result?.agingBuckets?.length,
+                summaryKeys: result?.summary ? Object.keys(result.summary) : null
+            });
+
             setData(result);
         } catch (err) {
+            console.error('🔍 useInvoiceAgingReport - Error:', err);
             setError(err.message);
             handleError(err, 'Invoice Aging Report');
         } finally {
             setLoading(false);
         }
-    }, [filters, makeApiCall, handleError]);
+    }, [debouncedFiltersString, makeApiCall, handleError, isElectronAvailable]);
 
     useEffect(() => {
         fetchData();
@@ -706,15 +1020,32 @@ export function usePaymentDelayAnalysis(filters = {}) {
     const [error, setError] = useState(null);
     const { makeApiCall, handleError } = useAnalytics();
 
+    // Serialize filters to avoid dependency issues
+    const filtersString = JSON.stringify(filters);
+
     const fetchData = useCallback(async () => {
         setLoading(true);
         setError(null);
 
         try {
+            const parsedFilters = JSON.parse(filtersString);
             const result = await makeApiCall(
                 window.electron.analytics.getPaymentDelayAnalysis,
-                filters
+                parsedFilters,
+                0, // retryCount
+                'getPaymentDelayAnalysis' // explicit method name
             );
+
+            console.log('🔍 usePaymentDelayAnalysis - Received result:', {
+                result,
+                hasResult: !!result,
+                resultKeys: result ? Object.keys(result) : null,
+                monthlyTrendsLength: result?.monthlyTrends?.length,
+                customerBehaviorLength: result?.customerBehavior?.length,
+                optimizationOpportunitiesLength: result?.optimizationOpportunities?.length,
+                summaryMetricsKeys: result?.summaryMetrics ? Object.keys(result.summaryMetrics) : null
+            });
+
             setData(result);
         } catch (err) {
             setError(err.message);
@@ -722,7 +1053,7 @@ export function usePaymentDelayAnalysis(filters = {}) {
         } finally {
             setLoading(false);
         }
-    }, [filters, makeApiCall, handleError]);
+    }, [filtersString, makeApiCall, handleError]);
 
     useEffect(() => {
         fetchData();
@@ -838,14 +1169,20 @@ export function useSmartAlerts(filters = {}) {
     const [error, setError] = useState(null);
     const { makeApiCall, handleError } = useAnalytics();
 
+    // Serialize filters to avoid dependency issues
+    const filtersString = JSON.stringify(filters);
+
     const fetchData = useCallback(async () => {
         setLoading(true);
         setError(null);
 
         try {
+            const parsedFilters = JSON.parse(filtersString);
             const result = await makeApiCall(
                 window.electron.analytics.getSmartAlerts,
-                filters
+                parsedFilters,
+                0, // retryCount
+                'getSmartAlerts' // explicit method name
             );
             setData(result);
         } catch (err) {
@@ -854,7 +1191,7 @@ export function useSmartAlerts(filters = {}) {
         } finally {
             setLoading(false);
         }
-    }, [filters, makeApiCall, handleError]);
+    }, [filtersString, makeApiCall, handleError]);
 
     useEffect(() => {
         fetchData();

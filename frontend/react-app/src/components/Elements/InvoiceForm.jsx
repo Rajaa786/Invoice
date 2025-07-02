@@ -55,6 +55,7 @@ import CustomerForm from "./CustomerForm";
 import CompanyForm from "./CompanyForm";
 import ItemForm from "./ItemForm";
 import { generateInvoicePDF } from "./generateInvoicePDF";
+import { templateLogger } from "../../utils/templateLogger";
 import { useCompanyConfiguration } from "../../hooks/useConfiguration";
 
 const InvoiceForm = () => {
@@ -723,7 +724,7 @@ const InvoiceForm = () => {
         discountPercentage: discountPercentage,
         customerNotes: customerNotes,
         termsAndConditions: termsAndConditions,
-        status: isDraft ? "draft" : "sent",
+        status: isDraft ? "draft" : "pending",
         priority: priority,
         tags: tags,
         internalNotes: internalNotes,
@@ -817,11 +818,24 @@ const InvoiceForm = () => {
         })),
       };
 
-      console.log("PDF invoice data:", invoiceForPDF);
+      templateLogger.invoiceForm('PDF data prepared', {
+        invoiceNumber: invoiceForPDF.invoiceNumber,
+        companyName: invoiceForPDF.company?.companyName,
+        customerName: invoiceForPDF.customer?.name,
+        itemCount: invoiceForPDF.items?.length
+      });
 
-      // Generate PDF using react-pdf
-      const pdfDocument = generateInvoicePDF(invoiceForPDF);
+      // Generate PDF using react-pdf (now async)
+      templateLogger.invoiceForm('Starting PDF generation');
+      const pdfDocument = await generateInvoicePDF(invoiceForPDF);
+
+      templateLogger.invoiceForm('Creating PDF blob');
       const pdfBlob = await pdf(pdfDocument).toBlob();
+
+      templateLogger.success('InvoiceForm', 'PDF blob created successfully', {
+        blobSize: pdfBlob.size,
+        invoiceNumber: invoiceForPDF.invoiceNumber
+      });
 
       // Revoke any existing URL to avoid memory leaks
       if (pdfUrl) {
@@ -979,7 +993,7 @@ const InvoiceForm = () => {
               </Button>
             ) : (
               <Button
-                onClick={() => handleSubmit(true)}
+                onClick={() => handleSubmit(false)}
                 size="sm"
                 className="flex items-center gap-1 text-xs px-3 py-1 h-7 bg-green-600 hover:bg-green-700"
               >
@@ -1745,7 +1759,7 @@ const InvoiceForm = () => {
                       <ArrowRight className="w-3 h-3" />
                     </Button>
                     <Button
-                      onClick={() => handleSubmit(true)}
+                      onClick={() => handleSubmit(false)}
                       size="sm"
                       className="flex items-center gap-1 text-xs px-3 py-1 h-7 bg-green-600 hover:bg-green-700"
                     >
@@ -1880,7 +1894,7 @@ const InvoiceForm = () => {
                   <ArrowRight className="w-3 h-3" />
                 </Button>
                 <Button
-                  onClick={() => handleSubmit(true)}
+                  onClick={() => handleSubmit(false)}
                   size="sm"
                   className="flex items-center gap-1 text-xs px-3 py-1 h-7 bg-green-600 hover:bg-green-700"
                 >
@@ -2029,7 +2043,7 @@ const InvoiceForm = () => {
                   Back to Terms
                 </Button>
                 <Button
-                  onClick={() => handleSubmit(true)}
+                  onClick={() => handleSubmit(false)}
                   size="sm"
                   className="flex items-center gap-1 text-xs px-3 py-1 h-7 bg-green-600 hover:bg-green-700"
                 >

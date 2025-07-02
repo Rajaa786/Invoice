@@ -7,6 +7,7 @@ import {
     switchTemplate,
     getTemplateColors
 } from './generateInvoicePDF';
+import { TemplateFactory } from './InvoiceTemplates/TemplateRegistry';
 
 /**
  * Template System Example Component
@@ -16,6 +17,8 @@ const TemplateSystemExample = () => {
     const [selectedTemplate, setSelectedTemplate] = useState(null);
     const [availableTemplates, setAvailableTemplates] = useState([]);
     const [previewMode, setPreviewMode] = useState(false);
+    const [pdfDocument, setPdfDocument] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
 
     // Sample invoice data for demonstration
     const sampleInvoice = {
@@ -56,25 +59,49 @@ const TemplateSystemExample = () => {
     };
 
     useEffect(() => {
-        // Load available templates
-        const templates = getAvailableTemplates();
-        setAvailableTemplates(templates);
+        const loadTemplateData = async () => {
+            try {
+                setIsLoading(true);
+                // Load available templates
+                const templates = getAvailableTemplates();
+                setAvailableTemplates(templates);
 
-        // Get current template
-        const current = getCurrentTemplate();
-        setSelectedTemplate(current);
+                // Get current template (async)
+                const current = await getCurrentTemplate();
+                setSelectedTemplate(current);
+
+                // Generate initial PDF document
+                const document = await generateInvoicePDF(sampleInvoice);
+                setPdfDocument(document);
+            } catch (error) {
+                console.error('Error loading template data:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadTemplateData();
     }, []);
 
-    const handleTemplateChange = (templateId) => {
-        const success = switchTemplate(templateId);
-        if (success) {
-            const newTemplate = getCurrentTemplate();
-            setSelectedTemplate(newTemplate);
+    const handleTemplateChange = async (templateId) => {
+        try {
+            const success = await switchTemplate(templateId);
+            if (success) {
+                const newTemplate = await getCurrentTemplate();
+                setSelectedTemplate(newTemplate);
+
+                // Regenerate PDF with new template
+                const document = await generateInvoicePDF(sampleInvoice);
+                setPdfDocument(document);
+            }
+        } catch (error) {
+            console.error('Error changing template:', error);
         }
     };
 
     const getTemplatePreview = (templateId) => {
-        const colors = getTemplateColors(templateId);
+        // Use synchronous method from TemplateFactory for colors
+        const colors = TemplateFactory.getTemplateColors(templateId);
         return (
             <div
                 className="w-6 h-6 rounded border-2 border-gray-300"
@@ -84,6 +111,17 @@ const TemplateSystemExample = () => {
             />
         );
     };
+
+    if (isLoading) {
+        return (
+            <div className="max-w-6xl mx-auto p-6">
+                <div className="bg-white rounded-lg shadow p-6 text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading template system...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-6xl mx-auto p-6 space-y-6">
@@ -104,8 +142,8 @@ const TemplateSystemExample = () => {
                             <div
                                 key={template.id}
                                 className={`border rounded-lg p-4 cursor-pointer transition-all duration-200 ${selectedTemplate?.id === template.id
-                                        ? 'border-blue-500 bg-blue-50'
-                                        : 'border-gray-200 hover:border-gray-300'
+                                    ? 'border-blue-500 bg-blue-50'
+                                    : 'border-gray-200 hover:border-gray-300'
                                     }`}
                                 onClick={() => handleTemplateChange(template.id)}
                             >
@@ -182,33 +220,36 @@ const TemplateSystemExample = () => {
 
                 {/* PDF Actions */}
                 <div className="flex flex-wrap gap-4 mb-6">
-                    <PDFDownloadLink
-                        document={generateInvoicePDF(sampleInvoice)}
-                        fileName={`invoice-${selectedTemplate?.name.toLowerCase().replace(/\s+/g, '-')}-demo.pdf`}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors duration-200"
-                    >
-                        {({ blob, url, loading, error }) =>
-                            loading ? 'Generating PDF...' : 'Download Sample Invoice'
-                        }
-                    </PDFDownloadLink>
+                    {pdfDocument && (
+                        <PDFDownloadLink
+                            document={pdfDocument}
+                            fileName={`invoice-${selectedTemplate?.name.toLowerCase().replace(/\s+/g, '-')}-demo.pdf`}
+                            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors duration-200"
+                        >
+                            {({ blob, url, loading, error }) =>
+                                loading ? 'Generating PDF...' : 'Download Sample Invoice'
+                            }
+                        </PDFDownloadLink>
+                    )}
 
                     <button
                         onClick={() => setPreviewMode(!previewMode)}
                         className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors duration-200"
+                        disabled={!pdfDocument}
                     >
                         {previewMode ? 'Hide Preview' : 'Show Preview'}
                     </button>
                 </div>
 
                 {/* PDF Preview */}
-                {previewMode && (
+                {previewMode && pdfDocument && (
                     <div className="border rounded-lg overflow-hidden">
                         <div className="bg-gray-100 px-4 py-2 border-b">
                             <h3 className="font-medium">PDF Preview - {selectedTemplate?.name}</h3>
                         </div>
                         <div style={{ height: '600px' }}>
                             <PDFViewer width="100%" height="100%">
-                                {generateInvoicePDF(sampleInvoice)}
+                                {pdfDocument}
                             </PDFViewer>
                         </div>
                     </div>

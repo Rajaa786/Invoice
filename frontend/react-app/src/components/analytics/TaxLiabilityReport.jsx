@@ -173,12 +173,32 @@ export default function TaxLiabilityReport() {
     const [selectedPeriod, setSelectedPeriod] = useState('monthly');
     const [showForecast, setShowForecast] = useState(true);
     const [retryCount, setRetryCount] = useState(0);
+    const [isResizing, setIsResizing] = useState(false);
 
     const { filters } = useAnalyticsContext();
     const { data, loading, error, refetch } = useTaxLiabilityReport({
         ...filters,
         period: selectedPeriod
     });
+
+    // Handle window resize to prevent loading state issues
+    useEffect(() => {
+        let resizeTimer;
+
+        const handleResize = () => {
+            setIsResizing(true);
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                setIsResizing(false);
+            }, 150);
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            clearTimeout(resizeTimer);
+        };
+    }, []);
 
     // Memoized data processing
     const processedData = useMemo(() => {
@@ -228,7 +248,7 @@ export default function TaxLiabilityReport() {
     };
 
     // Check if we have no data at all (matching TopItemsAnalysis pattern)
-    const hasNoData = !loading && (!data || !processedData?.monthlyData?.length);
+    const hasNoData = !loading && !isResizing && (!data || !processedData?.monthlyData?.length);
 
     const {
         combinedData,
@@ -247,9 +267,9 @@ export default function TaxLiabilityReport() {
                         <FileText className="w-5 h-5 text-blue-600" />
                         Tax Intelligence Dashboard
                         <div className="flex items-center gap-1 ml-2">
-                            <div className={`w-2 h-2 rounded-full ${loading ? 'bg-amber-500 animate-pulse' : error ? 'bg-red-500' : 'bg-green-500 animate-pulse'}`}></div>
-                            <span className={`text-xs font-medium ${loading ? 'text-amber-600' : error ? 'text-red-600' : 'text-green-600'}`}>
-                                {loading ? 'LOADING' : error ? 'ERROR' : 'LIVE'}
+                            <div className={`w-2 h-2 rounded-full ${(loading && !isResizing) ? 'bg-amber-500 animate-pulse' : error ? 'bg-red-500' : 'bg-green-500 animate-pulse'}`}></div>
+                            <span className={`text-xs font-medium ${(loading && !isResizing) ? 'text-amber-600' : error ? 'text-red-600' : 'text-green-600'}`}>
+                                {(loading && !isResizing) ? 'LOADING' : error ? 'ERROR' : 'LIVE'}
                             </span>
                         </div>
                         {processedData?.monthlyData?.length > 0 && (
@@ -266,10 +286,10 @@ export default function TaxLiabilityReport() {
                 <div className="flex items-center gap-3">
                     <button
                         onClick={refetch}
-                        disabled={loading}
+                        disabled={loading && !isResizing}
                         className="flex items-center gap-2 px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
                     >
-                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                        <RefreshCw className={`w-4 h-4 ${(loading && !isResizing) ? 'animate-spin' : ''}`} />
                         Refresh
                     </button>
 

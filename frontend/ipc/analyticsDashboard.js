@@ -16,7 +16,9 @@ class AnalyticsService {
     constructor() {
         this.db = DatabaseManager.getInstance().getDatabase();
         this.cache = new Map();
-        this.cacheTimeout = 5 * 60 * 1000; // 5 minutes cache
+        this.cacheTimeout = 60 * 1000; // Reduced to 1 minute cache to prevent stale data
+        this.maxRetries = 3;
+        this.retryDelay = 1000;
         log.info('AnalyticsService initialized with cache timeout:', this.cacheTimeout);
     }
 
@@ -45,14 +47,97 @@ class AnalyticsService {
     }
 
     /**
-     * Summary Metrics - Core KPIs
+     * Execute database query with retry logic for SQLite connection issues
+     */
+    async executeWithRetry(operation, context = 'database operation', retryCount = 0) {
+        try {
+            return await operation();
+        } catch (error) {
+            // Check for common SQLite errors that can be retried
+            const isRetryableError = (
+                error.message.includes('database is locked') ||
+                error.message.includes('SQLITE_BUSY') ||
+                error.message.includes('SQLITE_LOCKED') ||
+                error.message.includes('connection') ||
+                error.message.includes('timeout')
+            );
+
+            if (isRetryableError && retryCount < this.maxRetries) {
+                const delay = this.retryDelay * Math.pow(2, retryCount);
+                log.warn(`⚠️ ${context} failed (attempt ${retryCount + 1}/${this.maxRetries}), retrying in ${delay}ms:`, error.message);
+
+                await new Promise(resolve => setTimeout(resolve, delay));
+                return this.executeWithRetry(operation, context, retryCount + 1);
+            }
+
+            throw error;
+        }
+    }
+
+    /**
+     * Debug function to test basic database connectivity and data existence
+     */
+    async debugBasicData() {
+        try {
+            log.info('🔍 Running basic data debug check...');
+
+            // Test 1: Basic invoice count
+            const invoiceCount = await this.db
+                .select({ count: sql`COUNT(*)` })
+                .from(invoices)
+                .get();
+
+            log.info('📊 Total invoices in database:', invoiceCount?.count || 0);
+
+            // Test 2: Sample invoice data
+            const sampleInvoices = await this.db
+                .select({
+                    id: invoices.id,
+                    totalAmount: invoices.totalAmount,
+                    status: invoices.status,
+                    invoiceDate: invoices.invoiceDate
+                })
+                .from(invoices)
+                .limit(3);
+
+            log.info('📋 Sample invoices:', sampleInvoices);
+
+            // Test 3: Status distribution (raw)
+            const statusCheck = await this.db
+                .select({
+                    status: invoices.status,
+                    count: sql`COUNT(*)`
+                })
+                .from(invoices)
+                .groupBy(invoices.status);
+
+            log.info('📈 Status distribution:', statusCheck);
+
+            return {
+                invoiceCount: invoiceCount?.count || 0,
+                sampleInvoices,
+                statusDistribution: statusCheck
+            };
+        } catch (error) {
+            log.error('❌ Debug basic data failed:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Summary Metrics - Core KPIs with enhanced error handling
      */
     async getSummaryMetrics(filters = {}) {
         const cacheKey = `summary_metrics_${JSON.stringify(filters)}`;
         const cached = this.getCached(cacheKey);
-        if (cached) return cached;
+        if (cached) {
+            log.debug('📋 Cache hit for Summary Metrics');
+            return cached;
+        }
 
-        try {
+        return this.executeWithRetry(async () => {
+            log.debug('📊 Fetching Summary Metrics with filters:', filters);
+
             // Build dynamic WHERE clause based on filters
             const whereClause = this.buildWhereClause(filters);
 
@@ -81,6 +166,11 @@ class AnalyticsService {
                 .where(whereClause)
                 .get();
 
+            // Validate result
+            if (!result) {
+                throw new Error('No data returned from database query');
+            }
+
             // Calculate additional derived metrics
             const paymentRate = result.totalInvoices > 0 ?
                 (result.paidInvoices / result.totalInvoices) * 100 : 0;
@@ -90,18 +180,24 @@ class AnalyticsService {
 
             const metrics = {
                 ...result,
+                // Ensure all values are numbers
+                totalRevenue: Number(result.totalRevenue) || 0,
+                totalInvoices: Number(result.totalInvoices) || 0,
+                paidInvoices: Number(result.paidInvoices) || 0,
+                pendingInvoices: Number(result.pendingInvoices) || 0,
+                overdueInvoices: Number(result.overdueInvoices) || 0,
+                avgInvoiceValue: Number(result.avgInvoiceValue) || 0,
+                totalCustomers: Number(result.totalCustomers) || 0,
+                totalCompanies: Number(result.totalCompanies) || 0,
                 paymentRate: Math.round(paymentRate * 100) / 100,
                 overdueRate: Math.round(overdueRate * 100) / 100,
                 collectionEfficiency: Math.round((100 - overdueRate) * 100) / 100
             };
 
             this.setCache(cacheKey, metrics);
-            log.debug(`Summary metrics calculated successfully: ${Object.keys(metrics).length} metrics`);
+            log.debug(`✅ Summary metrics calculated successfully: ${Object.keys(metrics).length} metrics`);
             return metrics;
-        } catch (error) {
-            log.error('Error fetching summary metrics:', error);
-            throw new Error(`Failed to fetch summary metrics: ${error.message}`);
-        }
+        }, 'Summary Metrics');
     }
 
     /**
@@ -159,26 +255,25 @@ class AnalyticsService {
     }
 
     /**
-     * Invoice Status Distribution with Enhanced Analytics
+     * Invoice Status Distribution with Enhanced Analytics and better error handling
      */
     async getInvoiceStatusDistribution(filters = {}) {
-        console.log('🔍 Analytics Debug - getInvoiceStatusDistribution called with filters:', filters);
-        
+        log.info('📈 Invoice Status Distribution called with filters:', filters);
+
         const cacheKey = `invoice_status_${JSON.stringify(filters)}`;
         const cached = this.getCached(cacheKey);
         if (cached) {
-            console.log('🔍 Analytics Debug - Returning cached data:', cached);
+            log.info('📋 Cache hit for Invoice Status Distribution');
             return cached;
         }
 
-        try {
+        return this.executeWithRetry(async () => {
             const whereClause = this.buildWhereClause(filters);
-            console.log('🔍 Analytics Debug - Where clause:', whereClause);
 
             // Check if status column exists (for backwards compatibility)
             const hasStatusColumn = await this.checkColumnExists('invoices', 'status');
             const hasPaidDateColumn = await this.checkColumnExists('invoices', 'paid_date');
-            console.log('🔍 Analytics Debug - Column existence:', { hasStatusColumn, hasPaidDateColumn });
+            log.info('📈 Column existence check:', { hasStatusColumn, hasPaidDateColumn });
 
             // Get total count first for percentage calculation
             const totalCountResult = await this.db
@@ -353,54 +448,13 @@ class AnalyticsService {
                 }
             };
 
-            console.log('🔍 Analytics Debug - Final result being returned:', result);
+            log.info('✅ Invoice Status Distribution result generated:', {
+                statusCount: result.statusData?.length || 0,
+                totalInvoices: result.summary?.totalInvoices || 0
+            });
             this.setCache(cacheKey, result);
             return result;
-        } catch (error) {
-            console.error('Error fetching invoice status distribution:', error);
-            console.log('🔍 Analytics Debug - Error details:', {
-                message: error.message,
-                stack: error.stack,
-                filters,
-                cacheKey
-            });
-            
-            // TEMPORARY: Return test data instead of empty to help debug UI
-            return {
-                statusData: [
-                    {
-                        name: 'Pending',
-                        status: 'pending',
-                        value: 3,
-                        amount: 15000,
-                        percentage: 60,
-                        avgDays: 10,
-                        avgAmount: 5000,
-                        trend: 0,
-                        risk: 'Low'
-                    },
-                    {
-                        name: 'Paid',
-                        status: 'paid',
-                        value: 2,
-                        amount: 10000,
-                        percentage: 40,
-                        avgDays: 5,
-                        avgAmount: 5000,
-                        trend: 0,
-                        risk: 'None'
-                    }
-                ],
-                agingData: [],
-                summary: {
-                    totalInvoices: 5,
-                    totalAmount: 25000,
-                    avgDSO: 7,
-                    collectionRate: 67,
-                    overduePercentage: 0
-                }
-            };
-        }
+        }, 'Invoice Status Distribution');
     }
 
     /**
@@ -2008,7 +2062,10 @@ class AnalyticsService {
             const currentDate = new Date().toISOString().split('T')[0];
             const whereClause = this.buildWhereClause(filters);
 
+            console.log('🔍 Analytics Debug - Starting aging report generation for filters:', filters);
+
             // 1. Get detailed aging buckets with comprehensive metrics
+            // Include ALL invoices, not just pending/overdue ones for comprehensive aging analysis
             const agingBuckets = await this.db
                 .select({
                     range: sql`CASE 
@@ -2030,7 +2087,7 @@ class AnalyticsService {
                     avgAmount: sql`ROUND(AVG(${invoices.totalAmount}), 2)`,
                     collectionRate: sql`ROUND(
                         COUNT(CASE WHEN ${invoices.status} = 'paid' THEN 1 END) * 100.0 / 
-                        (COUNT(CASE WHEN ${invoices.status} = 'paid' THEN 1 END) + COUNT(*)), 2
+                        NULLIF(COUNT(*), 0), 2
                     )`,
                     paidInvoices: sql`COUNT(CASE WHEN ${invoices.status} = 'paid' THEN 1 END)`,
                     pendingInvoices: sql`COUNT(CASE WHEN ${invoices.status} = 'pending' THEN 1 END)`,
@@ -2038,7 +2095,7 @@ class AnalyticsService {
                 })
                 .from(invoices)
                 .innerJoin(customers, eq(invoices.customerId, customers.id))
-                .where(and(whereClause || sql`1=1`, sql`${invoices.status} IN ('pending', 'overdue')`))
+                .where(whereClause || sql`1=1`) // Remove restrictive status filter
                 .groupBy(sql`CASE 
                     WHEN julianday('${sql.raw(currentDate)}') - julianday(${invoices.dueDate}) <= 0 THEN '0-30 days'
                     WHEN julianday('${sql.raw(currentDate)}') - julianday(${invoices.dueDate}) <= 30 THEN '31-60 days'
@@ -2052,7 +2109,12 @@ class AnalyticsService {
                     ELSE 4
                 END`);
 
-            // 2. Get customer-wise aging analysis
+            console.log('🔍 Analytics Debug - Aging buckets query result:', {
+                length: agingBuckets.length,
+                sample: agingBuckets[0]
+            });
+
+            // 2. Get customer-wise aging analysis - Include ALL invoices for complete picture
             const customerAging = await this.db
                 .select({
                     customerId: customers.id,
@@ -2085,7 +2147,7 @@ class AnalyticsService {
                         END
                     ), 0)`,
                     paymentHistory: sql`ROUND(
-                        COUNT(CASE WHEN ${invoices.status} = 'paid' THEN 1 END) * 100.0 / COUNT(*), 0
+                        COUNT(CASE WHEN ${invoices.status} = 'paid' THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0), 0
                     )`,
                     lastPayment: sql`MAX(${invoices.paidDate})`,
                     creditLimit: sql`100000`, // Default credit limit - should come from customer table
@@ -2102,11 +2164,16 @@ class AnalyticsService {
                 })
                 .from(invoices)
                 .innerJoin(customers, eq(invoices.customerId, customers.id))
-                .where(and(whereClause || sql`1=1`, sql`${invoices.status} IN ('pending', 'overdue', 'paid')`))
+                .where(whereClause || sql`1=1`) // Remove restrictive status filter
                 .groupBy(customers.id, customers.companyName)
                 .having(sql`COUNT(${invoices.id}) > 0`)
                 .orderBy(desc(sql`COALESCE(SUM(${invoices.totalAmount}), 0)`))
                 .limit(20);
+
+            console.log('🔍 Analytics Debug - Customer aging query result:', {
+                length: customerAging.length,
+                sample: customerAging[0]
+            });
 
             // 3. Get collection efficiency trends (last 6 months)
             const collectionTrends = await this.db
@@ -2291,6 +2358,22 @@ class AnalyticsService {
             // 9. Generate insights and recommendations
             const insights = this.generateAgingInsights(enhancedAgingBuckets, enhancedCustomerAging, collectionTrends);
 
+            console.log('🔍 Analytics Debug - Collection trends result:', {
+                length: collectionTrends.length,
+                sample: collectionTrends[0]
+            });
+
+            console.log('🔍 Analytics Debug - Summary calculations:', {
+                totalOutstanding,
+                totalInvoices,
+                avgDSO,
+                overduePercentage,
+                currentEfficiency,
+                customersCount: enhancedCustomerAging.length,
+                agingBucketsCount: enhancedAgingBuckets.length,
+                highRiskCustomers: enhancedCustomerAging.filter(c => c.riskScore > 60).length
+            });
+
             const result = {
                 agingBuckets: enhancedAgingBuckets,
                 customerAging: enhancedCustomerAging,
@@ -2324,6 +2407,15 @@ class AnalyticsService {
                     }
                 }
             };
+
+            console.log('🔍 Analytics Debug - Final result being returned:', {
+                agingBucketsCount: result.agingBuckets.length,
+                customerAgingCount: result.customerAging.length,
+                collectionTrendsCount: result.collectionTrends.length,
+                summaryData: result.summary,
+                hasInsights: result.insights.length > 0,
+                cacheKey
+            });
 
             this.setCache(cacheKey, result);
             return result;
@@ -2422,44 +2514,66 @@ class AnalyticsService {
             const whereClause = this.buildWhereClause(filters);
             const currentDate = new Date().toISOString().split('T')[0];
 
+            console.log('🔍 PaymentDelayAnalysis Debug - Starting analysis with:', {
+                filters,
+                currentDate,
+                whereClause: whereClause ? 'Has conditions' : 'No conditions'
+            });
+
+            // Debug: Check if invoices exist in the last 12 months
+            const invoiceCountCheck = await this.db
+                .select({
+                    totalCount: sql`COUNT(*)`,
+                    recentCount: sql`COUNT(CASE WHEN datetime(${invoices.invoiceDate}, 'unixepoch') >= datetime('now', '-12 months') THEN 1 END)`,
+                    withPaidDate: sql`COUNT(CASE WHEN ${invoices.paidDate} IS NOT NULL THEN 1 END)`,
+                    paidStatus: sql`COUNT(CASE WHEN ${invoices.status} = 'paid' THEN 1 END)`,
+                    sampleInvoiceDate: sql`datetime(MIN(${invoices.invoiceDate}), 'unixepoch')`,
+                    latestInvoiceDate: sql`datetime(MAX(${invoices.invoiceDate}), 'unixepoch')`
+                })
+                .from(invoices)
+                .where(whereClause || sql`1=1`)
+                .get();
+
+            console.log('🔍 PaymentDelayAnalysis Debug - Invoice count check:', invoiceCountCheck);
+
             // 1. Get monthly payment trends (last 12 months)
             const monthlyTrends = await this.db
                 .select({
-                    month: sql`strftime('%m', ${invoices.invoiceDate})`,
-                    monthName: sql`CASE strftime('%m', ${invoices.invoiceDate})
+                    month: sql`strftime('%m', datetime(${invoices.invoiceDate}, 'unixepoch'))`,
+                    monthName: sql`CASE strftime('%m', datetime(${invoices.invoiceDate}, 'unixepoch'))
                         WHEN '01' THEN 'Jan' WHEN '02' THEN 'Feb' WHEN '03' THEN 'Mar'
                         WHEN '04' THEN 'Apr' WHEN '05' THEN 'May' WHEN '06' THEN 'Jun'
                         WHEN '07' THEN 'Jul' WHEN '08' THEN 'Aug' WHEN '09' THEN 'Sep'
                         WHEN '10' THEN 'Oct' WHEN '11' THEN 'Nov' WHEN '12' THEN 'Dec'
                     END`,
-                    period: sql`strftime('%Y-%m', ${invoices.invoiceDate})`,
+                    period: sql`strftime('%Y-%m', datetime(${invoices.invoiceDate}, 'unixepoch'))`,
                     avgDelay: sql`ROUND(AVG(
                         CASE 
                             WHEN ${invoices.paidDate} IS NOT NULL 
-                            THEN julianday(${invoices.paidDate}) - julianday(${invoices.dueDate})
-                            ELSE julianday('${sql.raw(currentDate)}') - julianday(${invoices.dueDate})
+                            THEN (${invoices.paidDate} - ${invoices.dueDate}) / 86400.0
+                            ELSE (strftime('%s', 'now') - ${invoices.dueDate}) / 86400.0
                         END
                     ), 1)`,
                     target: sql`30`, // Standard 30-day target
                     onTime: sql`ROUND(
-                        COUNT(CASE WHEN ${invoices.paidDate} IS NOT NULL AND julianday(${invoices.paidDate}) <= julianday(${invoices.dueDate}) THEN 1 END) * 100.0 / 
-                        COUNT(CASE WHEN ${invoices.paidDate} IS NOT NULL THEN 1 END), 0
+                        COUNT(CASE WHEN ${invoices.paidDate} IS NOT NULL AND ${invoices.paidDate} <= ${invoices.dueDate} THEN 1 END) * 100.0 / 
+                        NULLIF(COUNT(CASE WHEN ${invoices.paidDate} IS NOT NULL THEN 1 END), 0), 0
                     )`,
                     late: sql`ROUND(
-                        COUNT(CASE WHEN ${invoices.paidDate} IS NOT NULL AND julianday(${invoices.paidDate}) > julianday(${invoices.dueDate}) AND julianday(${invoices.paidDate}) - julianday(${invoices.dueDate}) <= 15 THEN 1 END) * 100.0 / 
-                        COUNT(CASE WHEN ${invoices.paidDate} IS NOT NULL THEN 1 END), 0
+                        COUNT(CASE WHEN ${invoices.paidDate} IS NOT NULL AND ${invoices.paidDate} > ${invoices.dueDate} AND (${invoices.paidDate} - ${invoices.dueDate}) / 86400.0 <= 15 THEN 1 END) * 100.0 / 
+                        NULLIF(COUNT(CASE WHEN ${invoices.paidDate} IS NOT NULL THEN 1 END), 0), 0
                     )`,
                     veryLate: sql`ROUND(
-                        COUNT(CASE WHEN ${invoices.paidDate} IS NOT NULL AND julianday(${invoices.paidDate}) - julianday(${invoices.dueDate}) > 15 THEN 1 END) * 100.0 / 
-                        COUNT(CASE WHEN ${invoices.paidDate} IS NOT NULL THEN 1 END), 0
+                        COUNT(CASE WHEN ${invoices.paidDate} IS NOT NULL AND (${invoices.paidDate} - ${invoices.dueDate}) / 86400.0 > 15 THEN 1 END) * 100.0 / 
+                        NULLIF(COUNT(CASE WHEN ${invoices.paidDate} IS NOT NULL THEN 1 END), 0), 0
                     )`,
                     totalInvoices: sql`COUNT(${invoices.id})`,
                     avgAmount: sql`ROUND(AVG(${invoices.totalAmount}), 0)`,
                     customerSatisfaction: sql`ROUND(4.5 - (AVG(
                         CASE 
                             WHEN ${invoices.paidDate} IS NOT NULL 
-                            THEN julianday(${invoices.paidDate}) - julianday(${invoices.dueDate})
-                            ELSE julianday('${sql.raw(currentDate)}') - julianday(${invoices.dueDate})
+                            THEN (${invoices.paidDate} - ${invoices.dueDate}) / 86400.0
+                            ELSE (strftime('%s', 'now') - ${invoices.dueDate}) / 86400.0
                         END
                     ) / 30.0), 1)`, // Satisfaction decreases with delay
                     cashFlow: sql`COALESCE(SUM(CASE WHEN ${invoices.status} = 'paid' THEN ${invoices.totalAmount} ELSE 0 END), 0)`,
@@ -2468,10 +2582,70 @@ class AnalyticsService {
                 .from(invoices)
                 .where(and(
                     whereClause || sql`1=1`,
-                    gte(invoices.invoiceDate, sql`date('now', '-12 months')`)
+                    sql`datetime(${invoices.invoiceDate}, 'unixepoch') >= datetime('now', '-12 months')`
                 ))
-                .groupBy(sql`strftime('%Y-%m', ${invoices.invoiceDate})`)
-                .orderBy(sql`strftime('%Y-%m', ${invoices.invoiceDate})`);
+                .groupBy(sql`strftime('%Y-%m', datetime(${invoices.invoiceDate}, 'unixepoch'))`)
+                .orderBy(sql`strftime('%Y-%m', datetime(${invoices.invoiceDate}, 'unixepoch'))`);
+
+            console.log('🔍 PaymentDelayAnalysis Debug - Monthly trends result:', {
+                length: monthlyTrends.length,
+                sample: monthlyTrends[0]
+            });
+
+            // If no recent data, try with a broader date range (last 24 months)
+            let fallbackMonthlyTrends = [];
+            if (monthlyTrends.length === 0) {
+                console.log('🔍 PaymentDelayAnalysis Debug - No recent data, trying broader range...');
+
+                fallbackMonthlyTrends = await this.db
+                    .select({
+                        month: sql`strftime('%m', datetime(${invoices.invoiceDate}, 'unixepoch'))`,
+                        monthName: sql`CASE strftime('%m', datetime(${invoices.invoiceDate}, 'unixepoch'))
+                            WHEN '01' THEN 'Jan' WHEN '02' THEN 'Feb' WHEN '03' THEN 'Mar'
+                            WHEN '04' THEN 'Apr' WHEN '05' THEN 'May' WHEN '06' THEN 'Jun'
+                            WHEN '07' THEN 'Jul' WHEN '08' THEN 'Aug' WHEN '09' THEN 'Sep'
+                            WHEN '10' THEN 'Oct' WHEN '11' THEN 'Nov' WHEN '12' THEN 'Dec'
+                        END`,
+                        period: sql`strftime('%Y-%m', datetime(${invoices.invoiceDate}, 'unixepoch'))`,
+                        avgDelay: sql`ROUND(AVG(
+                            CASE 
+                                WHEN ${invoices.paidDate} IS NOT NULL 
+                                THEN (${invoices.paidDate} - ${invoices.dueDate}) / 86400.0
+                                ELSE 0
+                            END
+                        ), 1)`,
+                        target: sql`30`,
+                        onTime: sql`ROUND(
+                            COUNT(CASE WHEN ${invoices.paidDate} IS NOT NULL AND ${invoices.paidDate} <= ${invoices.dueDate} THEN 1 END) * 100.0 / 
+                            NULLIF(COUNT(CASE WHEN ${invoices.paidDate} IS NOT NULL THEN 1 END), 0), 0
+                        )`,
+                        late: sql`ROUND(
+                            COUNT(CASE WHEN ${invoices.paidDate} IS NOT NULL AND ${invoices.paidDate} > ${invoices.dueDate} AND (${invoices.paidDate} - ${invoices.dueDate}) / 86400.0 <= 15 THEN 1 END) * 100.0 / 
+                            NULLIF(COUNT(CASE WHEN ${invoices.paidDate} IS NOT NULL THEN 1 END), 0), 0
+                        )`,
+                        veryLate: sql`ROUND(
+                            COUNT(CASE WHEN ${invoices.paidDate} IS NOT NULL AND (${invoices.paidDate} - ${invoices.dueDate}) / 86400.0 > 15 THEN 1 END) * 100.0 / 
+                            NULLIF(COUNT(CASE WHEN ${invoices.paidDate} IS NOT NULL THEN 1 END), 0), 0
+                        )`,
+                        totalInvoices: sql`COUNT(${invoices.id})`,
+                        avgAmount: sql`ROUND(AVG(${invoices.totalAmount}), 0)`,
+                        customerSatisfaction: sql`4.0`, // Default when no payment data
+                        cashFlow: sql`COALESCE(SUM(CASE WHEN ${invoices.status} = 'paid' THEN ${invoices.totalAmount} ELSE 0 END), 0)`,
+                        industryAvg: sql`32`
+                    })
+                    .from(invoices)
+                    .where(whereClause || sql`1=1`)
+                    .groupBy(sql`strftime('%Y-%m', datetime(${invoices.invoiceDate}, 'unixepoch'))`)
+                    .orderBy(sql`strftime('%Y-%m', datetime(${invoices.invoiceDate}, 'unixepoch'))`)
+                    .limit(12);
+
+                console.log('🔍 PaymentDelayAnalysis Debug - Fallback trends result:', {
+                    length: fallbackMonthlyTrends.length,
+                    sample: fallbackMonthlyTrends[0]
+                });
+            }
+
+            const finalMonthlyTrends = monthlyTrends.length > 0 ? monthlyTrends : fallbackMonthlyTrends;
 
             // 2. Get detailed customer payment behavior analysis
             const customerBehavior = await this.db
@@ -2481,8 +2655,8 @@ class AnalyticsService {
                     avgDelay: sql`ROUND(AVG(
                         CASE 
                             WHEN ${invoices.paidDate} IS NOT NULL 
-                            THEN julianday(${invoices.paidDate}) - julianday(${invoices.dueDate})
-                            ELSE julianday('${sql.raw(currentDate)}') - julianday(${invoices.dueDate})
+                            THEN (${invoices.paidDate} - ${invoices.dueDate}) / 86400.0
+                            ELSE (strftime('%s', 'now') - ${invoices.dueDate}) / 86400.0
                         END
                     ), 1)`,
                     consistency: sql`ROUND(
@@ -2496,15 +2670,15 @@ class AnalyticsService {
                         WHEN AVG(
                             CASE 
                                 WHEN ${invoices.paidDate} IS NOT NULL 
-                                THEN julianday(${invoices.paidDate}) - julianday(${invoices.dueDate})
-                                ELSE julianday('${sql.raw(currentDate)}') - julianday(${invoices.dueDate})
+                                THEN (${invoices.paidDate} - ${invoices.dueDate}) / 86400.0
+                                ELSE (strftime('%s', 'now') - ${invoices.dueDate}) / 86400.0
                             END
                         ) <= 20 THEN 'Improving'
                         WHEN AVG(
                             CASE 
                                 WHEN ${invoices.paidDate} IS NOT NULL 
-                                THEN julianday(${invoices.paidDate}) - julianday(${invoices.dueDate})
-                                ELSE julianday('${sql.raw(currentDate)}') - julianday(${invoices.dueDate})
+                                THEN (${invoices.paidDate} - ${invoices.dueDate}) / 86400.0
+                                ELSE (strftime('%s', 'now') - ${invoices.dueDate}) / 86400.0
                             END
                         ) <= 40 THEN 'Stable'
                         ELSE 'Deteriorating'
@@ -2514,15 +2688,15 @@ class AnalyticsService {
                             WHEN AVG(
                                 CASE 
                                     WHEN ${invoices.paidDate} IS NOT NULL 
-                                    THEN julianday(${invoices.paidDate}) - julianday(${invoices.dueDate})
-                                    ELSE julianday('${sql.raw(currentDate)}') - julianday(${invoices.dueDate})
+                                    THEN (${invoices.paidDate} - ${invoices.dueDate}) / 86400.0
+                                    ELSE (strftime('%s', 'now') - ${invoices.dueDate}) / 86400.0
                                 END
                             ) <= 20 THEN 15
                             WHEN AVG(
                                 CASE 
                                     WHEN ${invoices.paidDate} IS NOT NULL 
-                                    THEN julianday(${invoices.paidDate}) - julianday(${invoices.dueDate})
-                                    ELSE julianday('${sql.raw(currentDate)}') - julianday(${invoices.dueDate})
+                                    THEN (${invoices.paidDate} - ${invoices.dueDate}) / 86400.0
+                                    ELSE (strftime('%s', 'now') - ${invoices.dueDate}) / 86400.0
                                 END
                             ) <= 40 THEN 35
                             ELSE 65
@@ -2534,8 +2708,8 @@ class AnalyticsService {
                         WHEN COUNT(${invoices.id}) < 10 THEN 'Month-end'
                         ELSE 'Quarter-end'
                     END`,
-                    onTimePayments: sql`COUNT(CASE WHEN ${invoices.paidDate} IS NOT NULL AND julianday(${invoices.paidDate}) <= julianday(${invoices.dueDate}) THEN 1 END)`,
-                    latePayments: sql`COUNT(CASE WHEN ${invoices.paidDate} IS NOT NULL AND julianday(${invoices.paidDate}) > julianday(${invoices.dueDate}) THEN 1 END)`,
+                    onTimePayments: sql`COUNT(CASE WHEN ${invoices.paidDate} IS NOT NULL AND ${invoices.paidDate} <= ${invoices.dueDate} THEN 1 END)`,
+                    latePayments: sql`COUNT(CASE WHEN ${invoices.paidDate} IS NOT NULL AND ${invoices.paidDate} > ${invoices.dueDate} THEN 1 END)`,
                     avgInvoiceValue: sql`ROUND(AVG(${invoices.totalAmount}), 0)`,
                     paymentReliability: sql`ROUND(COUNT(CASE WHEN ${invoices.status} = 'paid' THEN 1 END) * 100.0 / COUNT(*), 0)`
                 })
@@ -2547,17 +2721,22 @@ class AnalyticsService {
                 .orderBy(desc(sql`COALESCE(SUM(${invoices.totalAmount}), 0)`))
                 .limit(20);
 
+            console.log('🔍 PaymentDelayAnalysis Debug - Customer behavior query result:', {
+                length: customerBehavior.length,
+                sample: customerBehavior[0]
+            });
+
             // 3. Generate optimization opportunities based on real data
-            const optimizationOpportunities = this.generatePaymentOptimizations(monthlyTrends, customerBehavior);
+            const optimizationOpportunities = this.generatePaymentOptimizations(finalMonthlyTrends, customerBehavior);
 
             // 4. Calculate summary metrics
-            const summaryMetrics = this.calculatePaymentSummaryMetrics(monthlyTrends, customerBehavior);
+            const summaryMetrics = this.calculatePaymentSummaryMetrics(finalMonthlyTrends, customerBehavior);
 
             // 5. Generate AI-powered insights
-            const insights = this.generatePaymentInsights(monthlyTrends, customerBehavior, summaryMetrics);
+            const insights = this.generatePaymentInsights(finalMonthlyTrends, customerBehavior, summaryMetrics);
 
             const result = {
-                monthlyTrends: monthlyTrends.map(trend => ({
+                monthlyTrends: finalMonthlyTrends.map(trend => ({
                     ...trend,
                     avgDelay: Number(trend.avgDelay || 0),
                     target: Number(trend.target || 30),
@@ -2590,10 +2769,10 @@ class AnalyticsService {
                     currentDate,
                     filters,
                     dataQuality: {
-                        hasTrendData: monthlyTrends.length > 0,
+                        hasTrendData: finalMonthlyTrends.length > 0,
                         hasCustomerData: customerBehavior.length > 0,
                         totalCustomers: customerBehavior.length,
-                        totalMonths: monthlyTrends.length
+                        totalMonths: finalMonthlyTrends.length
                     }
                 }
             };
@@ -3407,21 +3586,28 @@ class AnalyticsService {
         const conditions = [];
         const table = tableAlias === 'invoices' ? invoices : invoices;
 
-        if (filters.startDate) {
+        // Only add conditions if filters have actual values (not empty strings)
+        if (filters.startDate && filters.startDate.trim() !== '') {
             conditions.push(gte(table.invoiceDate, filters.startDate));
         }
-        if (filters.endDate) {
+        if (filters.endDate && filters.endDate.trim() !== '') {
             conditions.push(lte(table.invoiceDate, filters.endDate));
         }
-        if (filters.companyId) {
+        if (filters.companyId && filters.companyId.toString().trim() !== '') {
             conditions.push(eq(table.companyId, filters.companyId));
         }
-        if (filters.customerId) {
+        if (filters.customerId && filters.customerId.toString().trim() !== '') {
             conditions.push(eq(table.customerId, filters.customerId));
         }
-        if (filters.status) {
+        if (filters.status && filters.status.trim() !== '') {
             conditions.push(eq(table.status, filters.status));
         }
+
+        log.debug('🔍 BuildWhereClause Debug:', {
+            filters,
+            conditionsAdded: conditions.length,
+            finalClause: conditions.length > 0 ? 'Has conditions' : 'No conditions (will return all data)'
+        });
 
         return conditions.length > 0 ? and(...conditions) : undefined;
     }
@@ -3543,6 +3729,19 @@ const analyticsService = new AnalyticsService();
  */
 function registerAnalyticsDashboardIpc() {
     log.info('Registering Analytics Dashboard IPC handlers...');
+
+    // Debug Basic Data
+    ipcMain.handle("analytics:debugBasicData", async (event) => {
+        try {
+            log.debug('Processing debugBasicData request');
+            const result = await analyticsService.debugBasicData();
+            log.debug('debugBasicData completed successfully');
+            return result;
+        } catch (error) {
+            log.error('IPC Error - debugBasicData:', error);
+            throw error;
+        }
+    });
 
     // Summary Metrics
     ipcMain.handle("analytics:getSummaryMetrics", async (event, filters) => {

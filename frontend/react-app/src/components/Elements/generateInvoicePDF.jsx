@@ -4,6 +4,7 @@ import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/
 // Import template system
 import { TemplateFactory } from './InvoiceTemplates/TemplateRegistry';
 import { ConfigurationManager } from './InvoiceTemplates/ConfigurationManager';
+import { templateLogger } from '../../utils/templateLogger';
 
 // Register custom fonts for better typography
 Font.register({
@@ -18,37 +19,93 @@ Font.register({
  * Generate Invoice PDF using the selected template from ConfigurationManager
  * This function now acts as a template selector and factory
  * @param {Object} invoice - Invoice data
- * @returns {JSX.Element} PDF Document component
+ * @returns {Promise<JSX.Element>} PDF Document component
  */
-export const generateInvoicePDF = (invoice) => {
+export const generateInvoicePDF = async (invoice) => {
+    console.log('🚀 [generateInvoicePDF] === PDF GENERATION STARTED ===');
+    console.log('📄 [generateInvoicePDF] Invoice data received:', {
+        invoiceNumber: invoice?.invoiceNumber,
+        companyName: invoice?.company?.companyName,
+        customerName: invoice?.customer?.name || invoice?.customer?.customerName,
+        itemCount: invoice?.items?.length,
+        totalAmount: invoice?.totalAmount || invoice?.grandTotal,
+        hasCompany: !!invoice?.company,
+        hasCustomer: !!invoice?.customer,
+        hasItems: !!invoice?.items
+    });
+
+    // Initialize flow tracking
+    const flowTracker = templateLogger.trackPdfGenerationFlow(invoice);
+
     try {
-        // Get current template configuration
-        const selectedTemplateId = ConfigurationManager.getSelectedTemplate();
+        // Get current template configuration (async)
+        console.log('🔍 [generateInvoicePDF] Fetching selected template from configuration...');
+        const selectedTemplateId = await ConfigurationManager.getSelectedTemplate();
+        console.log(`🎨 [generateInvoicePDF] Selected template ID: "${selectedTemplateId}"`);
+        flowTracker.templateFetch(selectedTemplateId);
 
-        // Log template selection for debugging
-        console.log(`Generating PDF with template: ${selectedTemplateId}`);
-
-        // Create template using factory pattern
-        const templateComponent = TemplateFactory.createTemplate(selectedTemplateId, invoice);
+        // Create template using factory pattern (async)
+        console.log('🏭 [generateInvoicePDF] Creating template component using factory...');
+        console.log(`🔧 [generateInvoicePDF] Template factory will create: ${selectedTemplateId}`);
+        const templateComponent = await TemplateFactory.createTemplate(selectedTemplateId, invoice);
+        console.log('✅ [generateInvoicePDF] Template factory completed, result:', !!templateComponent);
+        flowTracker.templateLoad(selectedTemplateId, !!templateComponent);
 
         if (!templateComponent) {
-            console.error(`Failed to create template with ID: ${selectedTemplateId}`);
+            console.error(`❌ [generateInvoicePDF] Template creation failed for ID: ${selectedTemplateId}`);
+            templateLogger.warn('generateInvoicePDF', 'Template creation failed, using fallback', {
+                failedTemplateId: selectedTemplateId
+            });
+
             // Fallback to default template
+            console.log('🔄 [generateInvoicePDF] Attempting fallback to default template...');
             const defaultTemplate = TemplateFactory.getDefaultTemplate();
-            console.log(`Falling back to default template: ${defaultTemplate.id}`);
-            return TemplateFactory.createTemplate(defaultTemplate.id, invoice);
+            console.log(`🔄 [generateInvoicePDF] Default template: ${defaultTemplate.id}`);
+            const fallbackComponent = await TemplateFactory.createTemplate(defaultTemplate.id, invoice);
+            console.log('✅ [generateInvoicePDF] Fallback template created:', !!fallbackComponent);
+            flowTracker.templateRender(defaultTemplate.id, !!fallbackComponent);
+            flowTracker.complete(!!fallbackComponent);
+            console.log('🏁 [generateInvoicePDF] === PDF GENERATION COMPLETED (FALLBACK) ===');
+            return fallbackComponent;
         }
 
+        console.log('✅ [generateInvoicePDF] Template component created successfully');
+        console.log('🎨 [generateInvoicePDF] Template rendering completed');
+        flowTracker.templateRender(selectedTemplateId, true);
+        flowTracker.complete(true);
+        templateLogger.success('generateInvoicePDF', 'PDF generation completed successfully', {
+            templateId: selectedTemplateId,
+            invoiceNumber: invoice?.invoiceNumber
+        });
+
+        console.log('🏁 [generateInvoicePDF] === PDF GENERATION COMPLETED SUCCESSFULLY ===');
         return templateComponent;
     } catch (error) {
-        console.error('Error generating PDF:', error);
+        console.error('❌ [generateInvoicePDF] === PDF GENERATION FAILED ===');
+        console.error('❌ [generateInvoicePDF] Error details:', {
+            message: error.message,
+            stack: error.stack,
+            invoiceNumber: invoice?.invoiceNumber
+        });
+
+        templateLogger.error('generateInvoicePDF', 'PDF generation failed', error, {
+            invoiceNumber: invoice?.invoiceNumber
+        });
 
         // Ultimate fallback - use default template directly
         try {
+            console.log('🆘 [generateInvoicePDF] Attempting ultimate fallback...');
             const defaultTemplate = TemplateFactory.getDefaultTemplate();
-            return TemplateFactory.createTemplate(defaultTemplate.id, invoice);
+            console.log(`🆘 [generateInvoicePDF] Ultimate fallback template: ${defaultTemplate.id}`);
+            const fallbackComponent = await TemplateFactory.createTemplate(defaultTemplate.id, invoice);
+            console.log('✅ [generateInvoicePDF] Ultimate fallback succeeded:', !!fallbackComponent);
+            flowTracker.complete(!!fallbackComponent, error);
+            console.log('🏁 [generateInvoicePDF] === PDF GENERATION COMPLETED (ULTIMATE FALLBACK) ===');
+            return fallbackComponent;
         } catch (fallbackError) {
-            console.error('Fallback template creation failed:', fallbackError);
+            console.error('💥 [generateInvoicePDF] === ULTIMATE FALLBACK FAILED ===');
+            console.error('💥 [generateInvoicePDF] Fallback error:', fallbackError);
+            templateLogger.error('generateInvoicePDF', 'Fallback template creation failed', fallbackError);
 
             // Return a basic error document as last resort
             return (
@@ -82,10 +139,10 @@ export const getAvailableTemplates = () => {
 
 /**
  * Helper function to get current template info
- * @returns {Object} Current template metadata
+ * @returns {Promise<Object>} Current template metadata
  */
-export const getCurrentTemplate = () => {
-    const templateId = ConfigurationManager.getSelectedTemplate();
+export const getCurrentTemplate = async () => {
+    const templateId = await ConfigurationManager.getSelectedTemplate();
     return TemplateFactory.getTemplate(templateId);
 };
 
@@ -101,9 +158,9 @@ export const switchTemplate = (templateId) => {
 /**
  * Helper function to get template colors for UI previews
  * @param {string} templateId - Template ID (optional, uses current if not provided)
- * @returns {Object} Template color scheme
+ * @returns {Promise<Object>} Template color scheme
  */
-export const getTemplateColors = (templateId = null) => {
-    const id = templateId || ConfigurationManager.getSelectedTemplate();
+export const getTemplateColors = async (templateId = null) => {
+    const id = templateId || await ConfigurationManager.getSelectedTemplate();
     return TemplateFactory.getTemplateColors(id);
 }; 

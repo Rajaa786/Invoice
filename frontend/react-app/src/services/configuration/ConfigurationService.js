@@ -73,8 +73,12 @@ export class ConfigurationService {
      * @returns {Promise<string>} Template ID
      */
     async getSelectedTemplate() {
+        console.log('[ConfigurationService] 🔍 Getting selected template from storage...');
         await this.ensureInitialized();
-        return await this.settingsService.get(SETTINGS_KEYS.INVOICE_SELECTED_TEMPLATE);
+        const templateId = await this.settingsService.get(SETTINGS_KEYS.INVOICE_SELECTED_TEMPLATE);
+        console.log('[ConfigurationService] 📋 Retrieved template from storage:', templateId);
+        console.log('[ConfigurationService] 🔑 Using settings key:', SETTINGS_KEYS.INVOICE_SELECTED_TEMPLATE);
+        return templateId;
     }
 
     /**
@@ -83,8 +87,18 @@ export class ConfigurationService {
      * @returns {Promise<boolean>} Success status
      */
     async setSelectedTemplate(templateId) {
+        console.log('[ConfigurationService] 💾 Setting selected template in storage:', templateId);
+        console.log('[ConfigurationService] 🔑 Using settings key:', SETTINGS_KEYS.INVOICE_SELECTED_TEMPLATE);
         await this.ensureInitialized();
-        return await this.settingsService.set(SETTINGS_KEYS.INVOICE_SELECTED_TEMPLATE, templateId);
+        const result = await this.settingsService.set(SETTINGS_KEYS.INVOICE_SELECTED_TEMPLATE, templateId);
+        console.log('[ConfigurationService] 💾 Storage operation result:', result);
+
+        // Verify the save by reading it back
+        const verification = await this.settingsService.get(SETTINGS_KEYS.INVOICE_SELECTED_TEMPLATE);
+        console.log('[ConfigurationService] ✅ Verification read:', verification);
+        console.log('[ConfigurationService] 🔍 Save verification:', verification === templateId ? 'SUCCESS' : 'FAILED');
+
+        return result;
     }
 
     /**

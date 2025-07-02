@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
 import { generateInvoicePDF } from './generateInvoicePDF';
 
@@ -51,6 +51,35 @@ const sampleInvoiceData = {
 
 const InvoicePDFExample = () => {
     const [showPreview, setShowPreview] = useState(false);
+    const [pdfDocument, setPdfDocument] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const loadPdfDocument = async () => {
+            try {
+                setIsLoading(true);
+                const document = await generateInvoicePDF(sampleInvoiceData);
+                setPdfDocument(document);
+            } catch (error) {
+                console.error('Error loading PDF document:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadPdfDocument();
+    }, []);
+
+    if (isLoading) {
+        return (
+            <div className="p-6 max-w-4xl mx-auto">
+                <div className="bg-white rounded-lg shadow-lg p-6 text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading PDF template...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="p-6 max-w-4xl mx-auto">
@@ -66,27 +95,30 @@ const InvoicePDFExample = () => {
 
                     <div className="flex gap-4 flex-wrap">
                         {/* Download PDF Button */}
-                        <PDFDownloadLink
-                            document={generateInvoicePDF(sampleInvoiceData)}
-                            fileName={`invoice-${sampleInvoiceData.invoiceNumber}.pdf`}
-                            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                            {({ blob, url, loading, error }) =>
-                                loading ? 'Generating PDF...' : 'Download Invoice PDF'
-                            }
-                        </PDFDownloadLink>
+                        {pdfDocument && (
+                            <PDFDownloadLink
+                                document={pdfDocument}
+                                fileName={`invoice-${sampleInvoiceData.invoiceNumber}.pdf`}
+                                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                                {({ blob, url, loading, error }) =>
+                                    loading ? 'Generating PDF...' : 'Download Invoice PDF'
+                                }
+                            </PDFDownloadLink>
+                        )}
 
                         {/* Toggle Preview Button */}
                         <button
                             onClick={() => setShowPreview(!showPreview)}
                             className="inline-flex items-center px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
+                            disabled={!pdfDocument}
                         >
                             {showPreview ? 'Hide Preview' : 'Show Preview'}
                         </button>
                     </div>
 
                     {/* PDF Preview */}
-                    {showPreview && (
+                    {showPreview && pdfDocument && (
                         <div className="mt-6">
                             <h3 className="text-lg font-semibold mb-4">Invoice Preview:</h3>
                             <div className="border border-gray-300 rounded-lg overflow-hidden" style={{ height: '600px' }}>
@@ -94,7 +126,7 @@ const InvoicePDFExample = () => {
                                     style={{ width: '100%', height: '100%' }}
                                     showToolbar={true}
                                 >
-                                    {generateInvoicePDF(sampleInvoiceData)}
+                                    {pdfDocument}
                                 </PDFViewer>
                             </div>
                         </div>

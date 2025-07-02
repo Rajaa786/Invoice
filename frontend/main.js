@@ -45,18 +45,37 @@ const isDevMode = isDev();
 
 // Configure electron-log
 log.initialize();
-log.transports.file.level = 'debug';
-log.transports.console.level = 'debug';
+
+// Set log levels based on environment
+const logLevel = isDevMode ? 'debug' : 'info';
+log.transports.file.level = logLevel;
+log.transports.console.level = logLevel;
+
+// File transport configuration
 log.transports.file.maxSize = 10 * 1024 * 1024; // 10MB
 log.transports.file.archiveLog = true;
 log.transports.file.maxArchiveFiles = 5;
 
-// Set log file location
-log.transports.file.resolvePathFn = () => path.join(app.getPath('userData'), 'logs', 'main.log');
+// Create logs directory
+const logsDir = path.join(app.getPath('userData'), 'logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
 
-// Add timestamp format
-log.transports.file.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}';
-log.transports.console.format = '[{h}:{i}:{s}.{ms}] [{level}] {text}';
+// Set log file locations
+log.transports.file.resolvePathFn = () => path.join(logsDir, 'main.log');
+
+// Add timestamp format with component identification
+log.transports.file.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] [MAIN] {text}';
+log.transports.console.format = '[{h}:{i}:{s}.{ms}] [{level}] [MAIN] {text}';
+
+// Add template-specific log file for template system debugging
+const templateLog = log.create('template');
+templateLog.transports.file.resolvePathFn = () => path.join(logsDir, 'template-system.log');
+templateLog.transports.file.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] [TEMPLATE] {text}';
+templateLog.transports.console.format = '[{h}:{i}:{s}.{ms}] [{level}] [TEMPLATE] {text}';
+templateLog.transports.file.level = 'debug';
+templateLog.transports.console.level = logLevel;
 
 log.info('='.repeat(80));
 log.info('Application starting...');
@@ -156,17 +175,17 @@ function createWindow() {
   // Configure electron-settings
   const settingsDir = path.join(app.getPath('userData'), 'Settings');
   log.info(`Configuring electron-settings with directory: ${settingsDir}`);
-  
+
   // Create settings directory if it doesn't exist
   if (!fs.existsSync(settingsDir)) {
     fs.mkdirSync(settingsDir, { recursive: true });
     log.info(`Created settings directory: ${settingsDir}`);
   }
-  
+
   // Use a simpler settings file path
   settingsFile = path.join(settingsDir, 'settings.json');
   log.info(`Settings file path: ${settingsFile}`);
-  
+
   settings.configure({
     fileName: 'settings.json',
     dir: settingsDir,
@@ -199,7 +218,7 @@ function createWindow() {
       return true;
     } catch (error) {
       log.error(`Error setting ${keyPath}:`, error);
-      
+
       // Check for specific Windows permission errors
       if (error.code === 'EPERM') {
         log.error('Permission denied error - this might be due to:');
@@ -207,18 +226,18 @@ function createWindow() {
         log.error('2. Windows file permissions');
         log.error('3. File being locked by another process');
         log.error(`Settings file path: ${settingsFile}`);
-        
+
         // Try alternative approach - write directly to file
         try {
           log.info(`Attempting direct file write for ${keyPath}`);
-          
+
           // Read existing settings
           let existingSettings = {};
           if (fs.existsSync(settingsFile)) {
             const fileContent = fs.readFileSync(settingsFile, 'utf8');
             existingSettings = JSON.parse(fileContent);
           }
-          
+
           // Set the value using dot notation
           const keys = keyPath.split('.');
           let target = existingSettings;
@@ -227,7 +246,7 @@ function createWindow() {
             target = target[keys[i]];
           }
           target[keys[keys.length - 1]] = value;
-          
+
           // Write the file directly
           fs.writeFileSync(settingsFile, JSON.stringify(existingSettings, null, 2));
           log.info(`Successfully set ${keyPath} using direct file write`);
@@ -236,7 +255,7 @@ function createWindow() {
           log.error(`Direct file write also failed for ${keyPath}:`, fallbackError);
         }
       }
-      
+
       return false;
     }
   });
@@ -333,6 +352,87 @@ function createWindow() {
   });
 
   log.info("Settings IPC handlers registered successfully");
+
+  // Add logging IPC handlers for renderer process
+  log.info("Registering logging IPC handlers...");
+
+  ipcMain.handle('log:debug', async (event, component, message, data = null) => {
+    const logMessage = data ? `[${component}] ${message}` : `[${component}] ${message}`;
+    log.debug(logMessage, data || '');
+    if (component.toLowerCase().includes('template')) {
+      templateLog.debug(logMessage, data || '');
+    }
+  });
+
+  ipcMain.handle('log:info', async (event, component, message, data = null) => {
+    const logMessage = data ? `[${component}] ${message}` : `[${component}] ${message}`;
+    log.info(logMessage, data || '');
+    if (component.toLowerCase().includes('template')) {
+      templateLog.info(logMessage, data || '');
+    }
+  });
+
+  ipcMain.handle('log:warn', async (event, component, message, data = null) => {
+    const logMessage = data ? `[${component}] ${message}` : `[${component}] ${message}`;
+    log.warn(logMessage, data || '');
+    if (component.toLowerCase().includes('template')) {
+      templateLog.warn(logMessage, data || '');
+    }
+  });
+
+  ipcMain.handle('log:error', async (event, component, message, error = null, data = null) => {
+    const logMessage = `[${component}] ${message}`;
+    if (error) {
+      log.error(logMessage, error.message || error, error.stack || '');
+      if (component.toLowerCase().includes('template')) {
+        templateLog.error(logMessage, error.message || error, error.stack || '');
+      }
+    } else {
+      log.error(logMessage, data || '');
+      if (component.toLowerCase().includes('template')) {
+        templateLog.error(logMessage, data || '');
+      }
+    }
+  });
+
+  ipcMain.handle('log:success', async (event, component, message, data = null) => {
+    const logMessage = data ? `[${component}] ${message}` : `[${component}] ${message}`;
+    log.info(`✅ ${logMessage}`, data || '');
+    if (component.toLowerCase().includes('template')) {
+      templateLog.info(`✅ ${logMessage}`, data || '');
+    }
+  });
+
+  // Handler to get log file paths for debugging
+  ipcMain.handle('log:getLogPaths', async (event) => {
+    return {
+      main: path.join(logsDir, 'main.log'),
+      template: path.join(logsDir, 'template-system.log'),
+      logsDir: logsDir
+    };
+  });
+
+  // Handler to read log files
+  ipcMain.handle('log:readLogFile', async (event, logType = 'main') => {
+    try {
+      const logFile = logType === 'template'
+        ? path.join(logsDir, 'template-system.log')
+        : path.join(logsDir, 'main.log');
+
+      if (fs.existsSync(logFile)) {
+        const content = fs.readFileSync(logFile, 'utf8');
+        // Return last 1000 lines to avoid memory issues
+        const lines = content.split('\n');
+        return lines.slice(-1000).join('\n');
+      }
+      return 'Log file not found';
+    } catch (error) {
+      log.error('Error reading log file:', error);
+      return `Error reading log file: ${error.message}`;
+    }
+  });
+
+  log.info("Logging IPC handlers registered successfully");
 }
 
 protocol.registerSchemesAsPrivileged([

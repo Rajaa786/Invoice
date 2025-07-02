@@ -2,6 +2,7 @@
 const getClassicBlueTemplate = () => import('./ClassicBlueTemplate').then(mod => mod.default);
 const getModernGreenTemplate = () => import('./ModernGreenTemplate').then(mod => mod.default);
 const getMinimalWhiteTemplate = () => import('./MinimalWhiteTemplate').then(mod => mod.default);
+const getElegantPurpleTemplate = () => import('./ElegantPurpleTemplate').then(mod => mod.default);
 
 // Template Registry - Central registry for all invoice templates
 export const TEMPLATE_REGISTRY = {
@@ -15,7 +16,9 @@ export const TEMPLATE_REGISTRY = {
             'Rounded corners',
             'Modern typography',
             'Card-based layout',
-            'Professional appearance'
+            'Professional appearance',
+            'Company logo support',
+            'Tax Invoice title'
         ],
         preview: '/images/templates/classic-blue-preview.png', // We'll create this later
         component: null, // Will be loaded lazily
@@ -25,9 +28,9 @@ export const TEMPLATE_REGISTRY = {
             secondary: '#3b82f6',
             accent: '#10b981'
         },
-        tags: ['professional', 'blue', 'elegant', 'corporate'],
+        tags: ['professional', 'blue', 'elegant', 'corporate', 'logo'],
         compatibility: ['A4', 'Letter'],
-        version: '1.0.0',
+        version: '1.1.0',
         isDefault: true
     },
     modern_green: {
@@ -40,7 +43,9 @@ export const TEMPLATE_REGISTRY = {
             'Card-based design',
             'Modern layout',
             'Grid system',
-            'Contemporary styling'
+            'Contemporary styling',
+            'Company logo support',
+            'Tax Invoice title'
         ],
         preview: '/images/templates/modern-green-preview.png',
         component: null, // Will be loaded lazily
@@ -50,9 +55,9 @@ export const TEMPLATE_REGISTRY = {
             secondary: '#22c55e',
             accent: '#84cc16'
         },
-        tags: ['modern', 'green', 'fresh', 'vibrant', 'cards'],
+        tags: ['modern', 'green', 'fresh', 'vibrant', 'cards', 'logo'],
         compatibility: ['A4', 'Letter'],
-        version: '1.0.0',
+        version: '1.1.0',
         isDefault: false
     },
     minimal_white: {
@@ -65,7 +70,9 @@ export const TEMPLATE_REGISTRY = {
             'Black and white',
             'Clean typography',
             'Simple layout',
-            'Distraction-free'
+            'Distraction-free',
+            'Company logo support',
+            'Tax Invoice title'
         ],
         preview: '/images/templates/minimal-white-preview.png',
         component: null, // Will be loaded lazily
@@ -75,7 +82,34 @@ export const TEMPLATE_REGISTRY = {
             secondary: '#333333',
             accent: '#666666'
         },
-        tags: ['minimal', 'clean', 'simple', 'black-white', 'basic'],
+        tags: ['minimal', 'clean', 'simple', 'black-white', 'basic', 'logo'],
+        compatibility: ['A4', 'Letter'],
+        version: '1.1.0',
+        isDefault: false
+    },
+    elegant_purple: {
+        id: 'elegant_purple',
+        name: 'Elegant Purple',
+        description: 'Sophisticated and premium design with purple accents',
+        category: 'Professional',
+        features: [
+            'Purple color scheme',
+            'Sophisticated layout',
+            'Premium appearance',
+            'Elegant typography',
+            'Stylish design',
+            'Company logo support',
+            'Tax Invoice title'
+        ],
+        preview: '/images/templates/elegant-purple-preview.png',
+        component: null, // Will be loaded lazily
+        componentLoader: getElegantPurpleTemplate,
+        colors: {
+            primary: '#7c3aed',
+            secondary: '#8b5cf6',
+            accent: '#a855f7'
+        },
+        tags: ['professional', 'purple', 'elegant', 'premium', 'sophisticated', 'logo'],
         compatibility: ['A4', 'Letter'],
         version: '1.0.0',
         isDefault: false
@@ -111,23 +145,65 @@ export class TemplateFactory {
     }
 
     /**
-     * Get template component by ID (async for lazy loading)
-     * @param {string} templateId - Template ID
-     * @returns {Promise<Function>|null} Template component promise or null if not found
-     */
+ * Get template component by ID (async for lazy loading)
+ * @param {string} templateId - Template ID
+ * @returns {Promise<Function>|null} Template component promise or null if not found
+ */
     static async getTemplateComponent(templateId) {
+        console.log(`🔍 [TemplateFactory] === GETTING TEMPLATE COMPONENT ===`);
+        console.log(`🎯 [TemplateFactory] Looking for template ID: "${templateId}"`);
+
         const template = TEMPLATE_REGISTRY[templateId];
-        if (!template) return null;
-        
+        if (!template) {
+            console.warn(`❌ [TemplateFactory] Template not found in registry: ${templateId}`);
+            console.log(`📋 [TemplateFactory] Available templates:`, Object.keys(TEMPLATE_REGISTRY));
+            console.log(`🔍 [TemplateFactory] Registry keys:`, Object.keys(TEMPLATE_REGISTRY).map(key => `"${key}"`));
+            console.log(`🔍 [TemplateFactory] Requested template: "${templateId}" (length: ${templateId?.length})`);
+            console.log(`🏁 [TemplateFactory] === COMPONENT NOT FOUND IN REGISTRY ===`);
+            return null;
+        }
+
+        console.log(`✅ [TemplateFactory] Template found in registry:`, {
+            id: template.id,
+            name: template.name,
+            hasComponent: !!template.component,
+            hasLoader: !!template.componentLoader,
+            componentType: typeof template.component,
+            loaderType: typeof template.componentLoader
+        });
+
         if (template.component) {
+            console.log(`✅ [TemplateFactory] Using cached component for: ${templateId}`);
+            console.log(`🔍 [TemplateFactory] Cached component type:`, typeof template.component);
+            console.log(`🏁 [TemplateFactory] === RETURNING CACHED COMPONENT ===`);
             return template.component;
         }
-        
+
         if (template.componentLoader) {
-            template.component = await template.componentLoader();
-            return template.component;
+            console.log(`📦 [TemplateFactory] Loading component dynamically for: ${templateId}`);
+            console.log(`🔧 [TemplateFactory] Loader type:`, typeof template.componentLoader);
+            try {
+                console.log(`🔄 [TemplateFactory] Executing component loader...`);
+                template.component = await template.componentLoader();
+                console.log(`✅ [TemplateFactory] Component loaded and cached for: ${templateId}`);
+                console.log(`🔍 [TemplateFactory] Loaded component type:`, typeof template.component);
+                console.log(`🏁 [TemplateFactory] === RETURNING DYNAMICALLY LOADED COMPONENT ===`);
+                return template.component;
+            } catch (error) {
+                console.error(`❌ [TemplateFactory] Failed to load component for: ${templateId}`, error);
+                console.error(`📋 [TemplateFactory] Loader error details:`, {
+                    message: error.message,
+                    stack: error.stack,
+                    templateId
+                });
+                console.log(`🏁 [TemplateFactory] === DYNAMIC LOADING FAILED ===`);
+                return null;
+            }
         }
-        
+
+        console.warn(`⚠️ [TemplateFactory] No component or loader found for: ${templateId}`);
+        console.log(`🔍 [TemplateFactory] Template object:`, template);
+        console.log(`🏁 [TemplateFactory] === NO COMPONENT OR LOADER AVAILABLE ===`);
         return null;
     }
 
@@ -179,19 +255,53 @@ export class TemplateFactory {
      * Create template instance with invoice data
      * @param {string} templateId - Template ID
      * @param {Object} invoiceData - Invoice data
-     * @returns {JSX.Element|null} Template component instance or null
+     * @returns {Promise<JSX.Element|null>} Template component instance or null
      */
-    static createTemplate(templateId, invoiceData) {
-        const TemplateComponent = this.getTemplateComponent(templateId);
+    static async createTemplate(templateId, invoiceData) {
+        console.log(`🏭 [TemplateFactory] === CREATING TEMPLATE INSTANCE ===`);
+        console.log(`🎯 [TemplateFactory] Template ID: "${templateId}"`);
+        console.log(`📊 [TemplateFactory] Invoice data summary:`, {
+            hasInvoiceNumber: !!invoiceData?.invoiceNumber,
+            hasCompany: !!invoiceData?.company,
+            hasCustomer: !!invoiceData?.customer,
+            hasItems: !!invoiceData?.items,
+            itemCount: invoiceData?.items?.length || 0,
+            invoiceNumber: invoiceData?.invoiceNumber,
+            companyName: invoiceData?.company?.companyName,
+            customerName: invoiceData?.customer?.name
+        });
+
+        console.log(`🔍 [TemplateFactory] Getting template component for: ${templateId}`);
+        const TemplateComponent = await this.getTemplateComponent(templateId);
+
         if (!TemplateComponent) {
-            console.warn(`Template with ID "${templateId}" not found`);
+            console.warn(`❌ [TemplateFactory] Template component not found for ID: "${templateId}"`);
+            console.log(`🏁 [TemplateFactory] === TEMPLATE CREATION FAILED - NOT FOUND ===`);
             return null;
         }
 
+        console.log(`✅ [TemplateFactory] Template component loaded successfully for: ${templateId}`);
+        console.log(`🔍 [TemplateFactory] Component type:`, typeof TemplateComponent);
+        console.log(`🔍 [TemplateFactory] Component name:`, TemplateComponent.name || 'Anonymous');
+
         try {
-            return TemplateComponent(invoiceData);
+            console.log(`🎨 [TemplateFactory] Rendering template component...`);
+            console.log(`🔧 [TemplateFactory] Calling component with invoice data...`);
+            const renderedTemplate = TemplateComponent(invoiceData);
+            console.log(`✅ [TemplateFactory] Template rendered successfully`);
+            console.log(`🔍 [TemplateFactory] Rendered template type:`, typeof renderedTemplate);
+            console.log(`🏁 [TemplateFactory] === TEMPLATE CREATION COMPLETED SUCCESSFULLY ===`);
+            return renderedTemplate;
         } catch (error) {
-            console.error(`Error creating template "${templateId}":`, error);
+            console.error(`❌ [TemplateFactory] === TEMPLATE RENDERING FAILED ===`);
+            console.error(`❌ [TemplateFactory] Error creating template "${templateId}":`, error);
+            console.error(`📋 [TemplateFactory] Error details:`, {
+                message: error.message,
+                stack: error.stack,
+                templateId,
+                componentType: typeof TemplateComponent
+            });
+            console.log(`🏁 [TemplateFactory] === TEMPLATE CREATION FAILED - RENDER ERROR ===`);
             return null;
         }
     }
@@ -332,4 +442,4 @@ export const TemplateHelpers = {
     }
 };
 
-export default TemplateFactory; 
+export default TemplateFactory;

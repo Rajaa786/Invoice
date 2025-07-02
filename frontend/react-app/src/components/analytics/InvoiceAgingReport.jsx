@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid,
     LineChart, Line, ComposedChart, Area, PieChart, Pie, Cell, ScatterChart, Scatter
@@ -249,21 +249,12 @@ const CollectionEfficiencyChart = ({ data }) => {
                     <XAxis dataKey="month" />
                     <YAxis yAxisId="left" />
                     <YAxis yAxisId="right" orientation="right" />
-                    <Tooltip
-                        formatter={(value, name) => [
-                            name === 'efficiency' ? `${value}%` :
-                                name === 'dso' ? `${value} days` : `₹${(value / 1000).toFixed(0)}K`,
-                            name === 'efficiency' ? 'Collection Efficiency' :
-                                name === 'dso' ? 'DSO' :
-                                    name === 'collected' ? 'Collected' : 'Outstanding'
-                        ]}
-                    />
+                    <Tooltip />
                     <Legend />
-
-                    <Bar yAxisId="left" dataKey="collected" fill="#10b981" name="Collected (₹K)" />
-                    <Bar yAxisId="left" dataKey="outstanding" fill="#ef4444" name="Outstanding (₹K)" />
-                    <Line yAxisId="right" type="monotone" dataKey="efficiency" stroke="#3b82f6" strokeWidth={3} name="Efficiency %" />
-                    <Line yAxisId="right" type="monotone" dataKey="dso" stroke="#f59e0b" strokeWidth={2} name="DSO (days)" />
+                    <Bar yAxisId="left" dataKey="collected" fill="#10b981" name="Collected" />
+                    <Bar yAxisId="left" dataKey="outstanding" fill="#ef4444" name="Outstanding" />
+                    <Line yAxisId="right" type="monotone" dataKey="efficiency" stroke="#3b82f6" strokeWidth={2} name="Efficiency %" />
+                    <Line yAxisId="right" type="monotone" dataKey="dso" stroke="#f59e0b" strokeWidth={2} name="DSO" />
                 </ComposedChart>
             </ResponsiveContainer>
         </div>
@@ -273,6 +264,7 @@ const CollectionEfficiencyChart = ({ data }) => {
 export default function InvoiceAgingReport() {
     const [viewMode, setViewMode] = useState('overview'); // overview, customers, trends, insights
     const [selectedBucket, setSelectedBucket] = useState(null);
+    const [isResizing, setIsResizing] = useState(false);
 
     // Get real-time aging data
     const {
@@ -282,59 +274,105 @@ export default function InvoiceAgingReport() {
         refetch: refreshData
     } = useInvoiceAgingReport();
 
-    // Process real data with fallback to mock data structure
+    // Handle window resize to prevent loading state issues
+    useEffect(() => {
+        let resizeTimer;
+
+        const handleResize = () => {
+            setIsResizing(true);
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                setIsResizing(false);
+            }, 150);
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            clearTimeout(resizeTimer);
+        };
+    }, []);
+
+    // Add debugging console logs
+    console.log('🔍 InvoiceAgingReport Debug:', {
+        loading,
+        error,
+        hasAgingData: !!agingData,
+        agingDataKeys: agingData ? Object.keys(agingData) : null,
+        agingBucketsLength: agingData?.agingBuckets?.length,
+        summaryKeys: agingData?.summary ? Object.keys(agingData.summary) : null,
+        summaryValues: agingData?.summary
+    });
+
+    // Improved data processing with better fallback logic
     const processedData = useMemo(() => {
-        if (!agingData || loading) {
-            return {
-                agingBuckets: mockAgingData,
-                customerAging: customerAgingData,
-                collectionTrends: collectionTrends,
-                summary: {
-                    totalOutstanding: mockAgingData.reduce((sum, bucket) => sum + bucket.amount, 0),
-                    totalInvoices: mockAgingData.reduce((sum, bucket) => sum + bucket.invoices, 0),
-                    avgDSO: mockAgingData.reduce((sum, bucket) => sum + (bucket.avgDays * bucket.amount), 0) / mockAgingData.reduce((sum, bucket) => sum + bucket.amount, 0),
-                    overduePercentage: 45.2,
-                    currentEfficiency: 79,
-                    totalCustomers: customerAgingData.length,
-                    highRiskCustomers: 2,
-                    criticalAmount: 80000
-                },
-                insights: [
-                    {
-                        type: 'positive',
-                        icon: 'CheckCircle',
-                        title: 'Collection Health',
-                        message: '79% efficiency rate - above industry average of 72%.'
-                    },
-                    {
-                        type: 'warning',
-                        icon: 'AlertTriangle',
-                        title: 'Risk Alert',
-                        message: 'ServiceHub Ltd showing deteriorating payment pattern.'
-                    },
-                    {
-                        type: 'opportunity',
-                        icon: 'Target',
-                        title: 'Opportunity',
-                        message: 'Reducing DSO by 5 days could improve cash flow by ₹45L.'
-                    }
-                ]
-            };
+        // If still loading, show loading state
+        if (loading) {
+            return null;
         }
 
-        return {
+        // If error occurred, show error state
+        if (error) {
+            console.error('InvoiceAgingReport Error:', error);
+            return null;
+        }
+
+        // If no data received from backend, show no data state
+        if (!agingData) {
+            console.warn('No aging data received from backend');
+            return null;
+        }
+
+        // Check if we received valid data structure
+        const hasValidData = agingData.agingBuckets &&
+            Array.isArray(agingData.agingBuckets) &&
+            agingData.agingBuckets.length > 0;
+
+        if (!hasValidData) {
+            console.warn('Received invalid or empty aging data:', agingData);
+
+            // Check if summary has meaningful data
+            const summary = agingData.summary || {};
+            const hasSummaryData = (summary.totalOutstanding > 0) ||
+                (summary.totalInvoices > 0) ||
+                (summary.avgDSO > 0);
+
+            if (!hasSummaryData) {
+                return null; // Show no data state
+            }
+        }
+
+        // Process real data
+        const result = {
             agingBuckets: agingData.agingBuckets || [],
             customerAging: agingData.customerAging || [],
             collectionTrends: agingData.collectionTrends || [],
-            summary: agingData.summary || {},
+            summary: {
+                totalOutstanding: Number(agingData.summary?.totalOutstanding || 0),
+                totalInvoices: Number(agingData.summary?.totalInvoices || 0),
+                avgDSO: Number(agingData.summary?.avgDSO || 0),
+                overduePercentage: Number(agingData.summary?.overduePercentage || 0),
+                currentEfficiency: Number(agingData.summary?.currentEfficiency || 0),
+                totalCustomers: Number(agingData.summary?.totalCustomers || 0),
+                highRiskCustomers: Number(agingData.summary?.highRiskCustomers || 0),
+                criticalAmount: Number(agingData.summary?.criticalAmount || 0)
+            },
             insights: agingData.insights || []
         };
-    }, [agingData, loading]);
 
-    // Check if we have no data at all (matching other components pattern)
-    const hasNoData = !loading && (!processedData.agingBuckets || processedData.agingBuckets.length === 0);
+        console.log('🔍 Processed data:', result);
+        return result;
+    }, [agingData, loading, error]);
 
-    // Calculate insights from processed data
+    // Determine different states
+    const isLoading = loading && !isResizing;
+    const hasError = !loading && !isResizing && error;
+    const hasNoData = !loading && !isResizing && !error && (!processedData ||
+        (!processedData.agingBuckets?.length &&
+            processedData.summary?.totalOutstanding === 0 &&
+            processedData.summary?.totalInvoices === 0));
+
+    // Calculate insights from processed data with safe defaults
     const {
         totalOutstanding = 0,
         totalInvoices = 0,
@@ -343,7 +381,7 @@ export default function InvoiceAgingReport() {
         currentEfficiency = 0,
         totalCustomers = 0,
         highRiskCustomers = 0
-    } = processedData.summary;
+    } = processedData?.summary || {};
 
     return (
         <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 space-y-6">
@@ -354,9 +392,9 @@ export default function InvoiceAgingReport() {
                         <Clock className="w-5 h-5 text-blue-600" />
                         Receivables Intelligence Dashboard
                         <div className="flex items-center gap-1 ml-2">
-                            <div className={`w-2 h-2 rounded-full ${loading ? 'bg-amber-500 animate-pulse' : error ? 'bg-red-500' : 'bg-green-500 animate-pulse'}`}></div>
-                            <span className={`text-xs font-medium ${loading ? 'text-amber-600' : error ? 'text-red-600' : 'text-green-600'}`}>
-                                {loading ? 'LOADING' : error ? 'ERROR' : 'LIVE'}
+                            <div className={`w-2 h-2 rounded-full ${(loading && !isResizing) ? 'bg-amber-500 animate-pulse' : hasError ? 'bg-red-500' : 'bg-green-500 animate-pulse'}`}></div>
+                            <span className={`text-xs font-medium ${(loading && !isResizing) ? 'text-amber-600' : hasError ? 'text-red-600' : 'text-green-600'}`}>
+                                {(loading && !isResizing) ? 'LOADING' : hasError ? 'ERROR' : 'LIVE'}
                             </span>
                         </div>
                         {!hasNoData && (
@@ -373,10 +411,10 @@ export default function InvoiceAgingReport() {
                 <div className="flex items-center gap-3">
                     <button
                         onClick={refreshData}
-                        disabled={loading}
+                        disabled={loading && !isResizing}
                         className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
                     >
-                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                        <RefreshCw className={`w-4 h-4 ${(loading && !isResizing) ? 'animate-spin' : ''}`} />
                         Refresh
                     </button>
 
@@ -456,6 +494,46 @@ export default function InvoiceAgingReport() {
                 </div>
             </div>
 
+            {/* Loading State */}
+            {isLoading && (
+                <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-8 border-2 border-dashed border-blue-300">
+                    <div className="flex flex-col items-center gap-4 text-center max-w-md mx-auto">
+                        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm">
+                            <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Aging Data...</h3>
+                            <p className="text-gray-600">
+                                Fetching invoice aging analytics and collection insights.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Error State */}
+            {hasError && (
+                <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-lg p-8 border-2 border-dashed border-red-300">
+                    <div className="flex flex-col items-center gap-4 text-center max-w-md mx-auto">
+                        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm">
+                            <AlertTriangle className="w-8 h-8 text-red-600" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">Error Loading Data</h3>
+                            <p className="text-gray-600 mb-4">
+                                {error || 'Failed to load invoice aging data. Please try again.'}
+                            </p>
+                            <button
+                                onClick={refreshData}
+                                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                                Try Again
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* No Data State */}
             {hasNoData && (
                 <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg p-8 border-2 border-dashed border-gray-300">
@@ -477,220 +555,224 @@ export default function InvoiceAgingReport() {
             )}
 
             {/* Main Content */}
-            {!hasNoData && viewMode === 'overview' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Aging Buckets */}
-                    <div className="space-y-4">
-                        <h4 className="font-semibold text-gray-900">Aging Analysis</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {processedData.agingBuckets.map((bucket, index) => (
-                                <AgingBucket
-                                    key={index}
-                                    bucket={bucket}
-                                    isSelected={selectedBucket?.range === bucket.range}
-                                    onClick={setSelectedBucket}
-                                    totalAmount={totalOutstanding}
-                                />
-                            ))}
+            {!hasNoData && !isLoading && !hasError && processedData && (
+                <>
+                    {viewMode === 'overview' && (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Aging Buckets */}
+                            <div className="space-y-4">
+                                <h4 className="font-semibold text-gray-900">Aging Analysis</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {processedData.agingBuckets.map((bucket, index) => (
+                                        <AgingBucket
+                                            key={index}
+                                            bucket={bucket}
+                                            isSelected={selectedBucket?.range === bucket.range}
+                                            onClick={setSelectedBucket}
+                                            totalAmount={totalOutstanding}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Aging Distribution Chart */}
+                            <div className="space-y-4">
+                                <h4 className="font-semibold text-gray-900">Outstanding Distribution</h4>
+                                <div className="h-80">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <ComposedChart data={processedData.agingBuckets} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                                            <CartesianGrid strokeDasharray="3 3" />
+                                            <XAxis dataKey="range" />
+                                            <YAxis yAxisId="left" />
+                                            <YAxis yAxisId="right" orientation="right" />
+                                            <Tooltip
+                                                formatter={(value, name) => [
+                                                    name === 'amount' ? `₹${(value / 1000).toFixed(0)}K` :
+                                                        name === 'collectionRate' ? `${value}%` : value,
+                                                    name === 'amount' ? 'Outstanding' :
+                                                        name === 'collectionRate' ? 'Collection Rate' : 'Invoices'
+                                                ]}
+                                            />
+                                            <Legend />
+
+                                            <Bar yAxisId="left" dataKey="amount" fill="#3b82f6" name="Outstanding (₹K)" />
+                                            <Bar yAxisId="left" dataKey="invoices" fill="#10b981" name="Invoices" />
+                                            <Line
+                                                yAxisId="right"
+                                                type="monotone"
+                                                dataKey="collectionRate"
+                                                stroke="#ef4444"
+                                                strokeWidth={3}
+                                                name="Collection Rate %"
+                                            />
+                                        </ComposedChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
-                    {/* Aging Distribution Chart */}
-                    <div className="space-y-4">
-                        <h4 className="font-semibold text-gray-900">Outstanding Distribution</h4>
-                        <div className="h-80">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <ComposedChart data={processedData.agingBuckets} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="range" />
-                                    <YAxis yAxisId="left" />
-                                    <YAxis yAxisId="right" orientation="right" />
-                                    <Tooltip
-                                        formatter={(value, name) => [
-                                            name === 'amount' ? `₹${(value / 1000).toFixed(0)}K` :
-                                                name === 'collectionRate' ? `${value}%` : value,
-                                            name === 'amount' ? 'Outstanding' :
-                                                name === 'collectionRate' ? 'Collection Rate' : 'Invoices'
-                                        ]}
-                                    />
-                                    <Legend />
+                    {viewMode === 'customers' && (
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {/* Customer Risk Matrix */}
+                                <div className="space-y-4">
+                                    <h4 className="font-semibold text-gray-900">Customer Risk Matrix</h4>
+                                    <CustomerRiskMatrix customers={processedData.customerAging} />
+                                </div>
 
-                                    <Bar yAxisId="left" dataKey="amount" fill="#3b82f6" name="Outstanding (₹K)" />
-                                    <Bar yAxisId="left" dataKey="invoices" fill="#10b981" name="Invoices" />
-                                    <Line
-                                        yAxisId="right"
-                                        type="monotone"
-                                        dataKey="collectionRate"
-                                        stroke="#ef4444"
-                                        strokeWidth={3}
-                                        name="Collection Rate %"
-                                    />
-                                </ComposedChart>
-                            </ResponsiveContainer>
+                                {/* Customer Aging Table */}
+                                <div className="space-y-4">
+                                    <h4 className="font-semibold text-gray-900">Customer Aging Details</h4>
+                                    <div className="overflow-auto max-h-80">
+                                        <table className="w-full text-sm">
+                                            <thead className="sticky top-0 bg-gray-50">
+                                                <tr>
+                                                    <th className="text-left py-2 px-3 font-semibold text-gray-700">Customer</th>
+                                                    <th className="text-left py-2 px-3 font-semibold text-gray-700">Total</th>
+                                                    <th className="text-left py-2 px-3 font-semibold text-gray-700">Current</th>
+                                                    <th className="text-left py-2 px-3 font-semibold text-gray-700">30+</th>
+                                                    <th className="text-left py-2 px-3 font-semibold text-gray-700">60+</th>
+                                                    <th className="text-left py-2 px-3 font-semibold text-gray-700">90+</th>
+                                                    <th className="text-left py-2 px-3 font-semibold text-gray-700">Risk</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {processedData.customerAging.map((customer, index) => (
+                                                    <tr
+                                                        key={index}
+                                                        className={`border-b border-gray-100 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
+                                                            }`}
+                                                    >
+                                                        <td className="py-2 px-3 font-medium">{customer.customer}</td>
+                                                        <td className="py-2 px-3 font-semibold">₹{(customer.total / 1000).toFixed(0)}K</td>
+                                                        <td className="py-2 px-3">₹{(customer.current / 1000).toFixed(0)}K</td>
+                                                        <td className="py-2 px-3">₹{(customer.days30 / 1000).toFixed(0)}K</td>
+                                                        <td className="py-2 px-3">₹{(customer.days60 / 1000).toFixed(0)}K</td>
+                                                        <td className="py-2 px-3">₹{(customer.days90 / 1000).toFixed(0)}K</td>
+                                                        <td className="py-2 px-3">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-xs font-medium">{customer.riskScore}</span>
+                                                                <div className={`w-2 h-2 rounded-full ${customer.riskScore < 30 ? 'bg-emerald-500' :
+                                                                    customer.riskScore < 50 ? 'bg-amber-500' : 'bg-red-500'
+                                                                    }`} />
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                </div>
-            )}
+                    )}
 
-            {!hasNoData && viewMode === 'customers' && (
-                <div className="space-y-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Customer Risk Matrix */}
+                    {viewMode === 'trends' && (
                         <div className="space-y-4">
-                            <h4 className="font-semibold text-gray-900">Customer Risk Matrix</h4>
-                            <CustomerRiskMatrix customers={processedData.customerAging} />
+                            <h4 className="font-semibold text-gray-900">Collection Efficiency Trends</h4>
+                            <CollectionEfficiencyChart data={processedData.collectionTrends} />
                         </div>
+                    )}
 
-                        {/* Customer Aging Table */}
-                        <div className="space-y-4">
-                            <h4 className="font-semibold text-gray-900">Customer Aging Details</h4>
-                            <div className="overflow-auto max-h-80">
-                                <table className="w-full text-sm">
-                                    <thead className="sticky top-0 bg-gray-50">
-                                        <tr>
-                                            <th className="text-left py-2 px-3 font-semibold text-gray-700">Customer</th>
-                                            <th className="text-left py-2 px-3 font-semibold text-gray-700">Total</th>
-                                            <th className="text-left py-2 px-3 font-semibold text-gray-700">Current</th>
-                                            <th className="text-left py-2 px-3 font-semibold text-gray-700">30+</th>
-                                            <th className="text-left py-2 px-3 font-semibold text-gray-700">60+</th>
-                                            <th className="text-left py-2 px-3 font-semibold text-gray-700">90+</th>
-                                            <th className="text-left py-2 px-3 font-semibold text-gray-700">Risk</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {processedData.customerAging.map((customer, index) => (
-                                            <tr
-                                                key={index}
-                                                className={`border-b border-gray-100 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
-                                                    }`}
-                                            >
-                                                <td className="py-2 px-3 font-medium">{customer.customer}</td>
-                                                <td className="py-2 px-3 font-semibold">₹{(customer.total / 1000).toFixed(0)}K</td>
-                                                <td className="py-2 px-3">₹{(customer.current / 1000).toFixed(0)}K</td>
-                                                <td className="py-2 px-3">₹{(customer.days30 / 1000).toFixed(0)}K</td>
-                                                <td className="py-2 px-3">₹{(customer.days60 / 1000).toFixed(0)}K</td>
-                                                <td className="py-2 px-3">₹{(customer.days90 / 1000).toFixed(0)}K</td>
-                                                <td className="py-2 px-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xs font-medium">{customer.riskScore}</span>
-                                                        <div className={`w-2 h-2 rounded-full ${customer.riskScore < 30 ? 'bg-emerald-500' :
-                                                            customer.riskScore < 50 ? 'bg-amber-500' : 'bg-red-500'
-                                                            }`} />
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+                    {viewMode === 'insights' && selectedBucket && (
+                        <div className="space-y-6">
+                            <h4 className="font-semibold text-gray-900">
+                                Detailed Analysis: {selectedBucket.range}
+                            </h4>
 
-            {!hasNoData && viewMode === 'trends' && (
-                <div className="space-y-4">
-                    <h4 className="font-semibold text-gray-900">Collection Efficiency Trends</h4>
-                    <CollectionEfficiencyChart data={processedData.collectionTrends} />
-                </div>
-            )}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="bg-gray-50 rounded-lg p-4">
+                                    <h5 className="font-semibold text-gray-900 mb-3">Financial Impact</h5>
+                                    <div className="space-y-2 text-sm">
+                                        <div className="flex justify-between">
+                                            <span>Outstanding Amount:</span>
+                                            <span className="font-medium">₹{(selectedBucket.amount / 100000).toFixed(1)}L</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Number of Invoices:</span>
+                                            <span className="font-medium">{selectedBucket.invoices}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Affected Customers:</span>
+                                            <span className="font-medium">{selectedBucket.customers}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Average Days:</span>
+                                            <span className="font-medium">{selectedBucket.avgDays} days</span>
+                                        </div>
+                                    </div>
+                                </div>
 
-            {!hasNoData && viewMode === 'insights' && selectedBucket && (
-                <div className="space-y-6">
-                    <h4 className="font-semibold text-gray-900">
-                        Detailed Analysis: {selectedBucket.range}
-                    </h4>
+                                <div className="bg-gray-50 rounded-lg p-4">
+                                    <h5 className="font-semibold text-gray-900 mb-3">Collection Metrics</h5>
+                                    <div className="space-y-2 text-sm">
+                                        <div className="flex justify-between">
+                                            <span>Collection Rate:</span>
+                                            <span className="font-medium">{selectedBucket.collectionRate}%</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Risk Level:</span>
+                                            <span className={`font-medium ${selectedBucket.riskLevel === 'Low' ? 'text-emerald-600' :
+                                                selectedBucket.riskLevel === 'Medium' ? 'text-amber-600' :
+                                                    selectedBucket.riskLevel === 'High' ? 'text-red-600' : 'text-red-800'
+                                                }`}>
+                                                {selectedBucket.riskLevel}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Priority:</span>
+                                            <span className={`font-medium ${PRIORITY_COLORS[selectedBucket.priority]}`}>
+                                                {selectedBucket.priority}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Trend:</span>
+                                            <span className={`font-medium ${selectedBucket.trend > 0 ? 'text-red-600' : 'text-emerald-600'
+                                                }`}>
+                                                {selectedBucket.trend > 0 ? '↑' : '↓'} {Math.abs(selectedBucket.trend).toFixed(1)}%
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="bg-gray-50 rounded-lg p-4">
-                            <h5 className="font-semibold text-gray-900 mb-3">Financial Impact</h5>
-                            <div className="space-y-2 text-sm">
-                                <div className="flex justify-between">
-                                    <span>Outstanding Amount:</span>
-                                    <span className="font-medium">₹{(selectedBucket.amount / 100000).toFixed(1)}L</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Number of Invoices:</span>
-                                    <span className="font-medium">{selectedBucket.invoices}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Affected Customers:</span>
-                                    <span className="font-medium">{selectedBucket.customers}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Average Days:</span>
-                                    <span className="font-medium">{selectedBucket.avgDays} days</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="bg-gray-50 rounded-lg p-4">
-                            <h5 className="font-semibold text-gray-900 mb-3">Collection Metrics</h5>
-                            <div className="space-y-2 text-sm">
-                                <div className="flex justify-between">
-                                    <span>Collection Rate:</span>
-                                    <span className="font-medium">{selectedBucket.collectionRate}%</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Risk Level:</span>
-                                    <span className={`font-medium ${selectedBucket.riskLevel === 'Low' ? 'text-emerald-600' :
-                                        selectedBucket.riskLevel === 'Medium' ? 'text-amber-600' :
-                                            selectedBucket.riskLevel === 'High' ? 'text-red-600' : 'text-red-800'
-                                        }`}>
-                                        {selectedBucket.riskLevel}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Priority:</span>
-                                    <span className={`font-medium ${PRIORITY_COLORS[selectedBucket.priority]}`}>
-                                        {selectedBucket.priority}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Trend:</span>
-                                    <span className={`font-medium ${selectedBucket.trend > 0 ? 'text-red-600' : 'text-emerald-600'
-                                        }`}>
-                                        {selectedBucket.trend > 0 ? '↑' : '↓'} {Math.abs(selectedBucket.trend).toFixed(1)}%
-                                    </span>
+                                <div className="bg-gray-50 rounded-lg p-4">
+                                    <h5 className="font-semibold text-gray-900 mb-3">Recommended Actions</h5>
+                                    <div className="space-y-2 text-sm">
+                                        {selectedBucket.range === "0-30 days" && (
+                                            <>
+                                                <div>• Send payment reminders</div>
+                                                <div>• Maintain regular follow-up</div>
+                                                <div>• Monitor for early warning signs</div>
+                                            </>
+                                        )}
+                                        {selectedBucket.range === "31-60 days" && (
+                                            <>
+                                                <div>• Escalate to senior staff</div>
+                                                <div>• Implement payment plans</div>
+                                                <div>• Review credit terms</div>
+                                            </>
+                                        )}
+                                        {selectedBucket.range === "61-90 days" && (
+                                            <>
+                                                <div>• Legal notice consideration</div>
+                                                <div>• Suspend credit privileges</div>
+                                                <div>• Negotiate settlement</div>
+                                            </>
+                                        )}
+                                        {selectedBucket.range === "90+ days" && (
+                                            <>
+                                                <div>• Initiate legal proceedings</div>
+                                                <div>• Consider debt collection</div>
+                                                <div>• Evaluate write-off options</div>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
-
-                        <div className="bg-gray-50 rounded-lg p-4">
-                            <h5 className="font-semibold text-gray-900 mb-3">Recommended Actions</h5>
-                            <div className="space-y-2 text-sm">
-                                {selectedBucket.range === "0-30 days" && (
-                                    <>
-                                        <div>• Send payment reminders</div>
-                                        <div>• Maintain regular follow-up</div>
-                                        <div>• Monitor for early warning signs</div>
-                                    </>
-                                )}
-                                {selectedBucket.range === "31-60 days" && (
-                                    <>
-                                        <div>• Escalate to senior staff</div>
-                                        <div>• Implement payment plans</div>
-                                        <div>• Review credit terms</div>
-                                    </>
-                                )}
-                                {selectedBucket.range === "61-90 days" && (
-                                    <>
-                                        <div>• Legal notice consideration</div>
-                                        <div>• Suspend credit privileges</div>
-                                        <div>• Negotiate settlement</div>
-                                    </>
-                                )}
-                                {selectedBucket.range === "90+ days" && (
-                                    <>
-                                        <div>• Initiate legal proceedings</div>
-                                        <div>• Consider debt collection</div>
-                                        <div>• Evaluate write-off options</div>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                    )}
+                </>
             )}
 
             {/* AI Receivables Intelligence Insights - Always visible */}
@@ -699,7 +781,7 @@ export default function InvoiceAgingReport() {
                     <Zap className="w-5 h-5 text-violet-600" />
                     <h4 className="font-semibold text-gray-900">Receivables Intelligence Insights</h4>
                 </div>
-                {!hasNoData ? (
+                {!hasNoData && !isLoading && !hasError && processedData ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                         {processedData.insights && processedData.insights.length > 0 ? (
                             processedData.insights.map((insight, index) => {

@@ -1,0 +1,152 @@
+[
+  {
+    "id": 124,
+    "type": "Service",
+    "name": "Modern Rubber Ball",
+    "hsnSacCode": "823326",
+    "unit": "day",
+    "sellingPrice": 5860.59,
+    "currency": "USD",
+    "description": "Our delicious-inspired Mouse brings a taste of luxury to your palatable lifestyle"
+  },
+  {
+    "id": 113,
+    "type": "Service",
+    "name": "Gorgeous Ceramic Salad",
+    "hsnSacCode": "790929",
+    "unit": "day",
+    "sellingPrice": 7168.89,
+    "currency": "USD",
+    "description": "Ergonomic Soap made with Plastic for all-day gray support"
+  },
+  {
+    "id": 818,
+    "type": "Service",
+    "name": "Elegant Ceramic Shirt",
+    "hsnSacCode": "323040",
+    "unit": "day",
+    "sellingPrice": 7868.19,
+    "currency": "EUR",
+    "description": "New tan Ball with ergonomic design for lucky comfort"
+  },
+  {
+    "id": 936,
+    "type": "Service",
+    "name": "Recycled Plastic Cheese",
+    "hsnSacCode": "948171",
+    "unit": "month",
+    "sellingPrice": 5474.89,
+    "currency": "EUR",
+    "description": "Savor the golden essence in our Tuna, designed for icy culinary adventures"
+  },
+  {
+    "id": 521,
+    "type": "Service",
+    "name": "Luxurious Rubber Cheese",
+    "hsnSacCode": "112319",
+    "unit": "pcs",
+    "sellingPrice": 5546.19,
+    "currency": "EUR",
+    "description": "Ergonomic Mouse made with Metal for all-day uneven support"
+  },
+  {
+    "id": 23,
+    "type": "Goods",
+    "name": "Pizza",
+    "hsnSacCode": "89517138",
+    "unit": "kg",
+    "sellingPrice": 512.25,
+    "currency": "USD",
+    "description": "Savor the delicious essence in our Sausages, designed for bare culinary adventures"
+  },
+  {
+    "id": 218,
+    "type": "Goods",
+    "name": "Keyboard",
+    "hsnSacCode": "83019835",
+    "unit": "month",
+    "sellingPrice": 7445.89,
+    "currency": "EUR",
+    "description": "New fuchsia Keyboard with ergonomic design for watery comfort"
+  },
+  {
+    "id": 305,
+    "type": "Goods",
+    "name": "Fish",
+    "hsnSacCode": "81316971",
+    "unit": "ml",
+    "sellingPrice": 1453.05,
+    "currency": "EUR",
+    "description": "Ergonomic Car made with Wooden for all-day well-off support"
+  },
+  {
+    "id": 591,
+    "type": "Service",
+    "name": "Practical Bronze Pizza",
+    "hsnSacCode": "976881",
+    "unit": "l",
+    "sellingPrice": 3278.86,
+    "currency": "USD",
+    "description": "The Front-line asymmetric benchmark Fish offers reliable performance and frequent design"
+  },
+  {
+    "id": 438,
+    "type": "Goods",
+    "name": "Keyboard",
+    "hsnSacCode": "00236150",
+    "unit": "l",
+    "sellingPrice": 2876.75,
+    "currency": "INR",
+    "description": "Our horse-friendly Gloves ensures far-flung comfort for your pets"
+  },
+  {
+    "id": 998,
+    "type": "Service",
+    "name": "Fantastic Concrete Tuna",
+    "hsnSacCode": "367404",
+    "unit": "ml",
+    "sellingPrice": 6549.09,
+    "currency": "USD",
+    "description": "Discover the rundown new Hat with an exciting mix of Ceramic ingredients"
+  },
+  {
+    "id": 483,
+    "type": "Goods",
+    "name": "Pizza",
+    "hsnSacCode": "71095475",
+    "unit": "l",
+    "sellingPrice": 2402.39,
+    "currency": "EUR",
+    "description": "The sleek and petty Salad comes with lime LED lighting for smart functionality"
+  },
+  {
+    "id": 947,
+    "type": "Goods",
+    "name": "Cheese",
+    "hsnSacCode": "35421989",
+    "unit": "l",
+    "sellingPrice": 9023.65,
+    "currency": "USD",
+    "description": "Our rabbit-friendly Tuna ensures powerless comfort for your pets"
+  },
+  {
+    "id": 705,
+    "type": "Goods",
+    "name": "Shoes",
+    "hsnSacCode": "93307333",
+    "unit": "pcs",
+    "sellingPrice": 1760.89,
+    "currency": "USD",
+    "description": "Our gorilla-friendly Sausages ensures unimportant comfort for your pets"
+  },
+  {
+    "id": 143,
+    "type": "Service",
+    "name": "Frozen Granite Chips",
+    "hsnSacCode": "421996",
+    "unit": "day",
+    "sellingPrice": 4516.35,
+    "currency": "INR",
+    "description": "Stylish Chair designed to make you stand out with appropriate looks"
+  }
+]

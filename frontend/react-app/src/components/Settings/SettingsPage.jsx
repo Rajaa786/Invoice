@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import InvoiceTemplateSettings from './InvoiceTemplateSettings';
 import SettingsDebugger from './SettingsDebugger';
+import TemplateDebugPanel from './TemplateDebugPanel';
 import {
     useTemplateConfiguration,
     useAppConfiguration,
@@ -386,7 +387,7 @@ const SettingsPage = () => {
             <SettingsHeader />
 
             <Tabs value={activeSection} onValueChange={setActiveSection} className="w-full">
-                <TabsList className="grid w-full grid-cols-4">
+                <TabsList className="grid w-full grid-cols-5">
                     <TabsTrigger value="templates" className="flex items-center gap-2">
                         <FileText className="w-4 h-4" />
                         Templates
@@ -402,6 +403,10 @@ const SettingsPage = () => {
                     <TabsTrigger value="data" className="flex items-center gap-2">
                         <Database className="w-4 h-4" />
                         Data Management
+                    </TabsTrigger>
+                    <TabsTrigger value="debug" className="flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4" />
+                        Debug
                     </TabsTrigger>
                 </TabsList>
 
@@ -435,6 +440,21 @@ const SettingsPage = () => {
                     <DataManagement />
                 </TabsContent>
 
+                <TabsContent value="debug" className="space-y-6 mt-6">
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
+                        <div className="flex items-start gap-2">
+                            <AlertCircle className="w-5 h-5 text-orange-600 mt-0.5" />
+                            <div>
+                                <h4 className="font-medium text-orange-800">Template System Debug</h4>
+                                <p className="text-sm text-orange-700 mt-1">
+                                    Monitor template selection and PDF generation processes. Use this panel to troubleshoot template-related issues.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <TemplateDebugPanel />
+                </TabsContent>
 
             </Tabs>
 
