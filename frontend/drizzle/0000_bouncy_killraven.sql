@@ -23,8 +23,8 @@ CREATE TABLE `companies` (
 	`city` text NOT NULL,
 	`email` text NOT NULL,
 	`contact_no` text NOT NULL,
-	`logo_path` text,
-	`signature_path` text,
+	`logo_file_name` text,
+	`signature_file_name` text,
 	`established_year` integer,
 	`employee_count` integer,
 	`website` text,
@@ -189,7 +189,7 @@ CREATE TABLE `tally_voucher` (
 	`failed_reason` text,
 	`bank_ledger` text NOT NULL,
 	`result` integer,
-	`created_at` integer DEFAULT 1751135149060 NOT NULL,
+	`created_at` integer DEFAULT 1751555530164 NOT NULL,
 	FOREIGN KEY (`transaction_id`) REFERENCES `transactions`(`id`) ON UPDATE no action ON DELETE CASCADE
 );
 --> statement-breakpoint
@@ -206,7 +206,7 @@ CREATE TABLE `transactions` (
 	`bank` text DEFAULT 'unknown' NOT NULL,
 	`entity` text DEFAULT 'unknown' NOT NULL,
 	`voucher_type` text DEFAULT 'unknown',
-	`created_at` integer DEFAULT 1751135149060 NOT NULL,
+	`created_at` integer DEFAULT 1751555530163 NOT NULL,
 	FOREIGN KEY (`statement_id`) REFERENCES `statements`(`id`) ON UPDATE no action ON DELETE CASCADE
 );
 --> statement-breakpoint

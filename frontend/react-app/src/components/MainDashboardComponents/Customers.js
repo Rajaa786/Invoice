@@ -149,13 +149,11 @@ const Customers = () => {
       </div>
 
       {/* Customer Form Dialog */}
-      {customerFormOpen && (
-        <CustomerForm
-          isOpen={customerFormOpen}
-          onClose={() => setCustomerFormOpen(false)}
-          onSave={handleSaveCustomer}
-        />
-      )}
+      <CustomerForm
+        open={customerFormOpen}
+        onOpenChange={setCustomerFormOpen}
+        onSave={handleSaveCustomer}
+      />
     </div>
   );
 };

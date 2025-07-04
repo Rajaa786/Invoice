@@ -12,8 +12,8 @@ const { registerInvoiceGeneratorIpc, registerInvoiceItemsIpc } = require("./ipc/
 const log = require("electron-log/main");
 const { registerAnalyticsDashboardIpc } = require("./ipc/analyticsDashboard");
 const { registerMigrationIpc } = require("./ipc/migrationRunner");
+const { registerFileHandlers } = require("./ipc/fileHandlers");
 const settings = require('electron-settings');
-
 // Utility function to detect development environment
 const isDev = () => {
   // Method 1: Check NODE_ENV environment variable
@@ -104,15 +104,30 @@ let mainWindow = null;
 let settingsFile = null; // Global variable for settings file path
 
 function createProtocol() {
-  log.debug('Creating custom protocol handler for app://');
+  log.debug('Creating custom protocol handlers...');
+
+  // App protocol for React app files
   protocol.registerFileProtocol("app", (request, callback) => {
     const url = request.url.replace("app://", "");
     try {
       const filePath = path.normalize(`${__dirname}/../react-app/build/${url}`);
-      log.debug(`Protocol request: ${request.url} -> ${filePath}`);
+      log.debug(`App protocol request: ${request.url} -> ${filePath}`);
       return callback(filePath);
     } catch (error) {
-      log.error("Protocol error:", error);
+      log.error("App protocol error:", error);
+    }
+  });
+
+  // Uploads protocol for file serving from user data directory
+  protocol.registerFileProtocol("uploads", (request, callback) => {
+    const url = request.url.replace("uploads://", "");
+    try {
+      const userDataPath = app.getPath('userData');
+      const filePath = path.normalize(`${userDataPath}/uploads/${url}`);
+      log.debug(`Uploads protocol request: ${request.url} -> ${filePath}`);
+      return callback(filePath);
+    } catch (error) {
+      log.error("Uploads protocol error:", error);
     }
   });
 }
@@ -167,6 +182,7 @@ function createWindow() {
   registerInvoiceItemsIpc();
   registerAnalyticsDashboardIpc();
   registerMigrationIpc();
+  registerFileHandlers();
 
   // Register zoom level monitoring
   registerZoomMonitoring();
@@ -549,5 +565,15 @@ function registerZoomMonitoring() {
   }
 }
 
-// Export the tmp directory path for use in other files
-module.exports = { tmpDir };
+// Create uploads directory for file storage in user data directory
+const userDataPath = app.getPath('userData');
+const uploadsDir = path.join(userDataPath, "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  log.info(`Created uploads directory at: ${uploadsDir}`);
+} else {
+  log.debug(`Uploads directory already exists at: ${uploadsDir}`);
+}
+
+// Export the tmp and uploads directory paths for use in other files
+module.exports = { tmpDir, uploadsDir };

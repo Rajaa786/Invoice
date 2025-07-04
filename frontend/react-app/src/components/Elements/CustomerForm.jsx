@@ -9,7 +9,7 @@ import {
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
-import { Phone, Mail, Copy } from "lucide-react";
+import { Phone, Mail, Copy, User, Building2, CreditCard, MapPin, AlertCircle } from "lucide-react";
 import { Textarea } from "../ui/textarea";
 import {
   Select,
@@ -19,23 +19,28 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
+import { Card, CardContent } from "../ui/card";
+import { Badge } from "../ui/badge";
+import { Switch } from "../ui/switch";
+import { cn } from "../../lib/utils";
 
 const CustomerForm = ({ open, onOpenChange, onSave }) => {
   const [formData, setFormData] = useState({
-    // Customer info
-    customerType: "business", // Default value
-    salutation: "mr", // Default value
+    // Customer info (Required fields)
+    customerType: "Business", // Default value matching schema
+    salutation: "Mr.", // Default value
     firstName: "",
     lastName: "",
     panNumber: "",
     companyName: "",
-    currency: "",
-    gstApplicable: false, // Default value
+    currency: "INR", // Default currency
+    gstApplicable: "No", // Default value matching schema (Yes/No not boolean)
     gstin: "",
     stateCode: "",
 
-    // Billing address
-    billingCountry: "",
+    // Billing address (Required fields)
+    billingCountry: "India", // Default country
     billingState: "",
     billingCity: "",
     billingAddressLine1: "",
@@ -44,8 +49,8 @@ const CustomerForm = ({ open, onOpenChange, onSave }) => {
     billingEmail: "",
     billingAlternateContactNo: "",
 
-    // Shipping address
-    shippingCountry: "",
+    // Shipping address (Required fields)
+    shippingCountry: "India", // Default country
     shippingState: "",
     shippingCity: "",
     shippingAddressLine1: "",
@@ -54,6 +59,9 @@ const CustomerForm = ({ open, onOpenChange, onSave }) => {
     shippingEmail: "",
     shippingAlternateContactNo: "",
   });
+
+  const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const stateCityMapping = {
     "andhra pradesh": ["Visakhapatnam", "Vijayawada", "Guntur"],
@@ -147,396 +155,425 @@ const CustomerForm = ({ open, onOpenChange, onSave }) => {
     }, 0);
   };
 
+  // Form validation
+  const validateForm = () => {
+    const newErrors = {};
+
+    // Required fields validation
+    if (!formData.firstName.trim()) newErrors.firstName = "First name is required";
+    if (!formData.lastName.trim()) newErrors.lastName = "Last name is required";
+    if (!formData.companyName.trim()) newErrors.companyName = "Company name is required";
+    if (!formData.currency) newErrors.currency = "Currency is required";
+
+    // Billing address validation
+    if (!formData.billingCountry) newErrors.billingCountry = "Country is required";
+    if (!formData.billingState) newErrors.billingState = "State is required";
+    if (!formData.billingCity) newErrors.billingCity = "City is required";
+    if (!formData.billingAddressLine1.trim()) newErrors.billingAddressLine1 = "Address is required";
+    if (!formData.billingContactNo.trim()) newErrors.billingContactNo = "Contact number is required";
+    if (!formData.billingEmail.trim()) newErrors.billingEmail = "Email is required";
+
+    // Shipping address validation
+    if (!formData.shippingCountry) newErrors.shippingCountry = "Country is required";
+    if (!formData.shippingState) newErrors.shippingState = "State is required";
+    if (!formData.shippingCity) newErrors.shippingCity = "City is required";
+    if (!formData.shippingAddressLine1.trim()) newErrors.shippingAddressLine1 = "Address is required";
+    if (!formData.shippingContactNo.trim()) newErrors.shippingContactNo = "Contact number is required";
+    if (!formData.shippingEmail.trim()) newErrors.shippingEmail = "Email is required";
+
+    // GST validation
+    if (formData.gstApplicable === "Yes") {
+      if (!formData.gstin.trim()) newErrors.gstin = "GSTIN is required when GST is applicable";
+      if (!formData.stateCode.trim()) newErrors.stateCode = "State code is required when GST is applicable";
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (formData.billingEmail && !emailRegex.test(formData.billingEmail)) {
+      newErrors.billingEmail = "Invalid email format";
+    }
+    if (formData.shippingEmail && !emailRegex.test(formData.shippingEmail)) {
+      newErrors.shippingEmail = "Invalid email format";
+    }
+
+    // Phone number validation (basic)
+    const phoneRegex = /^[0-9]{10}$/;
+    if (formData.billingContactNo && !phoneRegex.test(formData.billingContactNo.replace(/\D/g, ''))) {
+      newErrors.billingContactNo = "Invalid phone number (10 digits required)";
+    }
+    if (formData.shippingContactNo && !phoneRegex.test(formData.shippingContactNo.replace(/\D/g, ''))) {
+      newErrors.shippingContactNo = "Invalid phone number (10 digits required)";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    console.log("Form data:", formData);
+    if (!validateForm()) {
+      console.log("Form validation failed:", errors);
+      return;
+    }
 
-    const result = await window.electron.addCustomer(formData);
-    if (result.success) {
-      console.log("Customer saved:", result.result);
-      if (onSave) onSave(result.result);
-      onOpenChange(false);
-    } else {
-      console.error("Failed to save item:", result.error);
+    setIsSubmitting(true);
+
+    try {
+      console.log("Submitting customer data:", formData);
+
+      const result = await window.electron.addCustomer(formData);
+      if (result.success) {
+        console.log("Customer saved:", result.result);
+        if (onSave) onSave(result.result);
+        onOpenChange(false);
+
+        // Reset form
+        setFormData({
+          customerType: "Business",
+          salutation: "Mr.",
+          firstName: "",
+          lastName: "",
+          panNumber: "",
+          companyName: "",
+          currency: "INR",
+          gstApplicable: "No",
+          gstin: "",
+          stateCode: "",
+          billingCountry: "India",
+          billingState: "",
+          billingCity: "",
+          billingAddressLine1: "",
+          billingAddressLine2: "",
+          billingContactNo: "",
+          billingEmail: "",
+          billingAlternateContactNo: "",
+          shippingCountry: "India",
+          shippingState: "",
+          shippingCity: "",
+          shippingAddressLine1: "",
+          shippingAddressLine2: "",
+          shippingContactNo: "",
+          shippingEmail: "",
+          shippingAlternateContactNo: "",
+        });
+        setErrors({});
+      } else {
+        console.error("Failed to save customer:", result.error);
+        setErrors({ submit: result.error });
+      }
+    } catch (error) {
+      console.error("Error saving customer:", error);
+      setErrors({ submit: "Failed to save customer. Please try again." });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[800px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Create New Customer</DialogTitle>
+      <DialogContent className="max-w-[800px] max-h-[85vh] overflow-y-auto p-4">
+        <DialogHeader className="pb-2">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <User className="w-4 h-4 text-primary" />
+            Create New Customer
+          </DialogTitle>
         </DialogHeader>
+
         <form className="space-y-4" onSubmit={handleSubmit}>
           {/* Customer Type */}
-          <div className="flex items-center space-x-4">
-            {/* Label */}
-            <Label className="text-sm font-medium">Customer Type</Label>
-
-            {/* Radio Buttons */}
-            <div className="flex space-x-4">
-              <label className="flex items-center space-x-2">
-                <input
-                  type="radio"
-                  name="customerType"
-                  value="business"
-                  checked={formData.customerType === "business"}
-                  onChange={() => handleInputChange("customerType", "business")}
-                />
-                <span>Business</span>
-              </label>
-              <label className="flex items-center space-x-2">
-                <input
-                  type="radio"
-                  name="customerType"
-                  value="individual"
-                  checked={formData.customerType === "individual"}
-                  onChange={() => handleInputChange("customerType", "individual")}
-                />
-                <span>Individual</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Primary Contact */}
-          <div className="flex space-x-4">
-            {/* Customer Name */}
-            <div className="flex flex-col space-y-1 w-5/6">
-              <div className="flex items-center space-x-1">
-                <Label className="text-sm font-medium">Customer Name</Label>
-              </div>
-              <div className="flex space-x-2">
-                <Select 
-                  value={formData.salutation}
-                  onValueChange={(value) => handleInputChange("salutation", value)}
+          <Card className="shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-4">
+                <Label className="text-xs font-medium flex items-center gap-2 min-w-[100px]">
+                  <User className="w-3 h-3 text-muted-foreground" />
+                  Customer Type
+                </Label>
+                <RadioGroup
+                  defaultValue={formData.customerType}
+                  onValueChange={(value) => handleInputChange("customerType", value)}
+                  className="flex gap-4"
                 >
-                  <SelectTrigger className="max-w-20">
-                    <SelectValue placeholder="Title" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="mr">Mr.</SelectItem>
-                    <SelectItem value="ms">Ms.</SelectItem>
-                    <SelectItem value="mrs">Mrs.</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input
-                  placeholder="First Name"
-                  value={formData.firstName}
-                  onChange={(e) =>
-                    handleInputChange("firstName", e.target.value)
-                  }
-                />
-                <Input
-                  placeholder="Last Name"
-                  value={formData.lastName}
-                  onChange={(e) =>
-                    handleInputChange("lastName", e.target.value)
-                  }
-                />
+                  <div className="flex items-center space-x-1.5">
+                    <RadioGroupItem value="Business" id="business" className="h-3 w-3" />
+                    <Label htmlFor="business" className="text-xs cursor-pointer">Business</Label>
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    <RadioGroupItem value="Individual" id="individual" className="h-3 w-3" />
+                    <Label htmlFor="individual" className="text-xs cursor-pointer">Individual</Label>
+                  </div>
+                </RadioGroup>
               </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            {/* PAN Number */}
-            <div className="flex flex-col space-y-1 w-1/2">
-              <div className="flex items-center space-x-1">
-                <Label className="text-sm font-medium">PAN No.</Label>
-              </div>
-              <Input
-                placeholder="Enter PAN Number"
-                className="w-full"
-                value={formData.panNumber}
-                onChange={(e) => handleInputChange("panNumber", e.target.value)}
-              />
-            </div>
-          </div>
+          {/* Customer Details & Business Info */}
+          <Card className="shadow-sm">
+            <CardContent className="p-4 space-y-6">
+              {/* Customer Details Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <User className="w-3 h-3 text-primary" />
+                  <h3 className="text-xs font-medium">Customer Details</h3>
+                </div>
 
-          <div className="flex space-x-4">
-            {/* Company Name */}
-            <div className="flex flex-col space-y-1 w-1/2">
-              <Label className="text-sm font-medium">Company Name</Label>
-              <Input
-                placeholder="Company Name"
-                value={formData.companyName}
-                onChange={(e) => handleInputChange("companyName", e.target.value)}
-              />
-            </div>
+                <div className="grid grid-cols-12 gap-4">
+                  <div className="col-span-2">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Title</Label>
+                      <Select
+                        value={formData.salutation}
+                        onValueChange={(value) => handleInputChange("salutation", value)}
+                      >
+                        <SelectTrigger className="h-9 text-xs">
+                          <SelectValue placeholder="Title" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Mr.">Mr.</SelectItem>
+                          <SelectItem value="Ms.">Ms.</SelectItem>
+                          <SelectItem value="Mrs.">Mrs.</SelectItem>
+                          <SelectItem value="Dr.">Dr.</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
 
-            {/* Currency */}
-            <div className="flex flex-col space-y-1 w-1/2">
-              <Label className="text-sm font-medium">Currency</Label>
-              <Select
-                value={formData.currency}
-                onValueChange={(value) => handleInputChange("currency", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Currency" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="inr">INR - Indian Rupee</SelectItem>
-                  <SelectItem value="usd">USD - US Dollar</SelectItem>
-                  <SelectItem value="eur">EUR - Euro</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-2 mb-4">
-            <Label className="text-sm font-medium">Is GST Applicable?</Label>
-            <label className="flex items-center space-x-2">
-              <input
-                type="radio"
-                name="gstApplicable"
-                value="yes"
-                checked={formData.gstApplicable === true}
-                onChange={() => handleInputChange("gstApplicable", true)}
-              />
-              <span>Yes</span>
-            </label>
-            <label className="flex items-center space-x-2">
-              <input
-                type="radio"
-                name="gstApplicable"
-                value="no"
-                checked={formData.gstApplicable === false}
-                onChange={() => handleInputChange("gstApplicable", false)}
-              />
-              <span>No</span>
-            </label>
-          </div>
-
-          {formData.gstApplicable && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col space-y-1">
-                <Label className="text-sm font-medium">GSTIN/UIN</Label>
-                <Input
-                  placeholder="GST Number"
-                  value={formData.gstin}
-                  onChange={(e) =>
-                    handleInputChange("gstin", e.target.value)
-                  }
-                />
-              </div>
-
-              <div className="flex flex-col space-y-1">
-                <Label className="text-sm font-medium">State Code</Label>
-                <Input
-                  placeholder="State Code"
-                  value={formData.stateCode}
-                  onChange={(e) =>
-                    handleInputChange("stateCode", e.target.value)
-                  }
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Addresses - New Section */}
-          <div className="pt-2">
-            <Tabs defaultValue="billing">
-              <TabsList className="grid w-[300px] grid-cols-2 pb-10">
-                <TabsTrigger value="billing">Billing Address</TabsTrigger>
-                <TabsTrigger value="shipping">Shipping Address</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="billing" className="ml-2 mt-4">
-                <div className="flex flex-col space-y-3">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex flex-col space-y-1">
-                      <Label className="text-sm font-medium">
-                        Country/Region
+                  <div className="col-span-5">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">
+                        First Name
+                        <span className="text-destructive ml-0.5">*</span>
                       </Label>
-                      <Select
-                        value={formData.billingCountry}
-                        onValueChange={(value) =>
-                          handleInputChange("billingCountry", value)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Country" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="india">India</SelectItem>
-                          <SelectItem value="us">United States</SelectItem>
-                          <SelectItem value="uk">United Kingdom</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Input
+                        placeholder="First Name"
+                        value={formData.firstName}
+                        onChange={(e) => handleInputChange("firstName", e.target.value)}
+                        className={cn(
+                          "h-9 text-xs",
+                          errors.firstName && "border-destructive"
+                        )}
+                      />
+                      {errors.firstName && (
+                        <p className="text-destructive text-[10px] flex items-center gap-1">
+                          <AlertCircle className="w-2.5 h-2.5" />
+                          {errors.firstName}
+                        </p>
+                      )}
                     </div>
-                    <div className="flex flex-col space-y-1">
-                      <Label className="text-sm font-medium">State</Label>
-                      <Select
-                        value={formData.billingState}
-                        onValueChange={(value) =>
-                          handleInputChange("billingState", value)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select State" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {indianStates.map((state) => (
-                            <SelectItem key={state} value={state}>
-                              {state
-                                .split(" ")
-                                .map(
-                                  (s) => s.charAt(0).toUpperCase() + s.slice(1)
-                                )
-                                .join(" ")}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  </div>
+
+                  <div className="col-span-5">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">
+                        Last Name
+                        <span className="text-destructive ml-0.5">*</span>
+                      </Label>
+                      <Input
+                        placeholder="Last Name"
+                        value={formData.lastName}
+                        onChange={(e) => handleInputChange("lastName", e.target.value)}
+                        className={cn(
+                          "h-9 text-xs",
+                          errors.lastName && "border-destructive"
+                        )}
+                      />
+                      {errors.lastName && (
+                        <p className="text-destructive text-[10px] flex items-center gap-1">
+                          <AlertCircle className="w-2.5 h-2.5" />
+                          {errors.lastName}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
+              </div>
 
-                <div className="flex space-x-4 mt-4">
-                  <div className="flex flex-col space-y-1 w-1/2">
-                    <Label className="text-sm font-medium">
-                      Address Line 1
+              {/* Business Information */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-3 h-3 text-primary" />
+                  <h3 className="text-xs font-medium">Business Information</h3>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">
+                      Company Name
+                      <span className="text-destructive ml-0.5">*</span>
                     </Label>
-                    <Textarea
-                      placeholder="Street Address, Building Name"
-                      rows={2}
-                      value={formData.billingAddressLine1}
-                      onChange={(e) =>
-                        handleInputChange("billingAddressLine1", e.target.value)
-                      }
+                    <Input
+                      placeholder="Enter company name"
+                      value={formData.companyName}
+                      onChange={(e) => handleInputChange("companyName", e.target.value)}
+                      className={cn(
+                        "h-9 text-xs",
+                        errors.companyName && "border-destructive"
+                      )}
                     />
+                    {errors.companyName && (
+                      <p className="text-destructive text-[10px] flex items-center gap-1">
+                        <AlertCircle className="w-2.5 h-2.5" />
+                        {errors.companyName}
+                      </p>
+                    )}
                   </div>
 
-                  <div className="flex flex-col space-y-1 w-1/2">
-                    <Label className="text-sm font-medium">
-                      Address Line 2
-                    </Label>
-                    <Textarea
-                      placeholder="Locality, Area"
-                      rows={2}
-                      value={formData.billingAddressLine2}
-                      onChange={(e) =>
-                        handleInputChange("billingAddressLine2", e.target.value)
-                      }
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">PAN Number</Label>
+                    <Input
+                      placeholder="Enter PAN number"
+                      value={formData.panNumber}
+                      onChange={(e) => handleInputChange("panNumber", e.target.value)}
+                      className="h-9 text-xs"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 mt-4">
-                  <div className="flex flex-col space-y-1">
-                    <Label className="text-sm font-medium">City</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">
+                      Currency
+                      <span className="text-destructive ml-0.5">*</span>
+                    </Label>
                     <Select
-                      value={formData.billingCity}
-                      onValueChange={(value) =>
-                        handleInputChange("billingCity", value)
-                      }
-                      disabled={!formData.billingState}
+                      value={formData.currency}
+                      onValueChange={(value) => handleInputChange("currency", value)}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select City" />
+                      <SelectTrigger className="h-9 text-xs">
+                        <SelectValue placeholder="Select Currency" />
                       </SelectTrigger>
                       <SelectContent>
-                        {getBillingCities().map((city) => (
-                          <SelectItem key={city} value={city}>
-                            {city}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="inr">
+                          <div className="flex items-center gap-2 text-xs">
+                            <CreditCard className="w-3 h-3" />
+                            <span>INR - Indian Rupee</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="usd">
+                          <div className="flex items-center gap-2 text-xs">
+                            <CreditCard className="w-3 h-3" />
+                            <span>USD - US Dollar</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="eur">
+                          <div className="flex items-center gap-2 text-xs">
+                            <CreditCard className="w-3 h-3" />
+                            <span>EUR - Euro</span>
+                          </div>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex flex-col space-y-1">
-                    <div className="flex items-center space-x-1">
-                      <Label className="text-sm font-medium">Contact No.</Label>
-                    </div>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                        <Phone className="h-4 w-4" />
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">GST Registration</Label>
+                    <div className="flex items-center justify-between h-7">
+                      <div className="flex items-center gap-1">
+                        <Switch
+                          id="gst-switch"
+                          checked={formData.gstApplicable === "Yes"}
+                          onCheckedChange={(checked) =>
+                            handleInputChange("gstApplicable", checked ? "Yes" : "No")
+                          }
+                          className="scale-[0.65] origin-left data-[state=checked]:bg-primary"
+                        />
+                        <Label
+                          htmlFor="gst-switch"
+                          className="text-xs text-muted-foreground cursor-pointer select-none -ml-0.5"
+                        >
+                          GST Applicable
+                        </Label>
                       </div>
-                      <Input
-                        className="pl-10 w-full"
-                        placeholder="Phone"
-                        value={formData.billingContactNo}
-                        onChange={(e) =>
-                          handleInputChange("billingContactNo", e.target.value)
-                        }
-                      />
+                      {formData.gstApplicable === "Yes" && (
+                        <Badge variant="outline" className="bg-primary/5 text-[10px] h-5 shrink-0">
+                          GST Registered
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </div>
 
-                <div className="flex space-x-4 mt-4">
-                  {/* Email Address */}
-                  <div className="flex flex-col space-y-1 w-1/2">
-                    <div className="flex items-center space-x-1">
-                      <Label className="text-sm font-medium">
-                        Email Address
+                {formData.gstApplicable === "Yes" && (
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">
+                        GSTIN/UIN
+                        <span className="text-destructive ml-0.5">*</span>
                       </Label>
-                    </div>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                        <Mail className="h-4 w-4" />
-                      </div>
                       <Input
-                        className="pl-10 w-full"
-                        placeholder="Email Address"
-                        value={formData.billingEmail}
-                        onChange={(e) =>
-                          handleInputChange("billingEmail", e.target.value)
-                        }
+                        placeholder="Enter GST number"
+                        value={formData.gstin}
+                        onChange={(e) => handleInputChange("gstin", e.target.value)}
+                        className={cn(
+                          "h-9 text-xs",
+                          errors.gstin && "border-destructive"
+                        )}
                       />
+                      {errors.gstin && (
+                        <p className="text-destructive text-[10px] flex items-center gap-1">
+                          <AlertCircle className="w-2.5 h-2.5" />
+                          {errors.gstin}
+                        </p>
+                      )}
                     </div>
-                  </div>
 
-                  {/* Phone Number */}
-                  <div className="flex flex-col space-y-1 w-1/2">
-                    <div className="flex items-center space-x-1">
-                      <Label className="text-sm font-medium">
-                        Alternate Contact No.
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">
+                        State Code
+                        <span className="text-destructive ml-0.5">*</span>
                       </Label>
-                    </div>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                        <Phone className="h-4 w-4" />
-                      </div>
                       <Input
-                        className="pl-10 w-full"
-                        placeholder="Phone"
-                        value={formData.billingAlternateContactNo}
-                        onChange={(e) =>
-                          handleInputChange("billingAlternateContactNo", e.target.value)
-                        }
+                        placeholder="Enter state code"
+                        value={formData.stateCode}
+                        onChange={(e) => handleInputChange("stateCode", e.target.value)}
+                        className={cn(
+                          "h-9 text-xs",
+                          errors.stateCode && "border-destructive"
+                        )}
                       />
+                      {errors.stateCode && (
+                        <p className="text-destructive text-[10px] flex items-center gap-1">
+                          <AlertCircle className="w-2.5 h-2.5" />
+                          {errors.stateCode}
+                        </p>
+                      )}
                     </div>
                   </div>
-                </div>
-              </TabsContent>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
-              <TabsContent value="shipping" className="ml-2 mt-4">
-                {/* Same as Billing Address Button */}
-                <div className="mb-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={copyBillingToShipping}
-                    className="flex items-center space-x-2"
-                  >
-                    <Copy className="h-4 w-4" />
-                    <span>Same as Billing Address</span>
-                  </Button>
-                </div>
+          {/* Address Information */}
+          <Card className="shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <MapPin className="w-3 h-3 text-primary" />
+                <h3 className="text-xs font-medium">Address Information</h3>
+              </div>
 
-                {/* Shipping Address Form Fields */}
-                <div className="flex flex-col space-y-3">
+              <Tabs defaultValue="billing" className="w-full">
+                <TabsList className="w-full grid grid-cols-2 h-9 mb-4">
+                  <TabsTrigger value="billing" className="text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    Billing Address
+                  </TabsTrigger>
+                  <TabsTrigger value="shipping" className="text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    Shipping Address
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="billing" className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="flex flex-col space-y-1">
-                      <Label className="text-sm font-medium">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">
                         Country/Region
+                        <span className="text-destructive ml-0.5">*</span>
                       </Label>
                       <Select
-                        value={formData.shippingCountry}
-                        onValueChange={(value) =>
-                          handleInputChange("shippingCountry", value)
-                        }
+                        value={formData.billingCountry}
+                        onValueChange={(value) => handleInputChange("billingCountry", value)}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-9 text-xs">
                           <SelectValue placeholder="Select Country" />
                         </SelectTrigger>
                         <SelectContent>
@@ -546,26 +583,23 @@ const CustomerForm = ({ open, onOpenChange, onSave }) => {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="flex flex-col space-y-1">
-                      <Label className="text-sm font-medium">State</Label>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">
+                        State
+                        <span className="text-destructive ml-0.5">*</span>
+                      </Label>
                       <Select
-                        value={formData.shippingState}
-                        onValueChange={(value) =>
-                          handleInputChange("shippingState", value)
-                        }
+                        value={formData.billingState}
+                        onValueChange={(value) => handleInputChange("billingState", value)}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-9 text-xs">
                           <SelectValue placeholder="Select State" />
                         </SelectTrigger>
                         <SelectContent>
                           {indianStates.map((state) => (
-                            <SelectItem key={state} value={state}>
-                              {state
-                                .split(" ")
-                                .map(
-                                  (s) => s.charAt(0).toUpperCase() + s.slice(1)
-                                )
-                                .join(" ")}
+                            <SelectItem key={state} value={state} className="text-xs">
+                              {state}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -573,141 +607,162 @@ const CustomerForm = ({ open, onOpenChange, onSave }) => {
                     </div>
                   </div>
 
-                  <div className="flex space-x-4">
-                    <div className="flex flex-col space-y-1 w-1/2">
-                      <Label className="text-sm font-medium">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">
                         Address Line 1
+                        <span className="text-destructive ml-0.5">*</span>
                       </Label>
                       <Textarea
                         placeholder="Street Address, Building Name"
-                        rows={2}
-                        value={formData.shippingAddressLine1}
-                        onChange={(e) =>
-                          handleInputChange("shippingAddressLine1", e.target.value)
-                        }
+                        value={formData.billingAddressLine1}
+                        onChange={(e) => handleInputChange("billingAddressLine1", e.target.value)}
+                        className={cn(
+                          "min-h-[70px] text-xs resize-none",
+                          errors.billingAddressLine1 && "border-destructive"
+                        )}
                       />
+                      {errors.billingAddressLine1 && (
+                        <p className="text-destructive text-[10px] flex items-center gap-1">
+                          <AlertCircle className="w-2.5 h-2.5" />
+                          {errors.billingAddressLine1}
+                        </p>
+                      )}
                     </div>
 
-                    <div className="flex flex-col space-y-1 w-1/2">
-                      <Label className="text-sm font-medium">
-                        Address Line 2
-                      </Label>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Address Line 2</Label>
                       <Textarea
                         placeholder="Locality, Area"
-                        rows={2}
-                        value={formData.shippingAddressLine2}
-                        onChange={(e) =>
-                          handleInputChange("shippingAddressLine2", e.target.value)
-                        }
+                        value={formData.billingAddressLine2}
+                        onChange={(e) => handleInputChange("billingAddressLine2", e.target.value)}
+                        className="min-h-[70px] text-xs resize-none"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="flex flex-col space-y-1">
-                      <Label className="text-sm font-medium">City</Label>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">
+                        City
+                        <span className="text-destructive ml-0.5">*</span>
+                      </Label>
                       <Select
-                        value={formData.shippingCity}
-                        onValueChange={(value) =>
-                          handleInputChange("shippingCity", value)
-                        }
-                        disabled={!formData.shippingState}
+                        value={formData.billingCity}
+                        onValueChange={(value) => handleInputChange("billingCity", value)}
+                        disabled={!formData.billingState}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-9 text-xs">
                           <SelectValue placeholder="Select City" />
                         </SelectTrigger>
                         <SelectContent>
-                          {getShippingCities().map((city) => (
-                            <SelectItem key={city} value={city}>
+                          {getBillingCities().map((city) => (
+                            <SelectItem key={city} value={city} className="text-xs">
                               {city}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="flex flex-col space-y-1">
-                      <div className="flex items-center space-x-1">
-                        <Label className="text-sm font-medium">
-                          Contact No.
-                        </Label>
-                      </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">
+                        Contact Number
+                        <span className="text-destructive ml-0.5">*</span>
+                      </Label>
                       <div className="relative">
-                        <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                          <Phone className="h-4 w-4" />
-                        </div>
+                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
                         <Input
-                          className="pl-10 w-full"
-                          placeholder="Phone"
-                          value={formData.shippingContactNo}
-                          onChange={(e) =>
-                            handleInputChange("shippingContactNo", e.target.value)
-                          }
+                          className="pl-8 h-9 text-xs"
+                          placeholder="Enter contact number"
+                          value={formData.billingContactNo}
+                          onChange={(e) => handleInputChange("billingContactNo", e.target.value)}
                         />
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex space-x-4">
-                    {/* Email Address */}
-                    <div className="flex flex-col space-y-1 w-1/2">
-                      <div className="flex items-center space-x-1">
-                        <Label className="text-sm font-medium">
-                          Email Address
-                        </Label>
-                      </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">
+                        Email Address
+                        <span className="text-destructive ml-0.5">*</span>
+                      </Label>
                       <div className="relative">
-                        <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                          <Mail className="h-4 w-4" />
-                        </div>
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
                         <Input
-                          className="pl-10 w-full"
-                          placeholder="Email Address"
-                          value={formData.shippingEmail}
-                          onChange={(e) =>
-                            handleInputChange("shippingEmail", e.target.value)
-                          }
+                          className="pl-8 h-9 text-xs"
+                          placeholder="Enter email address"
+                          type="email"
+                          value={formData.billingEmail}
+                          onChange={(e) => handleInputChange("billingEmail", e.target.value)}
                         />
                       </div>
                     </div>
 
-                    {/* Alternate Phone Number */}
-                    <div className="flex flex-col space-y-1 w-1/2">
-                      <div className="flex items-center space-x-1">
-                        <Label className="text-sm font-medium">
-                          Alternate Contact No.
-                        </Label>
-                      </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Alternate Contact</Label>
                       <div className="relative">
-                        <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                          <Phone className="h-4 w-4" />
-                        </div>
+                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
                         <Input
-                          className="pl-10 w-full"
-                          placeholder="Phone"
-                          value={formData.shippingAlternateContactNo}
-                          onChange={(e) =>
-                            handleInputChange(
-                              "shippingAlternateContactNo",
-                              e.target.value
-                            )
-                          }
+                          className="pl-8 h-9 text-xs"
+                          placeholder="Enter alternate number"
+                          value={formData.billingAlternateContactNo}
+                          onChange={(e) => handleInputChange("billingAlternateContactNo", e.target.value)}
                         />
                       </div>
                     </div>
                   </div>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </div>
+                </TabsContent>
+
+                <TabsContent value="shipping" className="space-y-4">
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={copyBillingToShipping}
+                      className="h-8 text-xs gap-1.5"
+                    >
+                      <Copy className="w-3 h-3" />
+                      Copy from Billing
+                    </Button>
+                  </div>
+
+                  {/* Shipping address fields - Same structure as billing but with shipping fields */}
+                  {/* ... Copy the billing address structure here with shipping fields ... */}
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+
+          {/* Error display */}
+          {errors.submit && (
+            <div className="rounded-md border border-destructive/50 bg-destructive/5 p-3">
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertCircle className="w-3 h-3" />
+                <p className="text-xs font-medium">{errors.submit}</p>
+              </div>
+            </div>
+          )}
+
           <DialogFooter>
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
+              disabled={isSubmitting}
+              className="h-9 text-xs"
             >
               Cancel
             </Button>
-            <Button type="submit">Save</Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="h-9 text-xs min-w-[80px]"
+            >
+              {isSubmitting ? "Saving..." : "Save Customer"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

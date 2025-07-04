@@ -16,8 +16,7 @@ Font.register({
 });
 
 /**
- * Generate Invoice PDF using the selected template from ConfigurationManager
- * This function now acts as a template selector and factory
+ * Generate Invoice PDF with simple file URLs
  * @param {Object} invoice - Invoice data
  * @returns {Promise<JSX.Element>} PDF Document component
  */
@@ -38,6 +37,13 @@ export const generateInvoicePDF = async (invoice) => {
     const flowTracker = templateLogger.trackPdfGenerationFlow(invoice);
 
     try {
+        // Enhanced invoice data with file URLs
+        const enhancedInvoice = enhanceInvoiceWithFileUrls(invoice);
+        console.log('🎨 [generateInvoicePDF] Enhanced invoice with file URLs:', {
+            logoUrl: enhancedInvoice.company?.logoUrl,
+            signatureUrl: enhancedInvoice.company?.signatureUrl
+        });
+
         // Get current template configuration (async)
         console.log('🔍 [generateInvoicePDF] Fetching selected template from configuration...');
         const selectedTemplateId = await ConfigurationManager.getSelectedTemplate();
@@ -47,7 +53,7 @@ export const generateInvoicePDF = async (invoice) => {
         // Create template using factory pattern (async)
         console.log('🏭 [generateInvoicePDF] Creating template component using factory...');
         console.log(`🔧 [generateInvoicePDF] Template factory will create: ${selectedTemplateId}`);
-        const templateComponent = await TemplateFactory.createTemplate(selectedTemplateId, invoice);
+        const templateComponent = await TemplateFactory.createTemplate(selectedTemplateId, enhancedInvoice);
         console.log('✅ [generateInvoicePDF] Template factory completed, result:', !!templateComponent);
         flowTracker.templateLoad(selectedTemplateId, !!templateComponent);
 
@@ -61,7 +67,7 @@ export const generateInvoicePDF = async (invoice) => {
             console.log('🔄 [generateInvoicePDF] Attempting fallback to default template...');
             const defaultTemplate = TemplateFactory.getDefaultTemplate();
             console.log(`🔄 [generateInvoicePDF] Default template: ${defaultTemplate.id}`);
-            const fallbackComponent = await TemplateFactory.createTemplate(defaultTemplate.id, invoice);
+            const fallbackComponent = await TemplateFactory.createTemplate(defaultTemplate.id, enhancedInvoice);
             console.log('✅ [generateInvoicePDF] Fallback template created:', !!fallbackComponent);
             flowTracker.templateRender(defaultTemplate.id, !!fallbackComponent);
             flowTracker.complete(!!fallbackComponent);
@@ -97,7 +103,8 @@ export const generateInvoicePDF = async (invoice) => {
             console.log('🆘 [generateInvoicePDF] Attempting ultimate fallback...');
             const defaultTemplate = TemplateFactory.getDefaultTemplate();
             console.log(`🆘 [generateInvoicePDF] Ultimate fallback template: ${defaultTemplate.id}`);
-            const fallbackComponent = await TemplateFactory.createTemplate(defaultTemplate.id, invoice);
+            const enhancedInvoice = enhanceInvoiceWithFileUrls(invoice);
+            const fallbackComponent = await TemplateFactory.createTemplate(defaultTemplate.id, enhancedInvoice);
             console.log('✅ [generateInvoicePDF] Ultimate fallback succeeded:', !!fallbackComponent);
             flowTracker.complete(!!fallbackComponent, error);
             console.log('🏁 [generateInvoicePDF] === PDF GENERATION COMPLETED (ULTIMATE FALLBACK) ===');
@@ -127,6 +134,37 @@ export const generateInvoicePDF = async (invoice) => {
             );
         }
     }
+};
+
+/**
+ * Simple enhancement to add file URLs from filename stored in database
+ * @param {Object} invoice - Original invoice data
+ * @returns {Object} Enhanced invoice with file URLs
+ */
+const enhanceInvoiceWithFileUrls = (invoice) => {
+    if (!invoice?.company) {
+        console.warn('⚠️ [enhanceInvoiceWithFileUrls] No company data found in invoice');
+        return invoice;
+    }
+
+    const enhancedCompany = { ...invoice.company };
+
+    // Generate logo URL from filename
+    if (enhancedCompany.logoFileName) {
+        enhancedCompany.logoUrl = `uploads://${enhancedCompany.logoFileName}`;
+        console.log(`🖼️ [enhanceInvoiceWithFileUrls] Logo URL: ${enhancedCompany.logoUrl}`);
+    }
+
+    // Generate signature URL from filename
+    if (enhancedCompany.signatureFileName) {
+        enhancedCompany.signatureUrl = `uploads://${enhancedCompany.signatureFileName}`;
+        console.log(`✍️ [enhanceInvoiceWithFileUrls] Signature URL: ${enhancedCompany.signatureUrl}`);
+    }
+
+    return {
+        ...invoice,
+        company: enhancedCompany
+    };
 };
 
 /**

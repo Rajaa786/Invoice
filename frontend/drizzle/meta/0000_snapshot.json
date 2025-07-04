@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "56b8353a-aa99-4a8c-ae8a-1e02d8fb0fce",
+  "id": "9eabd2ac-7e7c-47b2-ad88-29c74331b744",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "cases": {
@@ -172,15 +172,15 @@
           "notNull": true,
           "autoincrement": false
         },
-        "logo_path": {
-          "name": "logo_path",
+        "logo_file_name": {
+          "name": "logo_file_name",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "signature_path": {
-          "name": "signature_path",
+        "signature_file_name": {
+          "name": "signature_file_name",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -1319,7 +1319,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 1751135149060
+          "default": 1751555530164
         }
       },
       "indexes": {
@@ -1439,7 +1439,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 1751135149060
+          "default": 1751555530163
         }
       },
       "indexes": {},

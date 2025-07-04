@@ -21,9 +21,9 @@ const companies = sqliteTable("companies", {
   email: text("email").notNull(),
   contactNo: text("contact_no").notNull(),
 
-  // Added fields for logo and signature file paths
-  logoPath: text("logo_path"),
-  signaturePath: text("signature_path"),
+  // Simple file storage - just store relative paths from uploads folder
+  logoFileName: text("logo_file_name"), // e.g., "company_1_logo.png"
+  signatureFileName: text("signature_file_name"), // e.g., "company_1_signature.png"
 
   // Enhanced Analytics Fields
   establishedYear: integer("established_year"),

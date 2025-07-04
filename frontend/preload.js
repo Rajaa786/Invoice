@@ -111,6 +111,33 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.on("zoom-level-updated", (event, data) => callback(data));
       return () => ipcRenderer.removeListener("zoom-level-updated", callback);
     }
+  },
+
+  // 📁 File Management API
+  files: {
+    // Upload company logo
+    uploadLogo: (companyId, fileBuffer, originalName) =>
+      ipcRenderer.invoke("files:uploadLogo", { companyId, fileBuffer, originalName }),
+
+    // Upload company signature
+    uploadSignature: (companyId, fileBuffer, originalName) =>
+      ipcRenderer.invoke("files:uploadSignature", { companyId, fileBuffer, originalName }),
+
+    // Get file information
+    getFileInfo: (filename) =>
+      ipcRenderer.invoke("files:getFileInfo", filename),
+
+    // Check if file exists
+    fileExists: (filename) =>
+      ipcRenderer.invoke("files:fileExists", filename),
+
+    // Delete file
+    deleteFile: (companyId, type) =>
+      ipcRenderer.invoke("files:deleteFile", { companyId, type }),
+
+    // Get company assets (logo and signature URLs)
+    getCompanyAssets: (companyId) =>
+      ipcRenderer.invoke("files:getCompanyAssets", companyId)
   }
 });
 
