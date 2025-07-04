@@ -9,7 +9,7 @@ import {
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
-import { Package, Hash, DollarSign, AlertCircle } from "lucide-react";
+import { Package, Hash, DollarSign, AlertCircle, Wand2 } from "lucide-react";
 import { Textarea } from "../ui/textarea";
 import {
   Select,
@@ -22,15 +22,17 @@ import { Card, CardContent } from "../ui/card";
 
 const ItemForm = ({ isOpen, onClose, onSave }) => {
   const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    hsnSacCode: "",
-    unit: "",
-    sellingPrice: "",
+    // Schema-defined fields
+    type: "Goods",           // Required, defaulted
+    name: "",               // Required
+    hsnSacCode: "",         // Optional
+    unit: "",              // Optional
+    sellingPrice: "",       // Required
+    currency: "INR",        // Optional, defaulted
+    description: "",        // Optional
+
+    // UI-only fields (not in schema)
     purchasePrice: "",
-    openingStock: "",
-    minStockAlert: "",
-    taxRate: "",
   });
 
   const [errors, setErrors] = useState({});
@@ -49,6 +51,32 @@ const ItemForm = ({ isOpen, onClose, onSave }) => {
     "PAIR",
   ];
 
+  const typeOptions = ["Goods", "Service"];
+
+  // Function to generate dummy item data
+  const generateDummyData = () => {
+    const randomNum = Math.floor(Math.random() * 1000);
+    const randomUnit = unitOptions[Math.floor(Math.random() * unitOptions.length)];
+    const randomType = typeOptions[Math.floor(Math.random() * typeOptions.length)];
+    const randomPrice = Math.floor(Math.random() * 10000) + 100; // Random price between 100 and 10100
+    const randomHSN = Math.floor(Math.random() * 9000) + 1000; // 4-digit HSN code
+
+    const dummyData = {
+      type: randomType,
+      name: `Test Item ${randomNum}`,
+      description: `This is a test ${randomType.toLowerCase()} with ID ${randomNum}. It is measured in ${randomUnit}.`,
+      hsnSacCode: randomHSN.toString(),
+      unit: randomUnit,
+      sellingPrice: randomPrice.toString(),
+      currency: "INR",
+      // Additional fields (not in schema)
+      purchasePrice: (randomPrice * 0.7).toFixed(2), // 70% of selling price
+    };
+
+    setFormData(dummyData);
+    setErrors({});
+  };
+
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({
       ...prev,
@@ -66,26 +94,22 @@ const ItemForm = ({ isOpen, onClose, onSave }) => {
   const validateForm = () => {
     const newErrors = {};
 
-    // Required fields validation
-    if (!formData.name.trim()) newErrors.name = "Item name is required";
-    if (!formData.unit) newErrors.unit = "Unit is required";
-    if (!formData.sellingPrice) newErrors.sellingPrice = "Selling price is required";
+    // Required fields validation as per schema
+    if (!formData.type) {
+      newErrors.type = "Item type is required";
+    }
+    if (!formData.name.trim()) {
+      newErrors.name = "Item name is required";
+    }
+    if (!formData.sellingPrice || formData.sellingPrice.trim() === "") {
+      newErrors.sellingPrice = "Selling price is required";
+    } else if (isNaN(parseFloat(formData.sellingPrice)) || parseFloat(formData.sellingPrice) <= 0) {
+      newErrors.sellingPrice = "Must be a valid positive number";
+    }
 
-    // Number validations
-    if (formData.sellingPrice && isNaN(parseFloat(formData.sellingPrice))) {
-      newErrors.sellingPrice = "Must be a valid number";
-    }
-    if (formData.purchasePrice && isNaN(parseFloat(formData.purchasePrice))) {
-      newErrors.purchasePrice = "Must be a valid number";
-    }
-    if (formData.openingStock && isNaN(parseInt(formData.openingStock))) {
-      newErrors.openingStock = "Must be a valid number";
-    }
-    if (formData.minStockAlert && isNaN(parseInt(formData.minStockAlert))) {
-      newErrors.minStockAlert = "Must be a valid number";
-    }
-    if (formData.taxRate && (isNaN(parseFloat(formData.taxRate)) || parseFloat(formData.taxRate) > 100)) {
-      newErrors.taxRate = "Must be a valid percentage (0-100)";
+    // Optional field validations (for UI purposes)
+    if (formData.purchasePrice && (isNaN(parseFloat(formData.purchasePrice)) || parseFloat(formData.purchasePrice) < 0)) {
+      newErrors.purchasePrice = "Must be a valid non-negative number";
     }
 
     setErrors(newErrors);
@@ -102,13 +126,15 @@ const ItemForm = ({ isOpen, onClose, onSave }) => {
     setIsSubmitting(true);
 
     try {
+      // Only send schema-defined fields to the backend
       const itemData = {
-        itemType: "Goods",
-        name: formData.name,
-        hsnSacCode: formData.hsnSacCode || null,
+        type: formData.type,
+        name: formData.name.trim(),
+        hsnSacCode: formData.hsnSacCode.trim() || null,
         unit: formData.unit || null,
-        price: parseFloat(formData.sellingPrice) || 0,
-        description: formData.description || null,
+        sellingPrice: parseFloat(formData.sellingPrice),
+        currency: formData.currency,
+        description: formData.description.trim() || null,
       };
 
       await window.electron.addItems(itemData);
@@ -126,10 +152,21 @@ const ItemForm = ({ isOpen, onClose, onSave }) => {
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-[600px] max-h-[85vh] overflow-y-auto p-4">
         <DialogHeader className="pb-2">
-          <DialogTitle className="flex items-center gap-2 text-base">
-            <Package className="w-4 h-4 text-primary" />
-            Create New Item
-          </DialogTitle>
+          <div className="flex justify-between items-center">
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Package className="w-4 h-4 text-primary" />
+              Create New Item
+            </DialogTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+              onClick={generateDummyData}
+            >
+              <Wand2 className="h-4 w-4" />
+              Fill with Dummy Data
+            </Button>
+          </div>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -142,6 +179,34 @@ const ItemForm = ({ isOpen, onClose, onSave }) => {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">
+                    Item Type
+                    <span className="text-destructive ml-0.5">*</span>
+                  </Label>
+                  <Select
+                    value={formData.type}
+                    onValueChange={(value) => handleInputChange("type", value)}
+                  >
+                    <SelectTrigger className={errors.type ? "border-destructive" : ""}>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {typeOptions.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.type && (
+                    <p className="text-destructive text-[10px] flex items-center gap-1">
+                      <AlertCircle className="w-2.5 h-2.5" />
+                      {errors.type}
+                    </p>
+                  )}
+                </div>
+
                 <div className="space-y-1.5">
                   <Label className="text-xs">
                     Item Name
@@ -160,17 +225,16 @@ const ItemForm = ({ isOpen, onClose, onSave }) => {
                     </p>
                   )}
                 </div>
+              </div>
 
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">
-                    Unit
-                    <span className="text-destructive ml-0.5">*</span>
-                  </Label>
+                  <Label className="text-xs">Unit</Label>
                   <Select
                     value={formData.unit}
                     onValueChange={(value) => handleInputChange("unit", value)}
                   >
-                    <SelectTrigger className={errors.unit ? "border-destructive" : ""}>
+                    <SelectTrigger>
                       <SelectValue placeholder="Select unit" />
                     </SelectTrigger>
                     <SelectContent>
@@ -181,12 +245,19 @@ const ItemForm = ({ isOpen, onClose, onSave }) => {
                       ))}
                     </SelectContent>
                   </Select>
-                  {errors.unit && (
-                    <p className="text-destructive text-[10px] flex items-center gap-1">
-                      <AlertCircle className="w-2.5 h-2.5" />
-                      {errors.unit}
-                    </p>
-                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs">HSN/SAC Code</Label>
+                  <div className="relative">
+                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                    <Input
+                      placeholder="Enter HSN/SAC code"
+                      value={formData.hsnSacCode}
+                      onChange={(e) => handleInputChange("hsnSacCode", e.target.value)}
+                      className="pl-8"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -202,12 +273,12 @@ const ItemForm = ({ isOpen, onClose, onSave }) => {
             </CardContent>
           </Card>
 
-          {/* Pricing & Tax */}
+          {/* Pricing Section */}
           <Card className="shadow-sm">
             <CardContent className="p-4 space-y-4">
               <div className="flex items-center gap-2">
                 <DollarSign className="w-3 h-3 text-primary" />
-                <h3 className="text-xs font-medium">Pricing & Tax</h3>
+                <h3 className="text-xs font-medium">Pricing</h3>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -252,85 +323,6 @@ const ItemForm = ({ isOpen, onClose, onSave }) => {
                     <p className="text-destructive text-[10px] flex items-center gap-1">
                       <AlertCircle className="w-2.5 h-2.5" />
                       {errors.purchasePrice}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs">
-                    HSN/SAC Code
-                  </Label>
-                  <div className="relative">
-                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
-                    <Input
-                      placeholder="Enter HSN/SAC code"
-                      value={formData.hsnSacCode}
-                      onChange={(e) => handleInputChange("hsnSacCode", e.target.value)}
-                      className="pl-8"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Tax Rate (%)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="Enter tax rate"
-                    value={formData.taxRate}
-                    onChange={(e) => handleInputChange("taxRate", e.target.value)}
-                    className={errors.taxRate ? "border-destructive" : ""}
-                  />
-                  {errors.taxRate && (
-                    <p className="text-destructive text-[10px] flex items-center gap-1">
-                      <AlertCircle className="w-2.5 h-2.5" />
-                      {errors.taxRate}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Stock Information */}
-          <Card className="shadow-sm">
-            <CardContent className="p-4 space-y-4">
-              <div className="flex items-center gap-2">
-                <Package className="w-3 h-3 text-primary" />
-                <h3 className="text-xs font-medium">Stock Information</h3>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Opening Stock</Label>
-                  <Input
-                    type="number"
-                    placeholder="Enter opening stock"
-                    value={formData.openingStock}
-                    onChange={(e) => handleInputChange("openingStock", e.target.value)}
-                    className={errors.openingStock ? "border-destructive" : ""}
-                  />
-                  {errors.openingStock && (
-                    <p className="text-destructive text-[10px] flex items-center gap-1">
-                      <AlertCircle className="w-2.5 h-2.5" />
-                      {errors.openingStock}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Min Stock Alert</Label>
-                  <Input
-                    type="number"
-                    placeholder="Enter min stock level"
-                    value={formData.minStockAlert}
-                    onChange={(e) => handleInputChange("minStockAlert", e.target.value)}
-                    className={errors.minStockAlert ? "border-destructive" : ""}
-                  />
-                  {errors.minStockAlert && (
-                    <p className="text-destructive text-[10px] flex items-center gap-1">
-                      <AlertCircle className="w-2.5 h-2.5" />
-                      {errors.minStockAlert}
                     </p>
                   )}
                 </div>

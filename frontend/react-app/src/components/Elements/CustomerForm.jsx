@@ -9,7 +9,7 @@ import {
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
-import { Phone, Mail, Copy, User, Building2, CreditCard, MapPin, AlertCircle } from "lucide-react";
+import { Phone, Mail, Copy, User, Building2, CreditCard, MapPin, AlertCircle, Wand2 } from "lucide-react";
 import { Textarea } from "../ui/textarea";
 import {
   Select,
@@ -270,14 +270,66 @@ const CustomerForm = ({ open, onOpenChange, onSave }) => {
     }
   };
 
+  // Function to generate dummy customer data
+  const generateDummyData = () => {
+    const randomNum = Math.floor(Math.random() * 1000);
+    const randomState = indianStates[Math.floor(Math.random() * indianStates.length)].toLowerCase();
+    const randomCity = stateCityMapping[randomState][0];
+    const isGstApplicable = Math.random() > 0.5 ? "Yes" : "No";
+
+    const dummyData = {
+      customerType: Math.random() > 0.5 ? "Business" : "Individual",
+      salutation: "Mr.",
+      firstName: `John${randomNum}`,
+      lastName: `Doe${randomNum}`,
+      panNumber: "ABCDE1234F",
+      companyName: `Tech Solutions ${randomNum}`,
+      currency: "INR",
+      gstApplicable: isGstApplicable,
+      gstin: isGstApplicable === "Yes" ? "27AABCT1234A1Z5" : "",
+      stateCode: isGstApplicable === "Yes" ? "27" : "",
+
+      // Billing address
+      billingCountry: "India",
+      billingState: randomState,
+      billingCity: randomCity,
+      billingAddressLine1: "123 Business Park",
+      billingAddressLine2: "Tech Hub Area",
+      billingContactNo: `94${Math.floor(Math.random() * 100000000).toString().padStart(8, '0')}`,
+      billingEmail: `contact${randomNum}@techsolutions.com`,
+      billingAlternateContactNo: `98${Math.floor(Math.random() * 100000000).toString().padStart(8, '0')}`,
+
+      // Shipping address (same as billing for dummy data)
+      shippingCountry: "India",
+      shippingState: randomState,
+      shippingCity: randomCity,
+      shippingAddressLine1: "123 Business Park",
+      shippingAddressLine2: "Tech Hub Area",
+      shippingContactNo: `94${Math.floor(Math.random() * 100000000).toString().padStart(8, '0')}`,
+      shippingEmail: `contact${randomNum}@techsolutions.com`,
+      shippingAlternateContactNo: `98${Math.floor(Math.random() * 100000000).toString().padStart(8, '0')}`,
+    };
+
+    setFormData(dummyData);
+    setErrors({});
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[800px] max-h-[85vh] overflow-y-auto p-4">
-        <DialogHeader className="pb-2">
-          <DialogTitle className="flex items-center gap-2 text-base">
-            <User className="w-4 h-4 text-primary" />
-            Create New Customer
-          </DialogTitle>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <div className="flex justify-between items-center">
+            <DialogTitle>New Customer</DialogTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+              onClick={generateDummyData}
+            >
+              <Wand2 className="h-4 w-4" />
+              Fill with Dummy Data
+            </Button>
+          </div>
         </DialogHeader>
 
         <form className="space-y-4" onSubmit={handleSubmit}>

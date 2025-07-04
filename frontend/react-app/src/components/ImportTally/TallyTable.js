@@ -219,7 +219,7 @@ const TallyTable = ({
   };
   // When the user picks a ledger from the dropdown
   const handleLedgerChange = (row, newLedgerValue) => {
-    // Update the row’s ledger in filteredData (or transactions)
+    // Update the row's ledger in filteredData (or transactions)
     setFilteredData((prevData) =>
       prevData.map((tx) =>
         tx.id === row.id
@@ -236,7 +236,7 @@ const TallyTable = ({
       setLedgerOptions((prev) => [...prev, newLedgerName.trim()]);
     }
 
-    // Immediately update that row’s ledger value
+    // Immediately update that row's ledger value
     handleLedgerChange(row, newLedgerName.trim());
 
     // Return true so we know we successfully added it
@@ -846,9 +846,6 @@ const TallyTable = ({
   };
 
   const handleCopyToClipboard = () => {
-    // Use the same "columns" array (filtered to ignore unwanted keys)
-    // const headerRow = columns.join('\t');
-    // Map over the filteredData (or data you want to copy) and join each row's values with a tab.
     console.log(
       "Copying to clipboard... ",
       filteredData.length,
@@ -862,21 +859,19 @@ const TallyTable = ({
       const rows = filteredData.map((row) => {
         return [
           row.date || "",
-          row.ledger_name || "",
-          row.ledger_group || "",
-          row.gst_number || "",
-          row.address || "",
+          (row.ledger_name || "").trim(),
+          (row.ledger_group || "").trim(),
+          (row.gst_number || "").trim(),
+          (row.address || "").trim(),
           row.pincode || "",
-          row.state || "",
-          row.country || "",
+          (row.state || "").trim(),
+          (row.country || "").trim(),
           row.opening_balance || "",
           row.imported || "False",
         ].join("\t");
       });
       textToCopy = [...rows].join("\n");
     } else {
-      // make a seep copy of filteredData
-
       const rows = filteredDataCopy.map((row) => {
         console.log("Row = ", row);
 
@@ -887,32 +882,31 @@ const TallyTable = ({
           return null;
         }
         row["bill_reference"] = row["bill_reference"]
-          ? row["bill_reference"]
+          ? row["bill_reference"].trim()
           : "-";
 
-        // Add dr_ledger and cr_ledger using original logic
+        // Add dr_ledger and cr_ledger using original logic with proper formatting
         const dr_ledger =
-          row.type === "debit" ? row.ledger : selectedBankLedger;
+          row.type === "debit" ? (row.ledger || "").trim() : (selectedBankLedger || "").trim();
 
         const cr_ledger =
-          row.type === "credit" ? row.ledger : selectedBankLedger;
+          row.type === "credit" ? (row.ledger || "").trim() : (selectedBankLedger || "").trim();
 
         return [
-          companyName,
-          row["date"],
-          row["effective_date"],
-          row["bill_reference"],
+          (companyName || "").trim(),
+          (row["date"] || "").trim(),
+          (row["effective_date"] || "").trim(),
+          (row["bill_reference"] || "").trim(),
           dr_ledger,
           cr_ledger,
-          row["amount"],
-          row["voucher_type"],
-          row["narration"],
-          row["imported"],
+          (row["amount"] || "").toString().trim(),
+          (row["voucher_type"] || "").trim(),
+          (row["narration"] || "").trim(),
+          row["imported"] || "False",
         ].join("\t");
       });
       console.log({ rows });
-      // const textToCopy = [headerRow, ...rows].join('\n');
-      textToCopy = [...rows].join("\n");
+      textToCopy = [...rows].filter(Boolean).join("\n");
     }
 
     console.log({ textToCopy });

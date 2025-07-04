@@ -1,5 +1,5 @@
 const { ipcMain } = require('electron');
-const { getFileService } = require('../services/SimpleFileService');
+const fileService = require('../services/SimpleFileService');
 const DatabaseManager = require('../db/db');
 const { companies } = require('../db/schema/Company');
 const { eq } = require('drizzle-orm');
@@ -11,7 +11,6 @@ const log = require('electron-log/main');
 function registerFileHandlers() {
     log.info('Registering file management IPC handlers...');
 
-    const fileService = getFileService();
     const db = DatabaseManager.getInstance().getDatabase();
 
     // Upload company logo
@@ -19,24 +18,37 @@ function registerFileHandlers() {
         try {
             log.info(`Uploading logo for company ${companyId}: ${originalName}`);
 
-            // Save file
-            const filename = await fileService.replaceCompanyLogo(
-                Buffer.from(fileBuffer),
-                originalName,
-                companyId
-            );
+            // Get company name for the file path
+            const company = await db
+                .select()
+                .from(companies)
+                .where(eq(companies.id, companyId))
+                .get();
+
+            if (!company) {
+                throw new Error('Company not found');
+            }
+
+            // Convert buffer to base64
+            const base64Data = `data:image/${originalName.split('.').pop()};base64,${fileBuffer.toString('base64')}`;
+
+            // Save file using the new method
+            const relativePath = fileService.saveBase64File(base64Data, company.companyName, 'logo');
+            if (!relativePath) {
+                throw new Error('Failed to save logo file');
+            }
 
             // Update database
             await db
                 .update(companies)
-                .set({ logoFileName: filename })
+                .set({ logoFileName: relativePath })
                 .where(eq(companies.id, companyId));
 
-            log.info(`Logo uploaded successfully: ${filename}`);
+            log.info(`Logo uploaded successfully: ${relativePath}`);
             return {
                 success: true,
-                filename,
-                url: fileService.getFileUrl(filename)
+                filename: relativePath,
+                url: fileService.getBase64File(relativePath)
             };
         } catch (error) {
             log.error('Error uploading logo:', error);
@@ -49,24 +61,37 @@ function registerFileHandlers() {
         try {
             log.info(`Uploading signature for company ${companyId}: ${originalName}`);
 
-            // Save file
-            const filename = await fileService.replaceCompanySignature(
-                Buffer.from(fileBuffer),
-                originalName,
-                companyId
-            );
+            // Get company name for the file path
+            const company = await db
+                .select()
+                .from(companies)
+                .where(eq(companies.id, companyId))
+                .get();
+
+            if (!company) {
+                throw new Error('Company not found');
+            }
+
+            // Convert buffer to base64
+            const base64Data = `data:image/${originalName.split('.').pop()};base64,${fileBuffer.toString('base64')}`;
+
+            // Save file using the new method
+            const relativePath = fileService.saveBase64File(base64Data, company.companyName, 'signature');
+            if (!relativePath) {
+                throw new Error('Failed to save signature file');
+            }
 
             // Update database
             await db
                 .update(companies)
-                .set({ signatureFileName: filename })
+                .set({ signatureFileName: relativePath })
                 .where(eq(companies.id, companyId));
 
-            log.info(`Signature uploaded successfully: ${filename}`);
+            log.info(`Signature uploaded successfully: ${relativePath}`);
             return {
                 success: true,
-                filename,
-                url: fileService.getFileUrl(filename)
+                filename: relativePath,
+                url: fileService.getBase64File(relativePath)
             };
         } catch (error) {
             log.error('Error uploading signature:', error);
@@ -77,7 +102,11 @@ function registerFileHandlers() {
     // Get file info
     ipcMain.handle('files:getFileInfo', async (event, filename) => {
         try {
-            return await fileService.getFileInfo(filename);
+            const base64Data = fileService.getBase64File(filename);
+            return {
+                exists: !!base64Data,
+                url: base64Data
+            };
         } catch (error) {
             log.error('Error getting file info:', error);
             throw error;
@@ -87,7 +116,7 @@ function registerFileHandlers() {
     // Check if file exists
     ipcMain.handle('files:fileExists', async (event, filename) => {
         try {
-            return await fileService.fileExists(filename);
+            return !!fileService.getBase64File(filename);
         } catch (error) {
             log.error('Error checking file existence:', error);
             return false;
@@ -112,10 +141,7 @@ function registerFileHandlers() {
             const filename = company[fieldName];
 
             if (filename) {
-                // Delete file from filesystem
-                await fileService.deleteFile(filename);
-
-                // Remove from database
+                // Remove from database first
                 await db
                     .update(companies)
                     .set({ [fieldName]: null })
@@ -145,8 +171,8 @@ function registerFileHandlers() {
             }
 
             return {
-                logoUrl: company.logoFileName ? fileService.getFileUrl(company.logoFileName) : null,
-                signatureUrl: company.signatureFileName ? fileService.getFileUrl(company.signatureFileName) : null,
+                logoUrl: company.logoFileName ? fileService.getBase64File(company.logoFileName) : null,
+                signatureUrl: company.signatureFileName ? fileService.getBase64File(company.signatureFileName) : null,
                 logoFileName: company.logoFileName,
                 signatureFileName: company.signatureFileName
             };

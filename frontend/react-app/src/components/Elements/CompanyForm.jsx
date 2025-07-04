@@ -338,6 +338,47 @@ const CompanyForm = ({ open, onOpenChange, onSave }) => {
 
   const availableCities = stateCityMapping[formData.state] || [];
 
+  const fillDummyData = () => {
+    const randomNum = Math.floor(Math.random() * 1000);
+    setFormData({
+      companyType: "manufacturer",
+      companyName: `Tech Solutions ${randomNum}`,
+      currency: "inr",
+      gstApplicable: true,
+      gstin: "27AABCT1234A1Z5",
+      stateCode: "27",
+      country: "india",
+      addressLine1: "123 Business Park",
+      addressLine2: "Tech Hub Area",
+      state: "maharashtra",
+      city: "Mumbai",
+      email: `contact${randomNum}@techsolutions.com`,
+      contactNo: "9" + Math.floor(Math.random() * 1000000000).toString().padStart(9, '0'),
+      website: `www.techsolutions${randomNum}.com`,
+      industry: "technology",
+      establishedYear: "2020",
+      employeeCount: "50",
+      companySize: "startup",
+      businessModel: "b2b",
+      annualRevenue: "10000000",
+      primaryMarket: "domestic",
+      customerSegment: "enterprise",
+      valueProposition: "Innovative Tech Solutions",
+      operatingHours: "24/7",
+      timezone: "Asia/Kolkata",
+      fiscalYearStart: "04-01",
+      taxId: "TECH" + randomNum,
+      logo: null,
+      signature: null
+    });
+
+    toast({
+      title: "Dummy Data Filled",
+      description: "Form has been filled with dummy data. You can edit it before submitting.",
+      variant: "success",
+    });
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
@@ -346,6 +387,13 @@ const CompanyForm = ({ open, onOpenChange, onSave }) => {
             <Building2 className="h-4 w-4" />
             Create New Company
           </DialogTitle>
+          <Button
+            onClick={fillDummyData}
+            className="absolute right-12 top-4 bg-gray-100 hover:bg-gray-200 text-gray-900 text-xs"
+            size="sm"
+          >
+            Fill Test Data
+          </Button>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

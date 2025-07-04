@@ -17,6 +17,8 @@ const { fetchLedgersForAllCompanies } = require("./utils/getComapnyAndLedgers");
 
 const { XMLParser } = require("fast-xml-parser");
 const { tallyVoucher } = require("../db/schema/TallyVoucher");
+const { tallySalesVoucher } = require("../db/schema/TallySalesVoucher");
+const { invoices } = require("../db/schema/Invoice");
 
 function registerTallyIpc() {
   const db = databaseManager.getInstance().getDatabase();
@@ -277,46 +279,164 @@ function registerTallyIpc() {
     "store-tally-upload",
     async (event, uploadResponse, bankLedger, uploadData) => {
       try {
-        // Prepare the data to be inserted
-        const insertRecords = uploadData.map((transaction) => {
-          // Check if this transaction was successful
-          const isSuccessful = uploadResponse.successIds.includes(
-            transaction.id
-          );
+        // Check what type of data we're dealing with
+        const transactionIds = uploadData.map(t => t.id);
+        
+        // First check if these are transaction IDs
+        const existingTransactions = await db
+          .select({ id: transactions.id })
+          .from(transactions)
+          .where(inArray(transactions.id, transactionIds));
 
-          return {
-            transactionId: transaction.id,
-            effective_date: transaction.effectiveDate
-              ? new Date(transaction.effectiveDate)
-              : new Date(),
-            bill_reference: transaction.billRefernce || "",
-            failed_reason: isSuccessful
-              ? ""
-              : JSON.stringify(
-                uploadResponse.failedTransactions.find(
-                  (failed) => failed.id === transaction.id
-                ) || "Unknown failure"
-              ),
-            bank_ledger: bankLedger || "",
-            result: isSuccessful ? 1 : 0,
-            createdAt: new Date(),
-          };
-        });
+        const existingTransactionIds = new Set(existingTransactions.map(t => t.id));
+        
+        // If no transaction IDs found, check if these are invoice IDs
+        let existingInvoiceIds = new Set();
+        if (existingTransactionIds.size === 0) {
+          // Check if the IDs match invoice IDs (they might be string IDs like '1751631526542-0')
+          // For now, let's extract the numeric part and check if they exist as invoice IDs
+          const numericIds = transactionIds.map(id => {
+            // Extract numeric part from IDs like '1751631526542-0'
+            const match = String(id).match(/^(\d+)/);
+            return match ? parseInt(match[1]) : null;
+          }).filter(id => id !== null);
 
-        // Batch insert the records
-        const insertedRecords = [];
-        for (const record of insertRecords) {
-          const inserted = await db
-            .insert(tallyVoucher)
-            .values(record)
-            .returning();
-          insertedRecords.push(inserted[0]);
+          if (numericIds.length > 0) {
+            const existingInvoices = await db
+              .select({ id: invoices.id })
+              .from(invoices)
+              .where(inArray(invoices.id, numericIds));
+            
+            existingInvoiceIds = new Set(existingInvoices.map(inv => inv.id));
+          }
         }
 
-        return {
-          success: true,
-          insertedRecords: insertedRecords,
-        };
+        // Determine data type and process accordingly
+        if (existingTransactionIds.size > 0) {
+          // This is transaction data - store in tallyVoucher table
+          console.log("Processing transaction data for tallyVoucher table");
+          
+          const validUploadData = uploadData.filter(item => existingTransactionIds.has(item.id));
+          const missingIds = transactionIds.filter(id => !existingTransactionIds.has(id));
+
+          if (missingIds.length > 0) {
+            console.log(`Warning: Some transaction IDs not found: ${missingIds.join(', ')}`);
+          }
+
+          if (validUploadData.length === 0) {
+            return {
+              success: false,
+              error: `No valid transaction IDs found in database`
+            };
+          }
+
+          // Prepare transaction records for tallyVoucher table
+          const insertRecords = validUploadData.map((transaction) => {
+            const isSuccessful = uploadResponse.successIds.includes(transaction.id);
+
+            return {
+              transactionId: transaction.id,
+              effective_date: transaction.effectiveDate
+                ? new Date(transaction.effectiveDate)
+                : new Date(),
+              bill_reference: transaction.billRefernce || "",
+              failed_reason: isSuccessful
+                ? ""
+                : JSON.stringify(
+                  uploadResponse.failedTransactions.find(
+                    (failed) => failed.id === transaction.id
+                  ) || "Unknown failure"
+                ),
+              bank_ledger: bankLedger || "",
+              result: isSuccessful ? 1 : 0,
+              createdAt: new Date(),
+            };
+          });
+
+          // Insert transaction records
+          const insertedRecords = [];
+          for (const record of insertRecords) {
+            const inserted = await db
+              .insert(tallyVoucher)
+              .values(record)
+              .returning();
+            insertedRecords.push(inserted[0]);
+          }
+
+          return {
+            success: true,
+            insertedRecords: insertedRecords,
+            skippedRecords: missingIds.length,
+            dataType: 'transactions'
+          };
+
+        } else if (existingInvoiceIds.size > 0) {
+          // This is sales/invoice data - store in tallySalesVoucher table
+          console.log("Processing sales/invoice data for tallySalesVoucher table");
+          
+          // Map upload data to invoice IDs
+          const salesRecords = uploadData.map((salesItem) => {
+            // Extract numeric part from IDs like '1751631526542-0'
+            const match = String(salesItem.id).match(/^(\d+)/);
+            const invoiceId = match ? parseInt(match[1]) : null;
+            
+            if (!invoiceId || !existingInvoiceIds.has(invoiceId)) {
+              return null; // Skip invalid invoice IDs
+            }
+
+            const isSuccessful = uploadResponse.successIds.includes(salesItem.id);
+
+            return {
+              invoiceId: invoiceId,
+              effective_date: salesItem.effectiveDate
+                ? new Date(salesItem.effectiveDate)
+                : new Date(),
+              voucher_number: salesItem.VoucherNumber || salesItem.voucherNumber || "",
+              failed_reason: isSuccessful
+                ? ""
+                : JSON.stringify(
+                  uploadResponse.failedTransactions.find(
+                    (failed) => failed.id === salesItem.id
+                  ) || "Unknown failure"
+                ),
+              result: isSuccessful ? 1 : 0,
+              createdAt: new Date(),
+            };
+          }).filter(record => record !== null);
+
+          if (salesRecords.length === 0) {
+            return {
+              success: false,
+              error: `No valid invoice IDs found for sales data`
+            };
+          }
+
+          // Insert sales records
+          const insertedSalesRecords = [];
+          for (const record of salesRecords) {
+            const inserted = await db
+              .insert(tallySalesVoucher)
+              .values(record)
+              .returning();
+            insertedSalesRecords.push(inserted[0]);
+          }
+
+          return {
+            success: true,
+            insertedRecords: insertedSalesRecords,
+            skippedRecords: uploadData.length - salesRecords.length,
+            dataType: 'sales'
+          };
+
+        } else {
+          // No matching IDs found in either table
+          console.log("No matching transaction or invoice IDs found.");
+          return {
+            success: false,
+            error: "No matching transaction or invoice IDs found in database"
+          };
+        }
+
       } catch (error) {
         console.error("Error storing Tally upload:", error);
         return {

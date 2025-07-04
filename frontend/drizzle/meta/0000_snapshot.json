@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "9eabd2ac-7e7c-47b2-ad88-29c74331b744",
+  "id": "76d557f4-dbcf-4866-a9af-4c9700f3d9b5",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "cases": {
@@ -1319,7 +1319,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 1751555530164
+          "default": 1751605877402
         }
       },
       "indexes": {
@@ -1439,7 +1439,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 1751555530163
+          "default": 1751605877402
         }
       },
       "indexes": {},

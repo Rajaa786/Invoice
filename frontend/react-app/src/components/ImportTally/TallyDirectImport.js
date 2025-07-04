@@ -113,12 +113,12 @@ const TallyDirectImport = ({ defaultVoucher, source, setActiveTab }) => {
 
   // ----------------------------------
   // 1) FETCHING VOUCHERS/TRANSACTIONS
-  //    (only if not in “manual” source)
+  //    (only if not in "manual" source)
   // ----------------------------------
 
   useEffect(() => {
     if (source !== "manual") {
-      // If we’re NOT in “manual” mode, fetch transactions from your existing logic
+      // If we're NOT in "manual" mode, fetch transactions from your existing logic
       setLoading(true);
 
       // fetchVouchersTransactions();
@@ -312,7 +312,7 @@ const TallyDirectImport = ({ defaultVoucher, source, setActiveTab }) => {
   }
 
   const handleTallyUpload = async (txData) => {
-    // “txData” is optional—ManualEntryTable might pass it.
+    // "txData" is optional—ManualEntryTable might pass it.
     if (!companyName.trim()) {
       // alert("Please enter a company name before uploading.");
       toast({
@@ -429,7 +429,7 @@ const TallyDirectImport = ({ defaultVoucher, source, setActiveTab }) => {
   };
 
   const handleLedgerCreation = async (data) => {
-    // “txData” is optional—ManualEntryTable might pass it.
+    // "txData" is optional—ManualEntryTable might pass it.
     if (!companyName.trim()) {
       // alert("Please enter a company name before uploading.");
       toast({
@@ -639,7 +639,7 @@ const TallyDirectImport = ({ defaultVoucher, source, setActiveTab }) => {
       //   JSON.stringify(storedReasons)
       // );
 
-      // // Update local transactions with new “failed_reason” or “imported” flags
+      // // Update local transactions with new "failed_reason" or "imported" flags
       // const tempTransactions = transactions.map((tr) => {
       //   if (successIds.includes(tr.id)) {
       //     return { ...tr, imported: true, failed_reason: "" };
@@ -1043,7 +1043,7 @@ const TallyDirectImport = ({ defaultVoucher, source, setActiveTab }) => {
     }
   };
 
-  // If the user manually enters rows, “ManualEntryTable” might call this:
+  // If the user manually enters rows, "ManualEntryTable" might call this:
   const handleManualEntriesSubmit = (rows) => {
     // rows is an array from ManualEntryTable
     // setTransactions(rows);
@@ -1112,23 +1112,30 @@ const TallyDirectImport = ({ defaultVoucher, source, setActiveTab }) => {
           const withFullDetails = await Promise.all(
             invoiceList.map(async (invoice) => {
               let customerName = "Unknown";
-              let customerCompanyName = "Unknown";
+              let companyDetails = null;
 
               try {
-                const response = await window.electron.getCustomer();
-                const allCustomers = response.customers || [];
-
+                // Get customer details
+                const customerResponse = await window.electron.getCustomer();
+                const allCustomers = customerResponse.customers || [];
                 const customer = allCustomers.find(c => c.id === invoice.customerId);
-
                 if (customer) {
                   customerName = `${customer.firstName || ""} ${customer.lastName || ""}`.trim();
-                  customerCompanyName = customer.companyName || "Unknown";
                 }
+
+                // Get company details
+                const companyResponse = await window.electron.getCompany();
+                const allCompanies = companyResponse.companies || [];
+                companyDetails = allCompanies.find(c => c.id === invoice.companyId);
+
+                console.log("companyDetails", companyDetails);
+
               } catch (e) {
-                console.warn("Customer lookup failed:", e);
+                console.warn("Data lookup failed:", e);
               }
+
               return {
-                companyName: customerCompanyName || "Unknown",
+                companyName: companyDetails?.companyName || "Unknown",
                 invoiceDate: formatDateForTally(
                   invoice.invoiceDate || ""
                 ),
@@ -1183,20 +1190,26 @@ const TallyDirectImport = ({ defaultVoucher, source, setActiveTab }) => {
           const detailedInvoices = await Promise.all(
             invoiceList.map(async (invoice) => {
               let customerName = "Unknown";
-              let customerCompanyName = "Unknown";
+              let companyDetails = null;
 
               try {
-                const response = await window.electron.getCustomer();
-                const allCustomers = response.customers || [];
-
+                // Get customer details
+                const customerResponse = await window.electron.getCustomer();
+                const allCustomers = customerResponse.customers || [];
                 const customer = allCustomers.find(c => c.id === invoice.customerId);
-
                 if (customer) {
                   customerName = `${customer.firstName || ""} ${customer.lastName || ""}`.trim();
-                  customerCompanyName = customer.companyName || "Unknown";
                 }
+
+                // Get company details
+                const companyResponse = await window.electron.getCompany();
+                const allCompanies = companyResponse.companies || [];
+                companyDetails = allCompanies.find(c => c.id === invoice.companyId);
+
+                console.log("companyDetails", companyDetails);
+
               } catch (e) {
-                console.warn("Customer lookup failed:", e);
+                console.warn("Data lookup failed:", e);
               }
 
               // Handle invoice items
@@ -1207,7 +1220,6 @@ const TallyDirectImport = ({ defaultVoucher, source, setActiveTab }) => {
 
               try {
                 const itemsResponse = await window.electron.getAllInvoiceItems(invoice.id);
-                // console.log(itemsResponse, "itemmmmmmssssss");
 
                 if (itemsResponse.success && itemsResponse.data && itemsResponse.data.length > 0) {
                   const firstItem = itemsResponse.data[0];
@@ -1215,14 +1227,12 @@ const TallyDirectImport = ({ defaultVoucher, source, setActiveTab }) => {
                   quantity = firstItem.quantity || 0;
                   rate = firstItem.rate || 0;
                   taxValue = firstItem.amount || 0;
-
-                  // console.log("Fetched invoice item:", firstItem);
                 }
               } catch (e) {
                 console.warn("Failed to fetch invoice items:", e);
               }
               return {
-                companyName: customerCompanyName || "Unknown",
+                companyName: companyDetails?.companyName || "Unknown",
                 invoiceDate: formatDateForTally(
                   invoice.invoiceDate || ""
                 ),
