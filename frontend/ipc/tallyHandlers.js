@@ -16,7 +16,7 @@ const {
 const { fetchLedgersForAllCompanies } = require("./utils/getComapnyAndLedgers");
 
 const { XMLParser } = require("fast-xml-parser");
-const { tallyVoucher } = require("../db/schema/TallyVoucher");
+// const { tallyVoucher } = require("../db/schema/TallyVoucher");
 const { tallySalesVoucher } = require("../db/schema/TallySalesVoucher");
 const { invoices } = require("../db/schema/Invoice");
 
@@ -278,167 +278,102 @@ function registerTallyIpc() {
   ipcMain.handle(
     "store-tally-upload",
     async (event, uploadResponse, bankLedger, uploadData) => {
+      log.info("Upload Data", uploadData)
+      log.info("Upload Response", uploadResponse)
+      log.info("Bank Ledger", bankLedger)
       try {
-        // Check what type of data we're dealing with
-        const transactionIds = uploadData.map(t => t.id);
+        // This handler is specifically for sales data only
+        console.log("Processing sales data for tallySalesVoucher table");
         
-        // First check if these are transaction IDs
-        const existingTransactions = await db
-          .select({ id: transactions.id })
-          .from(transactions)
-          .where(inArray(transactions.id, transactionIds));
+        // Step 1: Verify this is sales data and has invoice IDs
+        const isSalesData = uploadData.length > 0 && 
+          uploadData[0].hasOwnProperty('VoucherNumber') && 
+          uploadData[0].hasOwnProperty('customerName') &&
+          uploadData[0].hasOwnProperty('invoiceId');
 
-        const existingTransactionIds = new Set(existingTransactions.map(t => t.id));
-        
-        // If no transaction IDs found, check if these are invoice IDs
-        let existingInvoiceIds = new Set();
-        if (existingTransactionIds.size === 0) {
-          // Check if the IDs match invoice IDs (they might be string IDs like '1751631526542-0')
-          // For now, let's extract the numeric part and check if they exist as invoice IDs
-          const numericIds = transactionIds.map(id => {
-            // Extract numeric part from IDs like '1751631526542-0'
-            const match = String(id).match(/^(\d+)/);
-            return match ? parseInt(match[1]) : null;
-          }).filter(id => id !== null);
-
-          if (numericIds.length > 0) {
-            const existingInvoices = await db
-              .select({ id: invoices.id })
-              .from(invoices)
-              .where(inArray(invoices.id, numericIds));
-            
-            existingInvoiceIds = new Set(existingInvoices.map(inv => inv.id));
-          }
+        if (!isSalesData) {
+          return {
+            success: false,
+            error: "This handler only processes sales data with invoice IDs"
+          };
         }
 
-        // Determine data type and process accordingly
-        if (existingTransactionIds.size > 0) {
-          // This is transaction data - store in tallyVoucher table
-          console.log("Processing transaction data for tallyVoucher table");
+        // Step 2: Extract invoice IDs and verify they exist in the database
+        const invoiceIds = uploadData.map(item => item.invoiceId).filter(Boolean);
+        
+        if (invoiceIds.length === 0) {
+          return {
+            success: false,
+            error: "No valid invoice IDs found in sales data"
+          };
+        }
+
+        const existingInvoices = await db
+          .select({ id: invoices.id })
+          .from(invoices)
+          .where(inArray(invoices.id, invoiceIds));
+
+        const existingInvoiceIds = new Set(existingInvoices.map(inv => inv.id));
+        const missingInvoiceIds = invoiceIds.filter(id => !existingInvoiceIds.has(id));
+
+        if (missingInvoiceIds.length > 0) {
+          return {
+            success: false,
+            error: `Invoice IDs not found in database: ${missingInvoiceIds.join(', ')}`
+          };
+        }
+
+        // Step 3: Prepare sales records for tallySalesVoucher table
+        const salesRecords = uploadData.map((salesItem) => {
+          // Check if this sales item was successful
+          const isSuccessful = uploadResponse.successIds.includes(salesItem.id);
           
-          const validUploadData = uploadData.filter(item => existingTransactionIds.has(item.id));
-          const missingIds = transactionIds.filter(id => !existingTransactionIds.has(id));
-
-          if (missingIds.length > 0) {
-            console.log(`Warning: Some transaction IDs not found: ${missingIds.join(', ')}`);
-          }
-
-          if (validUploadData.length === 0) {
-            return {
-              success: false,
-              error: `No valid transaction IDs found in database`
-            };
-          }
-
-          // Prepare transaction records for tallyVoucher table
-          const insertRecords = validUploadData.map((transaction) => {
-            const isSuccessful = uploadResponse.successIds.includes(transaction.id);
-
-            return {
-              transactionId: transaction.id,
-              effective_date: transaction.effectiveDate
-                ? new Date(transaction.effectiveDate)
-                : new Date(),
-              bill_reference: transaction.billRefernce || "",
-              failed_reason: isSuccessful
-                ? ""
-                : JSON.stringify(
-                  uploadResponse.failedTransactions.find(
-                    (failed) => failed.id === transaction.id
-                  ) || "Unknown failure"
-                ),
-              bank_ledger: bankLedger || "",
-              result: isSuccessful ? 1 : 0,
-              createdAt: new Date(),
-            };
-          });
-
-          // Insert transaction records
-          const insertedRecords = [];
-          for (const record of insertRecords) {
-            const inserted = await db
-              .insert(tallyVoucher)
-              .values(record)
-              .returning();
-            insertedRecords.push(inserted[0]);
+          // Extract failed reason if it exists
+          let failedReason = "";
+          if (!isSuccessful) {
+            const failedTransaction = uploadResponse.failedTransactions.find(
+              (failed) => Object.keys(failed)[0] === salesItem.id
+            );
+            failedReason = failedTransaction ? JSON.stringify(failedTransaction) : "Unknown failure";
           }
 
           return {
-            success: true,
-            insertedRecords: insertedRecords,
-            skippedRecords: missingIds.length,
-            dataType: 'transactions'
+            invoiceId: salesItem.invoiceId,
+            effective_date: salesItem.effectiveDate
+              ? new Date(salesItem.effectiveDate)
+              : new Date(),
+            bill_reference: salesItem.VoucherNumber || "",
+            failed_reason: failedReason,
+            bank_ledger: bankLedger || "Sales", // Use bankLedger or default to "Sales"
+            result: isSuccessful ? 1 : 0,
+            createdAt: new Date(),
           };
+        });
 
-        } else if (existingInvoiceIds.size > 0) {
-          // This is sales/invoice data - store in tallySalesVoucher table
-          console.log("Processing sales/invoice data for tallySalesVoucher table");
-          
-          // Map upload data to invoice IDs
-          const salesRecords = uploadData.map((salesItem) => {
-            // Extract numeric part from IDs like '1751631526542-0'
-            const match = String(salesItem.id).match(/^(\d+)/);
-            const invoiceId = match ? parseInt(match[1]) : null;
-            
-            if (!invoiceId || !existingInvoiceIds.has(invoiceId)) {
-              return null; // Skip invalid invoice IDs
-            }
-
-            const isSuccessful = uploadResponse.successIds.includes(salesItem.id);
-
-            return {
-              invoiceId: invoiceId,
-              effective_date: salesItem.effectiveDate
-                ? new Date(salesItem.effectiveDate)
-                : new Date(),
-              voucher_number: salesItem.VoucherNumber || salesItem.voucherNumber || "",
-              failed_reason: isSuccessful
-                ? ""
-                : JSON.stringify(
-                  uploadResponse.failedTransactions.find(
-                    (failed) => failed.id === salesItem.id
-                  ) || "Unknown failure"
-                ),
-              result: isSuccessful ? 1 : 0,
-              createdAt: new Date(),
-            };
-          }).filter(record => record !== null);
-
-          if (salesRecords.length === 0) {
-            return {
-              success: false,
-              error: `No valid invoice IDs found for sales data`
-            };
-          }
-
-          // Insert sales records
-          const insertedSalesRecords = [];
-          for (const record of salesRecords) {
+        // Step 4: Insert sales records into tallySalesVoucher table
+        const insertedSalesRecords = [];
+        for (const record of salesRecords) {
+          try {
             const inserted = await db
               .insert(tallySalesVoucher)
               .values(record)
               .returning();
             insertedSalesRecords.push(inserted[0]);
+          } catch (error) {
+            console.error("Error inserting sales record:", error);
+            // Continue with other records even if one fails
           }
-
-          return {
-            success: true,
-            insertedRecords: insertedSalesRecords,
-            skippedRecords: uploadData.length - salesRecords.length,
-            dataType: 'sales'
-          };
-
-        } else {
-          // No matching IDs found in either table
-          console.log("No matching transaction or invoice IDs found.");
-          return {
-            success: false,
-            error: "No matching transaction or invoice IDs found in database"
-          };
         }
 
+        return {
+          success: true,
+          insertedRecords: insertedSalesRecords,
+          dataType: 'sales',
+          message: `Successfully stored ${insertedSalesRecords.length} sales voucher records`
+        };
+
       } catch (error) {
-        console.error("Error storing Tally upload:", error);
+        console.error("Error storing Tally sales upload:", error);
         return {
           success: false,
           error: error.message,
@@ -447,94 +382,94 @@ function registerTallyIpc() {
     }
   );
 
-  ipcMain.handle(
-    "get-tally-transactions",
-    async (event, caseId, individualId) => {
-      try {
-        let allTransactions = [];
+  // ipcMain.handle(
+  //   "get-tally-transactions",
+  //   async (event, caseId, individualId) => {
+  //     try {
+  //       let allTransactions = [];
 
-        // Get all transactions based on caseId or individualId
-        if (individualId) {
-          console.log("individualId", individualId);
-          allTransactions = await db
-            .select({
-              id: transactions.id,
-              ...transactions,
-            })
-            .from(transactions)
-            .where(and(eq(transactions.statementId, individualId.toString())));
+  //       // Get all transactions based on caseId or individualId
+  //       if (individualId) {
+  //         console.log("individualId", individualId);
+  //         allTransactions = await db
+  //           .select({
+  //             id: transactions.id,
+  //             ...transactions,
+  //           })
+  //           .from(transactions)
+  //           .where(and(eq(transactions.statementId, individualId.toString())));
 
-          log.info({ allTransactions: allTransactions.length });
-        } else {
-          const allStatements = await db
-            .select()
-            .from(statements)
-            .where(eq(statements.caseId, caseId));
+  //         log.info({ allTransactions: allTransactions.length });
+  //       } else {
+  //         const allStatements = await db
+  //           .select()
+  //           .from(statements)
+  //           .where(eq(statements.caseId, caseId));
 
-          if (allStatements.length === 0) {
-            log.info("No statements found for case:", caseId);
-            return [];
-          }
+  //         if (allStatements.length === 0) {
+  //           log.info("No statements found for case:", caseId);
+  //           return [];
+  //         }
 
-          allTransactions = await db
-            .select({
-              id: transactions.id,
-              ...transactions,
-            })
-            .from(transactions)
-            .where(
-              inArray(
-                transactions.statementId,
-                allStatements.map((stmt) => stmt.id.toString())
-              )
-            );
-        }
+  //         allTransactions = await db
+  //           .select({
+  //             id: transactions.id,
+  //             ...transactions,
+  //           })
+  //           .from(transactions)
+  //           .where(
+  //             inArray(
+  //               transactions.statementId,
+  //               allStatements.map((stmt) => stmt.id.toString())
+  //             )
+  //           );
+  //       }
 
-        // Join with the tally_voucher table to get upload status information
-        const transactionsWithTallyStatus = await Promise.all(
-          allTransactions.map(async (transaction) => {
-            // Query the tally_voucher table for this transaction
-            const tallyData = await db
-              .select()
-              .from(tallyVoucher)
-              .where(eq(tallyVoucher.transactionId, transaction.id))
-              .limit(1);
+  //       // Join with the tally_voucher table to get upload status information
+  //       const transactionsWithTallyStatus = await Promise.all(
+  //         allTransactions.map(async (transaction) => {
+  //           // Query the tally_voucher table for this transaction
+  //           const tallyData = await db
+  //             .select()
+  //             .from(tallyVoucher)
+  //             .where(eq(tallyVoucher.transactionId, transaction.id))
+  //             .limit(1);
 
-            // Determine if the transaction was successfully uploaded to Tally
-            const isImported =
-              tallyData.length > 0 && tallyData[0].result === true;
-            const failedReason =
-              tallyData.length > 0 ? tallyData[0].failed_reason : "";
-            const bankLedger =
-              tallyData.length > 0 ? tallyData[0].bank_ledger : "";
-            const effective_date =
-              tallyData.length > 0 ? tallyData[0].effective_date : null;
-            const bill_reference =
-              tallyData.length > 0 ? tallyData[0].bill_reference : "";
+  //           // Determine if the transaction was successfully uploaded to Tally
+  //           const isImported =
+  //             tallyData.length > 0 && tallyData[0].result === true;
+  //           const failedReason =
+  //             tallyData.length > 0 ? tallyData[0].failed_reason : "";
+  //           const bankLedger =
+  //             tallyData.length > 0 ? tallyData[0].bank_ledger : "";
+  //           const effective_date =
+  //             tallyData.length > 0 ? tallyData[0].effective_date : null;
+  //           const bill_reference =
+  //             tallyData.length > 0 ? tallyData[0].bill_reference : "";
 
-            // Return transaction with the additional Tally status info
-            return {
-              ...transaction,
-              imported: isImported ? 1 : 0,
-              failed_reason: failedReason,
-              bank_ledger: bankLedger,
-              effective_date: effective_date
-                ? new Date(effective_date).toISOString()
-                : "",
-              bill_reference: bill_reference,
-            };
-          })
-        );
+  //           // Return transaction with the additional Tally status info
+  //           return {
+  //             ...transaction,
+  //             imported: isImported ? 1 : 0,
+  //             failed_reason: failedReason,
+  //             bank_ledger: bankLedger,
+  //             effective_date: effective_date
+  //               ? new Date(effective_date).toISOString()
+  //               : "",
+  //             bill_reference: bill_reference,
+  //           };
+  //         })
+  //       );
 
-        // log.info("transactionsWithTallyStatus", transactionsWithTallyStatus);
+  //       // log.info("transactionsWithTallyStatus", transactionsWithTallyStatus);
 
-        return transactionsWithTallyStatus;
-      } catch (error) {
-        log.error("Error fetching transactions with Tally status:", error);
-        throw error;
-      }
-    }
-  );
+  //       return transactionsWithTallyStatus;
+  //     } catch (error) {
+  //       log.error("Error fetching transactions with Tally status:", error);
+  //       throw error;
+  //     }
+  //   }
+  // );
 
   ipcMain.handle(
     "sales-create",
@@ -607,6 +542,69 @@ function registerTallyIpc() {
       log.info({ successIds, failedTransactions });
 
       return { success: true, successIds, failedTransactions };
+    }
+  );
+
+  ipcMain.handle(
+    "get-tally-sales",
+    async (event) => {
+      try {
+        // Get all invoices
+        const allInvoices = await db
+          .select({
+            id: invoices.id,
+            ...invoices,
+          })
+          .from(invoices);
+
+        if (allInvoices.length === 0) {
+          log.info("No invoices found");
+          return [];
+        }
+
+        // Join with the tally_sales_voucher table to get upload status information
+        const invoicesWithTallyStatus = await Promise.all(
+          allInvoices.map(async (invoice) => {
+            // Query the tally_sales_voucher table for this invoice
+            const tallySalesData = await db
+              .select()
+              .from(tallySalesVoucher)
+              .where(eq(tallySalesVoucher.invoiceId, invoice.id))
+              .limit(1);
+
+            // Determine if the invoice was successfully uploaded to Tally
+            const isImported =
+              tallySalesData.length > 0 && tallySalesData[0].result === true;
+            const failedReason =
+              tallySalesData.length > 0 ? tallySalesData[0].failed_reason : "";
+            const bankLedger =
+              tallySalesData.length > 0 ? tallySalesData[0].bank_ledger : "";
+            const effective_date =
+              tallySalesData.length > 0 ? tallySalesData[0].effective_date : null;
+            const bill_reference =
+              tallySalesData.length > 0 ? tallySalesData[0].bill_reference : "";
+
+            // Return invoice with the additional Tally status info
+            return {
+              ...invoice,
+              imported: isImported ? 1 : 0,
+              failed_reason: failedReason,
+              bank_ledger: bankLedger,
+              effective_date: effective_date
+                ? new Date(effective_date).toISOString()
+                : "",
+              bill_reference: bill_reference,
+            };
+          })
+        );
+
+        log.info("invoicesWithTallyStatus count:", invoicesWithTallyStatus.length);
+
+        return invoicesWithTallyStatus;
+      } catch (error) {
+        log.error("Error fetching invoices with Tally status:", error);
+        throw error;
+      }
     }
   );
 }

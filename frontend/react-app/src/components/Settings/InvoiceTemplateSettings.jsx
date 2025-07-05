@@ -155,187 +155,66 @@ const createTestTemplate = (invoiceData) => {
 
 // Sample invoice data for preview - Fixed to match template expectations exactly
 const SAMPLE_INVOICE_DATA = {
-    invoiceNumber: 'INV-2024-001',
-    invoiceDate: new Date().toLocaleDateString('en-GB'),  // ✅ Fixed: was 'date', now 'invoiceDate'
-    date: new Date().toLocaleDateString('en-GB'),  // Keep both for compatibility
-    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB'),
+    invoiceNumber: 'PREVIEW-001',
+    invoiceDate: new Date(),
+    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    customerNotes: "Thank you for your business",
+    termsAndConditions: "Standard terms and conditions apply",
+    cgstRate: 9,
+    sgstRate: 9,
+    cgstAmount: 90,
+    sgstAmount: 90,
+    totalAmount: 1180,
+    isPreviewMode: true,
 
     // Company info - matches template expectations
     company: {
-        companyName: 'Cyphersol Fintech India Pvt. Ltd.',
-        logo: '/cyphersol-logo.png',  // Add logo path
+        companyName: 'Demo Company Ltd.',
         addressLine1: '123 Business Street',
-        city: 'Business City',
-        state: 'BC',
-        zip: '12345',
-        phone: '+1 (555) 123-4567',
-        email: 'hello@yourcompany.com',
-        website: 'www.yourcompany.com',
-        gstin: 'GST123456789012345'
+        addressLine2: 'Suite 101',
+        city: 'Mumbai',
+        state: 'Maharashtra',
+        email: 'contact@democompany.com',
+        contactNo: '+91 98765 43210',
+        gstin: '27ABCDE1234F1Z5',
+        stateCode: '27',
+        logo: null
     },
 
-    // Customer info - Fixed to match template expectations
+    // Customer info with GST fields
     customer: {
-        name: 'Customer Company Ltd.',  // ✅ Fixed: was 'customerName', now 'name'
-        customerName: 'Customer Company Ltd.',  // Keep both for compatibility
-        contactPerson: 'John Smith',
-        addressLine1: '456 Client Avenue',
-        city: 'Client City',
-        state: 'CC',
-        zip: '67890',
-        phone: '+1 (555) 987-6543',
-        email: 'john@customer.com'
+        name: 'John Smith',
+        addressLine1: '456 Customer Lane',
+        addressLine2: 'Floor 2',
+        city: 'Mumbai',
+        state: 'Maharashtra',
+        country: 'India',
+        email: 'john@customer.com',
+        contactNo: '+91 98765 43210',
+        gstin: '27PQRST5678G1Z5',
+        stateCode: '27',
+        gstApplicable: 'Yes'
     },
 
-    // Items - Fixed to match template field names
+    // Sample items
     items: [
         {
-            id: 1,
-            details: 'Professional Consulting Services',  // ✅ Added 'details' field
-            description: 'Professional Consulting Services',  // Keep both for compatibility
-            name: 'Professional Consulting Services',  // Keep both for compatibility
-            hsn: '998314',  // ✅ Fixed: was 'hsnSac', now 'hsn'
-            hsnSac: '998314',  // Keep both for compatibility
+            name: 'Product 1',
+            details: 'Premium Product',
+            hsn: '998391',
             quantity: 2,
-            rate: 2000.00,
-            amount: 4000.00,
-            per: 'Nos'  // ✅ Added 'per' field for unit
-        },
-        {
-            id: 2,
-            details: 'Software Development Services',  // ✅ Added 'details' field
-            description: 'Software Development Services',  // Keep both for compatibility
-            name: 'Software Development Services',  // Keep both for compatibility
-            hsn: '998313',  // ✅ Fixed: was 'hsnSac', now 'hsn'
-            hsnSac: '998313',  // Keep both for compatibility
-            quantity: 1,
-            rate: 1500.00,
-            amount: 1500.00,
-            per: 'Nos'  // ✅ Added 'per' field for unit
-        },
-        {
-            id: 3,
-            details: 'Software Development Services',  // ✅ Added 'details' field
-            description: 'Software Development Services',  // Keep both for compatibility
-            name: 'Software Development Services',  // Keep both for compatibility 
-            hsn: '998312',  // ✅ Fixed: was 'hsnSac', now 'hsn'
-            hsnSac: '998313',  // Keep both for compatibility
-            quantity: 1,
-            rate: 1500.00,
-            amount: 1500.00,
-            per: 'Nos'  // ✅ Added 'per' field for unit
-        },
-        {
-            id: 4,
-            details: 'Software Development Services',  // ✅ Added 'details' field
-            description: 'Software Development Services',  // Keep both for compatibility
-            name: 'Software Development Services',  // Keep both for compatibility 
-            hsn: '998312',  // ✅ Fixed: was 'hsnSac', now 'hsn'
-            hsnSac: '998313',  // Keep both for compatibility
-            quantity: 1,
-            rate: 1500.00,
-            amount: 1500.00,
-            per: 'Nos'  // ✅ Added 'per' field for unit
-        },
-        {
-            id: 5,
-            details: 'Software Development Services',  // ✅ Added 'details' field
-            description: 'Software Development Services',  // Keep both for compatibility
-            name: 'Software Development Services',  // Keep both for compatibility 
-            hsn: '998312',  // ✅ Fixed: was 'hsnSac', now 'hsn'
-            hsnSac: '998313',  // Keep both for compatibility
-            quantity: 1,
-            rate: 1500.00,
-            amount: 1500.00,
-            per: 'Nos'  // ✅ Added 'per' field for unit
-        },
-        {
-            id: 4,
-            details: 'Software Development Services',  // ✅ Added 'details' field
-            description: 'Software Development Services',  // Keep both for compatibility
-            name: 'Software Development Services',  // Keep both for compatibility 
-            hsn: '998312',  // ✅ Fixed: was 'hsnSac', now 'hsn'
-            hsnSac: '998313',  // Keep both for compatibility
-            quantity: 1,
-            rate: 1500.00,
-            amount: 1500.00,
-            per: 'Nos'  // ✅ Added 'per' field for unit
-        },
-        // {
-        //     id: 6,
-        //     details: 'Software Development Services',  // ✅ Added 'details' field
-        //     description: 'Software Development Services',  // Keep both for compatibility
-        //     name: 'Software Development Services',  // Keep both for compatibility 
-        //     hsn: '998312',  // ✅ Fixed: was 'hsnSac', now 'hsn'
-        //     hsnSac: '998313',  // Keep both for compatibility
-        //     quantity: 1,
-        //     rate: 1500.00,
-        //     amount: 1500.00,
-        //     per: 'Nos'  // ✅ Added 'per' field for unit
-        // },
-        // {
-        //     id: 7,
-        //     details: 'Software Development Services',  // ✅ Added 'details' field
-        //     description: 'Software Development Services',  // Keep both for compatibility
-        //     name: 'Software Development Services',  // Keep both for compatibility 
-        //     hsn: '998312',  // ✅ Fixed: was 'hsnSac', now 'hsn'
-        //     hsnSac: '998313',  // Keep both for compatibility
-        //     quantity: 1,
-        //     rate: 1500.00,
-        //     amount: 1500.00,
-        //     per: 'Nos'  // ✅ Added 'per' field for unit
-        // },
-        // {
-        //     id: 8,
-        //     details: 'Software Development Services',  // ✅ Added 'details' field
-        //     description: 'Software Development Services',  // Keep both for compatibility
-        //     name: 'Software Development Services',  // Keep both for compatibility 
-        //     hsn: '998312',  // ✅ Fixed: was 'hsnSac', now 'hsn'
-        //     hsnSac: '998313',  // Keep both for compatibility
-        //     quantity: 1,
-        //     rate: 1500.00,
-        //     amount: 1500.00,
-        //     per: 'Nos'  // ✅ Added 'per' field for unit
-        // },
-        // {
-        //     id: 9,
-        //     details: 'Software Development Services',  // ✅ Added 'details' field
-        //     description: 'Software Development Services',  // Keep both for compatibility
-        //     name: 'Software Development Services',  // Keep both for compatibility 
-        //     hsn: '998312',  // ✅ Fixed: was 'hsnSac', now 'hsn'
-        //     hsnSac: '998313',  // Keep both for compatibility
-        //     quantity: 1,
-        //     rate: 1500.00,
-        //     amount: 1500.00,
-        //     per: 'Nos'  // ✅ Added 'per' field for unit
-        // },
-        // {
-        //     id: 10,
-        //     details: 'Software Development Services',  // ✅ Added 'details' field
-        //     description: 'Software Development Services',  // Keep both for compatibility
-        //     name: 'Software Development Services',  // Keep both for compatibility 
-        //     hsn: '998312',  // ✅ Fixed: was 'hsnSac', now 'hsn'
-        //     hsnSac: '998313',  // Keep both for compatibility
-        //     quantity: 1,
-        //     rate: 1500.00,
-        //     amount: 1500.00,
-        //     per: 'Nos'  // ✅ Added 'per' field for unit
-        // }
+            rate: 500,
+            per: 'Nos',
+            amount: 1000
+        }
     ],
 
-    // Tax calculations - matching template structure
-    subtotal: 5500.00,
-    cgstRate: 9,
-    sgstRate: 9,
-    cgstAmount: 495.00,
-    sgstAmount: 495.00,
-    grandTotal: 6490.00,
-
-    notes: 'Thank you for your business! Payment is due within 30 days.',
-    customerNotes: 'Thank you for your business! Payment is due within 30 days.',  // ✅ Added customerNotes
-    paymentTerms: 'Net 30',
-
-    currency: 'INR'
+    // GST display settings
+    gstDisplaySettings: {
+        defaultMode: 'split',
+        showSplitByDefault: true
+    },
+    isIntraState: true
 };
 
 // 🔧 FIXED: Stable debounce utility outside component
@@ -396,6 +275,7 @@ const InvoiceTemplateSettings = ({ onClose }) => {
     const [previewFontSize, setPreviewFontSize] = useState('normal');
     const [showPreviewPanel, setShowPreviewPanel] = useState(true);
     const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+    const [previewData, setPreviewData] = useState(SAMPLE_INVOICE_DATA);
 
     // Template data - FIXED: Use memoized static reference
     const templates = useMemo(() => {
@@ -702,9 +582,42 @@ const InvoiceTemplateSettings = ({ onClose }) => {
 
     // Preview template
     const handlePreview = (templateId) => {
+        console.log('🔍 [TemplateSettings] Generating preview for template:', templateId);
+
+        // Create preview data with current settings
+        const previewData = {
+            ...SAMPLE_INVOICE_DATA,
+            templateSettings: {
+                ...templateSettings,
+                pageSize: previewPageSize,
+                fontSize: previewFontSize,
+                gstDisplay: {
+                    defaultMode: 'split',
+                    showSplitByDefault: true,
+                    showGSTINInPreview: true
+                }
+            },
+            isPreviewMode: true,
+            customer: {
+                ...SAMPLE_INVOICE_DATA.customer,
+                gstApplicable: 'Yes',
+                gstin: '27PQRST5678G1Z5'
+            }
+        };
+
+        console.log('📋 [TemplateSettings] Preview data:', {
+            templateId,
+            pageSize: previewData.templateSettings.pageSize,
+            fontSize: previewData.templateSettings.fontSize,
+            gstMode: previewData.templateSettings.gstDisplay.defaultMode,
+            isPreviewMode: previewData.isPreviewMode,
+            customerGST: previewData.customer.gstin,
+            gstApplicable: previewData.customer.gstApplicable
+        });
+
+        // Set preview state
         setPreviewTemplate(templateId);
-        setPreviewPageSize(templateSettings.pageSize);
-        setPreviewFontSize(templateSettings.fontSize);
+        setPreviewData(previewData);
         setIsPreviewOpen(true);
     };
 

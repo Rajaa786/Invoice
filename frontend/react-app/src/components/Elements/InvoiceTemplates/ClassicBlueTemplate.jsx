@@ -480,13 +480,72 @@ const calculateTotals = (items, invoice) => {
         return sum + amount;
     }, 0);
 
-    const cgstRate = parseFloat(invoice.cgstRate) || 9;
-    const sgstRate = parseFloat(invoice.sgstRate) || 9;
-    const cgstAmount = subtotal * (cgstRate / 100);
-    const sgstAmount = subtotal * (sgstRate / 100);
-    const grandTotal = subtotal + cgstAmount + sgstAmount;
+    // Get GST details from invoice object
+    const customerStateCode = invoice.customerStateCode;
+    const cgstAmount = invoice.cgstAmount || 0;
+    const sgstAmount = invoice.sgstAmount || 0;
+    const igstAmount = invoice.igstAmount || 0;
+    const cgstRate = invoice.cgstRate || 0;
+    const sgstRate = invoice.sgstRate || 0;
+    const igstRate = invoice.igstRate || 0;
+    const totalGST = invoice.totalGST || 0;
 
-    return { subtotal, cgstRate, sgstRate, cgstAmount, sgstAmount, grandTotal };
+    // Determine if we're in preview mode
+    const isPreviewMode = invoice.isPreviewMode || false;
+
+    // Get GST display settings with defaults
+    const gstDisplaySettings = invoice.gstDisplaySettings || {
+        defaultMode: 'split',
+        showSplitByDefault: true
+    };
+
+    // Smart GST display logic with preview mode handling:
+    let shouldShowSplit = false;
+
+    if (isPreviewMode) {
+        // In preview mode, respect the settings
+        shouldShowSplit = gstDisplaySettings.showSplitByDefault && gstDisplaySettings.defaultMode === 'split';
+        console.log('🔍 [ClassicBlueTemplate] Preview Mode GST Display:', {
+            showSplitByDefault: gstDisplaySettings.showSplitByDefault,
+            defaultMode: gstDisplaySettings.defaultMode,
+            shouldShowSplit
+        });
+    } else {
+        // In normal mode, use business logic
+        shouldShowSplit = customerStateCode === "27" || invoice.isIntraState;
+        console.log('🔍 [ClassicBlueTemplate] Normal Mode GST Display:', {
+            customerStateCode,
+            isIntraState: invoice.isIntraState,
+            shouldShowSplit
+        });
+    }
+
+    console.log('💰 [ClassicBlueTemplate] GST Display Logic:', {
+        isPreviewMode,
+        customerStateCode,
+        defaultMode: gstDisplaySettings.defaultMode,
+        isIntraState: invoice.isIntraState,
+        shouldShowSplit,
+        cgstAmount,
+        sgstAmount,
+        igstAmount,
+        gstDisplaySettings
+    });
+
+    return {
+        subtotal,
+        cgstRate,
+        sgstRate,
+        igstRate,
+        cgstAmount,
+        sgstAmount,
+        igstAmount,
+        totalGST,
+        customerStateCode,
+        shouldShowSplit,
+        isPreviewMode,
+        grandTotal: subtotal + totalGST
+    };
 };
 
 // Template Components
@@ -545,9 +604,6 @@ const CompanyAndInvoiceInfo = ({ invoice, dynamicStyles }) => (
             {invoice.company?.email && (
                 <Text style={styles.addressText}>Email: {invoice.company.email}</Text>
             )}
-            {invoice.company?.gstin && (
-                <Text style={styles.gstinText}>GSTIN: {invoice.company.gstin}</Text>
-            )}
         </View>
 
         <View style={styles.invoiceInfoSection}>
@@ -573,13 +629,76 @@ const CompanyAndInvoiceInfo = ({ invoice, dynamicStyles }) => (
 );
 
 const CustomerInfo = ({ invoice, dynamicStyles }) => (
-    <View style={styles.customerSection}>
-        <Text style={dynamicStyles?.sectionTitle || styles.sectionTitle}>Bill To</Text>
-        <Text style={styles.customerName}>
+    <View style={[styles.customerSection, { marginBottom: 12 }]}>
+        <Text style={[dynamicStyles?.sectionTitle || styles.sectionTitle, { marginBottom: 6 }]}>Bill To</Text>
+
+        {/* Customer Name with enhanced styling */}
+        <Text style={[styles.customerName, {
+            fontSize: 13,
+            color: colors.primary,
+            letterSpacing: 0.3,
+            marginBottom: 6
+        }]}>
             {invoice.customer?.name || invoice.customerName || "Customer Name"}
         </Text>
-        {invoice.customer?.addressLine1 && (
-            <Text style={styles.addressText}>{invoice.customer.addressLine1}</Text>
+
+        {/* Address Block */}
+        <View style={{ marginBottom: 6 }}>
+            {invoice.customer?.addressLine1 && (
+                <Text style={[styles.addressText, { lineHeight: 1.4 }]}>
+                    {invoice.customer.addressLine1}
+                </Text>
+            )}
+            {/* City, State, ZIP in one line */}
+            <Text style={[styles.addressText, { lineHeight: 1.4 }]}>
+                {[
+                    invoice.customer?.city,
+                    invoice.customer?.state,
+                    invoice.customer?.zip
+                ].filter(Boolean).join(", ")}
+            </Text>
+        </View>
+
+        {/* Contact Information */}
+        {(invoice.customer?.phone || invoice.customer?.email) && (
+            <View style={{ marginBottom: 6 }}>
+                {invoice.customer?.phone && (
+                    <Text style={[styles.addressText, { lineHeight: 1.4 }]}>
+                        Ph: {invoice.customer.phone}
+                    </Text>
+                )}
+                {invoice.customer?.email && (
+                    <Text style={[styles.addressText, { lineHeight: 1.4 }]}>
+                        Email: {invoice.customer.email}
+                    </Text>
+                )}
+            </View>
+        )}
+
+        {/* GSTIN with better color differentiation */}
+        {(invoice.isPreviewMode || invoice.customer?.gstApplicable === 'Yes') && (
+            <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginTop: 2
+            }}>
+                <Text style={{
+                    fontSize: 9,
+                    color: colors.textSecondary,
+                    lineHeight: 1.4
+                }}>
+                    GSTIN:
+                </Text>
+                <Text style={{
+                    marginLeft: 4,
+                    fontSize: 9,
+                    color: colors.primary,
+                    fontWeight: 'bold',
+                    lineHeight: 1.4
+                }}>
+                    {invoice.customer?.gstin || (invoice.isPreviewMode ? '27ABCDE1234F1Z5' : '')}
+                </Text>
+            </View>
         )}
     </View>
 );
@@ -595,10 +714,10 @@ const ItemsTable = ({ invoice, totals, dynamicStyles }) => {
                 <Text style={[tableHeaderCellStyle, styles.col1]}>Sl.</Text>
                 <Text style={[tableHeaderCellStyle, styles.col2]}>Description</Text>
                 <Text style={[tableHeaderCellStyle, styles.col3]}>HSN/SAC</Text>
-                <Text style={[tableHeaderCellStyle, styles.col4]}>Qty</Text>
-                <Text style={[tableHeaderCellStyle, styles.col5]}>Rate</Text>
-                <Text style={[tableHeaderCellStyle, styles.col6]}>Unit</Text>
-                <Text style={[tableHeaderCellStyle, styles.col7]}>Amount</Text>
+                <Text style={[tableHeaderCellStyle, styles.col4]}>QTY</Text>
+                <Text style={[tableHeaderCellStyle, styles.col5]}>RATE</Text>
+                <Text style={[tableHeaderCellStyle, styles.col6]}>UNIT</Text>
+                <Text style={[tableHeaderCellStyle, styles.col7]}>AMOUNT</Text>
             </View>
 
             {items.map((item, index) => {
@@ -646,18 +765,27 @@ const ItemsTable = ({ invoice, totals, dynamicStyles }) => {
                 );
             })}
 
-            <View style={styles.taxRow}>
-                <Text style={styles.taxLabel}>CGST ({totals.cgstRate}%)</Text>
-                <Text style={styles.taxAmount}>{formatCurrency(totals.cgstAmount)}</Text>
-            </View>
-
-            <View style={styles.taxRow}>
-                <Text style={styles.taxLabel}>SGST ({totals.sgstRate}%)</Text>
-                <Text style={styles.taxAmount}>{formatCurrency(totals.sgstAmount)}</Text>
-            </View>
+            {/* Smart GST display based on multiple factors */}
+            {totals.shouldShowSplit ? (
+                <>
+                    <View style={styles.taxRow}>
+                        <Text style={styles.taxLabel}>CGST ({totals.cgstRate}%)</Text>
+                        <Text style={styles.taxAmount}>{formatCurrency(totals.cgstAmount)}</Text>
+                    </View>
+                    <View style={styles.taxRow}>
+                        <Text style={styles.taxLabel}>SGST ({totals.sgstRate}%)</Text>
+                        <Text style={styles.taxAmount}>{formatCurrency(totals.sgstAmount)}</Text>
+                    </View>
+                </>
+            ) : (
+                <View style={styles.taxRow}>
+                    <Text style={styles.taxLabel}>IGST ({totals.igstRate}%)</Text>
+                    <Text style={styles.taxAmount}>{formatCurrency(totals.igstAmount)}</Text>
+                </View>
+            )}
 
             <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Grand Total</Text>
+                <Text style={styles.totalLabel}>GRAND TOTAL</Text>
                 <Text style={styles.totalAmount}>{formatCurrency(totals.grandTotal)}</Text>
             </View>
         </View>

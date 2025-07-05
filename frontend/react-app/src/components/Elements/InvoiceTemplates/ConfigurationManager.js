@@ -111,7 +111,11 @@ export class ConfigurationManager {
                 orientation: 'portrait',
                 fontSize: 'normal',
                 margins: 'normal',
-                colorScheme: 'default'
+                colorScheme: 'default',
+                gstDisplay: {
+                    defaultMode: 'split', // 'split' for CGST+SGST, 'combined' for IGST
+                    showSplitByDefault: true // Always show CGST+SGST fields in template
+                }
             },
             userPreferences: {
                 showPreviewBeforeDownload: true,

@@ -4,6 +4,7 @@ import InvoiceTable from "./InvoiceTable";
 import { Loader2, AlertTriangle, Clock, CheckCircle, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
+import { calculateGSTAmounts, getCustomerStateCode } from "../../shared/constants/GSTConfig";
 
 // Status configuration for invoices
 const INVOICE_STATUS = {
@@ -106,30 +107,66 @@ export default function GenerateReport() {
 
   useEffect(() => {
     const fetchInvoices = async () => {
+      console.group('📊 [Invoice] Fetching and processing invoices');
       setLoading(true);
       try {
         const response = await window.electron.getAllInvoices();
+        console.log('📥 [Invoice] Received invoices response:', {
+          success: response.success,
+          count: response.invoices?.length
+        });
 
         if (response.success) {
           const invoiceList = response.invoices;
 
           const processedInvoices = await Promise.all(
             invoiceList.map(async (invoice) => {
+              console.group(`📄 [Invoice] Processing invoice: ${invoice.invoiceNo}`);
               let customerName = "Unknown Customer";
+              let customerDetails = null;
 
-              // Try to get customer name
+              // Try to get customer details
               try {
                 const customerResponse = await window.electron.getCustomerById(invoice.customerId);
+                console.log('👤 [Invoice] Customer lookup result:', {
+                  success: customerResponse.success,
+                  customerId: invoice.customerId
+                });
+
                 if (customerResponse.success) {
                   customerName = customerResponse.customer.name;
+                  customerDetails = customerResponse.customer;
+                  console.log('✅ [Invoice] Customer details found:', {
+                    name: customerName,
+                    state: customerDetails.state,
+                    gstin: customerDetails.gstin,
+                    gstApplicable: customerDetails.gstApplicable,
+                    stateCode: customerDetails.stateCode
+                  });
                 }
               } catch (error) {
-                console.warn("Could not fetch customer name:", error);
+                console.warn('⚠️ [Invoice] Could not fetch customer details:', {
+                  customerId: invoice.customerId,
+                  error: error.message
+                });
               }
 
+              // Get customer's state code for GST calculation
+              const customerStateCode = getCustomerStateCode(customerDetails);
+              
+              // Calculate subtotal and GST
+              const subtotal = invoice.items?.reduce((sum, item) => sum + (item.quantity * item.rate), 0) || 0;
+              console.log('💰 [Invoice] Calculated subtotal:', {
+                invoiceNo: invoice.invoiceNo,
+                itemCount: invoice.items?.length,
+                subtotal: subtotal?.toFixed(2)
+              });
+
+              const gstDetails = calculateGSTAmounts(subtotal, customerStateCode);
+              
               const dueDateObj = new Date(invoice.dueDate);
               const today = new Date();
-              today.setHours(0, 0, 0, 0); // Reset time for accurate day comparison
+              today.setHours(0, 0, 0, 0);
               dueDateObj.setHours(0, 0, 0, 0);
 
               const diffTime = dueDateObj - today;
@@ -138,20 +175,42 @@ export default function GenerateReport() {
               const status = calculateStatus(daysUntilDue, invoice.isPaid);
               const statusConfig = INVOICE_STATUS[status];
 
-              return {
+              console.log('📅 [Invoice] Due date calculation:', {
+                invoiceNo: invoice.invoiceNo,
+                dueDate: invoice.dueDate,
+                daysUntilDue,
+                status,
+                isPaid: invoice.isPaid
+              });
+
+              const processedInvoice = {
                 ...invoice,
                 invoiceNo: invoice.invoiceNo,
                 invoiceDate: formatDate(invoice.invoiceDate),
                 dueDate: formatDate(invoice.dueDate),
-                amount: invoice.totalAmount,
-                formattedAmount: formatCurrency(invoice.totalAmount),
+                amount: subtotal + gstDetails.totalGST,
+                subtotal: subtotal,
+                formattedAmount: formatCurrency(subtotal + gstDetails.totalGST),
                 customerName,
+                customerStateCode,
+                ...gstDetails,
                 daysUntilDue,
                 status,
                 statusConfig,
                 rowClassName: statusConfig.bgColor,
                 priority: statusConfig.priority
               };
+
+              console.log('✅ [Invoice] Processed invoice:', {
+                invoiceNo: processedInvoice.invoiceNo,
+                amount: processedInvoice.formattedAmount,
+                status: processedInvoice.status,
+                gstType: processedInvoice.isIntraState ? 'CGST+SGST' : 'IGST',
+                totalGST: gstDetails.totalGST?.toFixed(2)
+              });
+
+              console.groupEnd();
+              return processedInvoice;
             })
           );
 
@@ -185,15 +244,29 @@ export default function GenerateReport() {
             return acc;
           }, { overdue: 0, dueSoon: 0, pending: 0, paid: 0, totalAmount: 0, overdueAmount: 0 });
 
+          console.log('📊 [Invoice] Final statistics:', {
+            totalInvoices: processedInvoices.length,
+            overdue: stats.overdue,
+            dueSoon: stats.dueSoon,
+            pending: stats.pending,
+            paid: stats.paid,
+            totalAmount: formatCurrency(stats.totalAmount),
+            overdueAmount: formatCurrency(stats.overdueAmount)
+          });
+
           setStatusStats(stats);
           setInvoices(processedInvoices);
         } else {
-          console.error("Failed to fetch invoices:", response.error);
+          console.error('❌ [Invoice] Failed to fetch invoices:', response.error);
         }
       } catch (error) {
-        console.error("Error fetching invoices:", error);
+        console.error('❌ [Invoice] Error processing invoices:', {
+          error: error.message,
+          stack: error.stack
+        });
       } finally {
         setLoading(false);
+        console.groupEnd();
       }
     };
 

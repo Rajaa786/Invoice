@@ -96,6 +96,9 @@ const TallyDirectImport = ({ defaultVoucher, source, setActiveTab }) => {
       setCompanyName(reportData.selectedCompany);
     }
 
+    // Set selectedVoucher to "Sales" for this sales component
+    setSelectedVoucher("Sales");
+
     checkIsTallyStatus();
     handleLedgerImport();
   }, []);
@@ -495,7 +498,6 @@ const TallyDirectImport = ({ defaultVoucher, source, setActiveTab }) => {
 
   const handleSalesUpload = async (data) => {
     if (!companyName.trim()) {
-      // alert("Please enter a company name before uploading.");
       toast({
         title: "Error",
         description: "Please enter a company name before uploading.",
@@ -504,9 +506,49 @@ const TallyDirectImport = ({ defaultVoucher, source, setActiveTab }) => {
         variant: "destructive",
         type: "error",
       });
-
       return false;
     }
+
+    // First check if all required ledgers exist in Tally
+    const response = await window.electron.importLedgers(companyName, port);
+    if (!response.success) {
+      toast({
+        title: "Error",
+        description: "Failed to check ledger existence",
+        status: "error",
+        duration: 5000,
+        variant: "destructive",
+        type: "error",
+      });
+      return false;
+    }
+
+    // Get all unique ledgers used in the sales data
+    const requiredLedgers = new Set();
+    data.forEach(transaction => {
+      if (transaction.salesLedger) requiredLedgers.add(transaction.salesLedger);
+      if (transaction.cgstLedger) requiredLedgers.add(transaction.cgstLedger);
+      if (transaction.sgstLedger) requiredLedgers.add(transaction.sgstLedger);
+      if (transaction.igstLedger) requiredLedgers.add(transaction.igstLedger);
+    });
+
+    // Check if all required ledgers exist
+    const existingLedgers = response.ledgerData.find(company => company.companyName === companyName)?.ledgerData || [];
+    const existingLedgerNames = existingLedgers.map(ledger => ledger.ledgerName);
+    const missingLedgers = Array.from(requiredLedgers).filter(ledger => !existingLedgerNames.includes(ledger));
+
+    if (missingLedgers.length > 0) {
+      toast({
+        title: "Error",
+        description: `The following ledgers do not exist in Tally: ${missingLedgers.join(', ')}. Please create them first.`,
+        status: "error",
+        duration: 8000,
+        variant: "destructive",
+        type: "error",
+      });
+      return false;
+    }
+
     // Prepare data for Tally
     const tallyData = data
       .map((transaction) => {
@@ -537,6 +579,8 @@ const TallyDirectImport = ({ defaultVoucher, source, setActiveTab }) => {
           billAmount: transaction.totalBillAmount,
           narration: transaction.narration,
           status: transaction.status,
+          // Include the original invoice ID for database operations
+          invoiceId: transaction.invoiceId,
         };
       })
       .filter(Boolean);
@@ -618,6 +662,49 @@ const TallyDirectImport = ({ defaultVoucher, source, setActiveTab }) => {
       );
 
       setDataToRender(tempDataToRender);
+
+      // Update sales data if this was a sales upload
+      if (selectedVoucher === "Sales") {
+        // Update invoices state
+        const updatedInvoices = invoices.map((invoice) => {
+          if (successIds.includes(invoice.id)) {
+            return {
+              ...invoice,
+              imported: true,
+            };
+          } else if (Object.keys(failedTransactions).includes(invoice.id)) {
+            return {
+              ...invoice,
+              imported: false,
+              failed_reason: failedTransactions[invoice.id],
+            };
+          } else {
+            return invoice;
+          }
+        });
+
+        setInvoices(updatedInvoices);
+
+        // Update salesMultiStockData state
+        const updatedSalesMultiStockData = salesMultiStockData.map((sales) => {
+          if (successIds.includes(sales.id)) {
+            return {
+              ...sales,
+              imported: true,
+            };
+          } else if (Object.keys(failedTransactions).includes(sales.id)) {
+            return {
+              ...sales,
+              imported: false,
+              failed_reason: failedTransactions[sales.id],
+            };
+          } else {
+            return sales;
+          }
+        });
+
+        setSalesMultiStockData(updatedSalesMultiStockData);
+      }
 
       // Show summary
       setFailedTransactions(failedTransactions);
@@ -1159,6 +1246,8 @@ const TallyDirectImport = ({ defaultVoucher, source, setActiveTab }) => {
                 totalBillAmount: invoice.totalAmount || 0,
                 narration: invoice.narration || "",
                 status: "Paid",
+                // Include the original invoice ID for database operations
+                invoiceId: invoice.id,
               };
             })
           );
@@ -1258,6 +1347,8 @@ const TallyDirectImport = ({ defaultVoucher, source, setActiveTab }) => {
                 igstAmount: invoice.igstAmount || 0,
                 totalBill: invoice.totalAmount || 0,
                 naration: invoice.narration || "",
+                // Include the original invoice ID for database operations
+                invoiceId: invoice.id,
               };
             })
           );
@@ -1364,7 +1455,7 @@ const TallyDirectImport = ({ defaultVoucher, source, setActiveTab }) => {
               <DialogTitle>Confirm Tally Import</DialogTitle>
               <DialogDescription>
                 <p className="mt-4 text-lg">
-                  {`You are about to import ${tallyUploadData.length} ${selectedVoucher === "Ledgers" ? "ledgers" : "transactions"
+                  {`You are about to import ${tallyUploadData.length} ${selectedVoucher === "Ledgers" ? "ledgers" : selectedVoucher === "Sales" ? "sales vouchers" : "transactions"
                     }
                   to Tally. Are you sure you want to proceed?`}
                 </p>

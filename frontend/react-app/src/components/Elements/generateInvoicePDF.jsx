@@ -5,6 +5,7 @@ import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/
 import { TemplateFactory } from './InvoiceTemplates/TemplateRegistry';
 import { ConfigurationManager } from './InvoiceTemplates/ConfigurationManager';
 import { templateLogger } from '../../utils/templateLogger';
+import { calculateGSTAmounts, getCustomerStateCode } from '../../shared/constants/GSTConfig';
 
 // Register custom fonts for better typography
 Font.register({
@@ -21,7 +22,7 @@ Font.register({
  * @returns {Promise<JSX.Element>} PDF Document component
  */
 export const generateInvoicePDF = async (invoice) => {
-    console.log('🚀 [generateInvoicePDF] === PDF GENERATION STARTED ===');
+    console.group('🚀 [generateInvoicePDF] === PDF GENERATION STARTED ===');
     console.log('📄 [generateInvoicePDF] Invoice data received:', {
         invoiceNumber: invoice?.invoiceNumber,
         companyName: invoice?.company?.companyName,
@@ -30,18 +31,108 @@ export const generateInvoicePDF = async (invoice) => {
         totalAmount: invoice?.totalAmount || invoice?.grandTotal,
         hasCompany: !!invoice?.company,
         hasCustomer: !!invoice?.customer,
-        hasItems: !!invoice?.items
+        hasItems: !!invoice?.items,
+        customerState: invoice?.customer?.state,
+        customerGST: invoice?.customer?.gstin,
+        gstApplicable: invoice?.customer?.gstApplicable,
+        isPreviewMode: invoice?.isPreviewMode
     });
 
     // Initialize flow tracking
     const flowTracker = templateLogger.trackPdfGenerationFlow(invoice);
 
     try {
+        // Get current template settings
+        const config = await ConfigurationManager.getConfiguration();
+        const gstDisplaySettings = config?.templateSettings?.gstDisplay || {
+            defaultMode: 'split',
+            showSplitByDefault: true
+        };
+
+        // Get customer's state code for GST calculation
+        const customerStateCode = getCustomerStateCode(invoice?.customer);
+
+        // Calculate subtotal (before GST)
+        const subtotal = invoice.items.reduce((sum, item) => sum + (item.quantity * item.rate), 0);
+        console.log('💰 [generateInvoicePDF] Base calculation:', {
+            itemCount: invoice.items.length,
+            subtotal: subtotal?.toFixed(2)
+        });
+
+        // Calculate GST amounts based on state code
+        const gstDetails = invoice?.customer?.gstApplicable === 'Yes'
+            ? calculateGSTAmounts(subtotal, customerStateCode)
+            : {
+                cgstRate: 0,
+                sgstRate: 0,
+                igstRate: 0,
+                cgstAmount: 0,
+                sgstAmount: 0,
+                igstAmount: 0,
+                totalGST: 0,
+                isIntraState: false
+            };
+
+        // Determine if we're in preview mode
+        const isPreviewMode = invoice.isPreviewMode || false;
+
+        // Smart GST display logic with preview mode handling
+        let shouldShowSplit = false;
+
+        if (isPreviewMode) {
+            // In preview mode, respect the settings
+            shouldShowSplit = gstDisplaySettings.showSplitByDefault && gstDisplaySettings.defaultMode === 'split';
+            console.log('🔍 [generateInvoicePDF] Preview Mode GST Display:', {
+                showSplitByDefault: gstDisplaySettings.showSplitByDefault,
+                defaultMode: gstDisplaySettings.defaultMode,
+                shouldShowSplit
+            });
+        } else {
+            // In normal mode, use business logic
+            shouldShowSplit = customerStateCode === "27" || invoice.isIntraState;
+            console.log('🔍 [generateInvoicePDF] Normal Mode GST Display:', {
+                customerStateCode,
+                isIntraState: invoice.isIntraState,
+                shouldShowSplit
+            });
+        }
+
+        // Log GST calculation details
+        console.log('💰 [generateInvoicePDF] GST Calculation:', {
+            isPreviewMode,
+            customerStateCode,
+            customerState: invoice?.customer?.state,
+            isIntraState: gstDetails.isIntraState,
+            gstType: shouldShowSplit ? 'CGST+SGST' : 'IGST',
+            subtotal: subtotal?.toFixed(2),
+            cgstAmount: gstDetails.cgstAmount?.toFixed(2),
+            sgstAmount: gstDetails.sgstAmount?.toFixed(2),
+            igstAmount: gstDetails.igstAmount?.toFixed(2),
+            totalGST: gstDetails.totalGST?.toFixed(2),
+            finalAmount: (subtotal + gstDetails.totalGST)?.toFixed(2),
+            displaySettings: gstDisplaySettings,
+            shouldShowSplit
+        });
+
+        // Enhance invoice with GST calculations and display settings
+        const enhancedInvoice = {
+            ...invoice,
+            subtotal,
+            ...gstDetails,
+            gstDisplaySettings,
+            isPreviewMode, // Pass preview mode flag
+            shouldShowSplit, // Pass split display decision
+            totalAmount: subtotal + gstDetails.totalGST,
+            customerStateCode
+        };
+
         // Enhanced invoice data with file URLs
-        const enhancedInvoice = enhanceInvoiceWithFileUrls(invoice);
+        const finalInvoice = enhanceInvoiceWithFileUrls(enhancedInvoice);
         console.log('🎨 [generateInvoicePDF] Enhanced invoice with file URLs:', {
-            logoUrl: enhancedInvoice.company?.logoUrl,
-            signatureUrl: enhancedInvoice.company?.signatureUrl
+            logoUrl: finalInvoice.company?.logoUrl,
+            signatureUrl: finalInvoice.company?.signatureUrl,
+            totalAmount: finalInvoice.totalAmount?.toFixed(2),
+            isPreviewMode: finalInvoice.isPreviewMode
         });
 
         // Get current template configuration (async)
@@ -53,7 +144,7 @@ export const generateInvoicePDF = async (invoice) => {
         // Create template using factory pattern (async)
         console.log('🏭 [generateInvoicePDF] Creating template component using factory...');
         console.log(`🔧 [generateInvoicePDF] Template factory will create: ${selectedTemplateId}`);
-        const templateComponent = await TemplateFactory.createTemplate(selectedTemplateId, enhancedInvoice);
+        const templateComponent = await TemplateFactory.createTemplate(selectedTemplateId, finalInvoice);
         console.log('✅ [generateInvoicePDF] Template factory completed, result:', !!templateComponent);
         flowTracker.templateLoad(selectedTemplateId, !!templateComponent);
 
@@ -67,7 +158,7 @@ export const generateInvoicePDF = async (invoice) => {
             console.log('🔄 [generateInvoicePDF] Attempting fallback to default template...');
             const defaultTemplate = TemplateFactory.getDefaultTemplate();
             console.log(`🔄 [generateInvoicePDF] Default template: ${defaultTemplate.id}`);
-            const fallbackComponent = await TemplateFactory.createTemplate(defaultTemplate.id, enhancedInvoice);
+            const fallbackComponent = await TemplateFactory.createTemplate(defaultTemplate.id, finalInvoice);
             console.log('✅ [generateInvoicePDF] Fallback template created:', !!fallbackComponent);
             flowTracker.templateRender(defaultTemplate.id, !!fallbackComponent);
             flowTracker.complete(!!fallbackComponent);
@@ -81,7 +172,8 @@ export const generateInvoicePDF = async (invoice) => {
         flowTracker.complete(true);
         templateLogger.success('generateInvoicePDF', 'PDF generation completed successfully', {
             templateId: selectedTemplateId,
-            invoiceNumber: invoice?.invoiceNumber
+            invoiceNumber: invoice?.invoiceNumber,
+            isPreviewMode
         });
 
         console.log('🏁 [generateInvoicePDF] === PDF GENERATION COMPLETED SUCCESSFULLY ===');

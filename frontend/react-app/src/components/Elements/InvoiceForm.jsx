@@ -692,8 +692,9 @@ const InvoiceForm = () => {
 
     try {
       // Step 2: Calculate tax amounts and total
-      const calculatedCgst = subtotal * 0.09;
-      const calculatedSgst = subtotal * 0.09;
+      const shouldApplyGST = selectedCustomer.gstApplicable === 'Yes';
+      const calculatedCgst = shouldApplyGST ? subtotal * 0.09 : 0;
+      const calculatedSgst = shouldApplyGST ? subtotal * 0.09 : 0;
       const calculatedTotal = subtotal + calculatedCgst + calculatedSgst;
 
       console.log("items max", items);
@@ -800,6 +801,7 @@ const InvoiceForm = () => {
           contactNo: selectedCustomer.billingContactNo || "",
           gstin: selectedCustomer.gstin || "",
           stateCode: selectedCustomer.stateCode || "",
+          gstApplicable: selectedCustomer.gstApplicable || "No",
         },
 
         // Step 9: Include signature for PDF generation
