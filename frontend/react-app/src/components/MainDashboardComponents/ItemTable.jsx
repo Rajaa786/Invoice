@@ -1,9 +1,55 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Package, Hash, DollarSign, Ruler } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { BaseTable } from "../ui/base-table";
+import { ActionButtons } from "../ui/action-buttons";
+import { ConfirmationDialog } from "../ui/confirmation-dialog";
+import ItemView from "../Elements/ItemView";
+import ItemForm from "../Elements/ItemForm";
 
-const ItemTable = ({ data = [], loading = false }) => {
+const ItemTable = ({ data = [], loading = false, onRefresh }) => {
+    const [selectedItem, setSelectedItem] = useState(null);
+    const [viewItem, setViewItem] = useState(null);
+    const [editItem, setEditItem] = useState(null);
+    const [deleteItem, setDeleteItem] = useState(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const handleView = (item) => {
+        setViewItem(item);
+    };
+
+    const handleEdit = (item) => {
+        setEditItem(item);
+    };
+
+    const handleDelete = (item) => {
+        setDeleteItem(item);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteItem) return;
+
+        setIsDeleting(true);
+        try {
+            const result = await window.electron.deleteItem(deleteItem.id);
+            if (result.success) {
+                if (onRefresh) onRefresh();
+                setDeleteItem(null);
+            } else {
+                console.error("Error deleting item:", result.error);
+            }
+        } catch (error) {
+            console.error("Error deleting item:", error);
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    const handleSave = (savedItem) => {
+        if (onRefresh) onRefresh();
+        setEditItem(null);
+    };
+
     const columns = [
         {
             header: "Item",
@@ -48,14 +94,14 @@ const ItemTable = ({ data = [], loading = false }) => {
         },
         {
             header: "Rate",
-            accessor: "rate",
+            accessor: "sellingPrice",
             sortable: true,
-            sortAccessor: "rate",
+            sortAccessor: "sellingPrice",
             cell: (row) => (
                 <div className="flex items-center gap-1 min-w-0">
                     <DollarSign className="w-2 h-2 text-green-500 flex-shrink-0" />
                     <span className="text-xs font-medium truncate whitespace-nowrap">
-                        ₹{parseFloat(row.rate || 0).toFixed(2)}
+                        ₹{parseFloat(row.sellingPrice || 0).toFixed(2)}
                     </span>
                 </div>
             )
@@ -88,17 +134,66 @@ const ItemTable = ({ data = [], loading = false }) => {
                     Active
                 </Badge>
             )
+        },
+        {
+            header: "Actions",
+            accessor: "actions",
+            sortable: false,
+            cell: (row) => (
+                <ActionButtons
+                    onView={() => handleView(row)}
+                    onEdit={() => handleEdit(row)}
+                    onDelete={() => handleDelete(row)}
+                    viewLabel="View Item Details"
+                    editLabel="Edit Item"
+                    deleteLabel="Delete Item"
+                    showDuplicate={false}
+                    showExport={false}
+                />
+            )
         }
     ];
 
     return (
-        <BaseTable
-            data={data}
-            columns={columns}
-            title="Item Inventory"
-            defaultSort={{ column: "name", direction: "asc" }}
-            loading={loading}
-        />
+        <>
+            <BaseTable
+                data={data}
+                columns={columns}
+                title="Item Inventory"
+                defaultSort={{ column: "name", direction: "asc" }}
+                loading={loading}
+            />
+
+            {/* View Item Dialog */}
+            <ItemView
+                open={!!viewItem}
+                onOpenChange={(open) => !open && setViewItem(null)}
+                item={viewItem}
+            />
+
+            {/* Edit Item Dialog */}
+            <ItemForm
+                isOpen={!!editItem}
+                onClose={() => setEditItem(null)}
+                onSave={handleSave}
+                editItem={editItem}
+            />
+
+            {/* Delete Confirmation Dialog */}
+            <ConfirmationDialog
+                open={!!deleteItem}
+                onOpenChange={(open) => !open && setDeleteItem(null)}
+                onConfirm={confirmDelete}
+                title="Delete Item"
+                description="This action cannot be undone."
+                confirmText="Delete"
+                cancelText="Cancel"
+                variant="destructive"
+                isLoading={isDeleting}
+                itemName={deleteItem?.name}
+                itemType="item"
+            />
+        </>
     );
 };
 

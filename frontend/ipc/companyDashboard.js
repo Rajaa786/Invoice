@@ -27,7 +27,7 @@ function registerCompanyDashboardIpc() {
         const stateCode = data.gstApplicable === true ? data.stateCode : null;
 
         log.info("💾 Preparing to insert company data into database...");
-        
+
         // Insert the company data into the database
         const companyData = {
           companyType: data.companyType || "manufacturer",
@@ -122,8 +122,8 @@ function registerCompanyDashboardIpc() {
           hasSignature: !!signatureFileName
         });
 
-        return { 
-          success: true, 
+        return {
+          success: true,
           result: {
             ...result,
             id: companyId
@@ -141,8 +141,8 @@ function registerCompanyDashboardIpc() {
           companyName: data?.companyName,
           errorType: err.name
         });
-        return { 
-          success: false, 
+        return {
+          success: false,
           error: err.message,
           debug: {
             errorType: err.name,
@@ -199,6 +199,189 @@ function registerCompanyDashboardIpc() {
       }
     });
     log.info("✅ IPC handler 'get-company' registered successfully");
+
+    // Register the IPC handler for updating companies
+    ipcMain.handle("update-company", async (event, id, data) => {
+      try {
+        log.info("🏢 Starting company update process for ID:", id);
+        log.debug("📝 Received company update data:", {
+          ...data,
+          logo: data.logo ? "[LOGO BASE64 DATA]" : "No logo provided",
+          signature: data.signature ? "[SIGNATURE BASE64 DATA]" : "No signature provided"
+        });
+
+        const gstin = data.gstApplicable === true ? data.gstin : null;
+        const stateCode = data.gstApplicable === true ? data.stateCode : null;
+
+        const updateData = {
+          companyType: data.companyType || "manufacturer",
+          companyName: data.companyName,
+          currency: data.currency || "inr",
+          gstApplicable: data.gstApplicable === true ? "Yes" : "No",
+          gstin,
+          stateCode,
+          country: data.country,
+          addressLine1: data.addressLine1,
+          addressLine2: data.addressLine2 || null,
+          state: data.state,
+          city: data.city,
+          email: data.email,
+          contactNo: data.contactNo,
+          website: data.website || null,
+          industry: data.industry || null,
+          establishedYear: data.establishedYear ? parseInt(data.establishedYear) : null,
+          employeeCount: data.employeeCount ? parseInt(data.employeeCount) : null,
+          companySize: data.companySize || null,
+          businessModel: data.businessModel || null,
+          annualRevenue: data.annualRevenue ? parseInt(data.annualRevenue) : null,
+          primaryMarket: data.primaryMarket || null,
+          customerSegment: data.customerSegment || null,
+          valueProposition: data.valueProposition || null,
+          operatingHours: data.operatingHours || null,
+          timezone: data.timezone || "Asia/Kolkata",
+          fiscalYearStart: data.fiscalYearStart || null,
+          taxId: data.taxId || null
+        };
+
+        const result = await db
+          .update(companies)
+          .set(updateData)
+          .where(eq(companies.id, id))
+          .returning();
+
+        if (result.length === 0) {
+          return { success: false, error: "Company not found" };
+        }
+
+        // Handle logo and signature updates if provided
+        if (data.logo) {
+          try {
+            const logoFileName = await fileService.saveBase64File(data.logo, id, data.companyName, "logo");
+            if (logoFileName) {
+              await db
+                .update(companies)
+                .set({ logoFileName })
+                .where(eq(companies.id, id));
+            }
+          } catch (error) {
+            log.error("Error updating logo file:", error);
+          }
+        }
+
+        if (data.signature) {
+          try {
+            const signatureFileName = await fileService.saveBase64File(data.signature, id, data.companyName, "signature");
+            if (signatureFileName) {
+              await db
+                .update(companies)
+                .set({ signatureFileName })
+                .where(eq(companies.id, id));
+            }
+          } catch (error) {
+            log.error("Error updating signature file:", error);
+          }
+        }
+
+        log.info("✅ Company updated successfully:", result[0]);
+        return { success: true, result: result[0] };
+      } catch (err) {
+        log.error("❌ Company update failed:", {
+          error: err.message,
+          stack: err.stack,
+          companyId: id,
+          errorType: err.name
+        });
+        return { success: false, error: err.message };
+      }
+    });
+    log.info("✅ IPC handler 'update-company' registered successfully");
+
+    // Register the IPC handler for deleting companies
+    ipcMain.handle("delete-company", async (event, id) => {
+      try {
+        log.info("🗑️ Starting company deletion process for ID:", id);
+
+        // First get the company to clean up files
+        const companyToDelete = await db
+          .select()
+          .from(companies)
+          .where(eq(companies.id, id))
+          .limit(1);
+
+        if (companyToDelete.length === 0) {
+          return { success: false, error: "Company not found" };
+        }
+
+        // Delete the company record
+        const result = await db
+          .delete(companies)
+          .where(eq(companies.id, id))
+          .returning();
+
+        log.info("✅ Company deleted successfully:", result[0]);
+        return { success: true, result: result[0] };
+      } catch (err) {
+        log.error("❌ Company deletion failed:", {
+          error: err.message,
+          stack: err.stack,
+          companyId: id,
+          errorType: err.name
+        });
+        return { success: false, error: err.message };
+      }
+    });
+    log.info("✅ IPC handler 'delete-company' registered successfully");
+
+    // Register the IPC handler for getting a single company by ID
+    ipcMain.handle("get-company-by-id", async (event, id) => {
+      try {
+        log.debug("📋 Received get-company-by-id request with id:", id);
+        const result = await db
+          .select()
+          .from(companies)
+          .where(eq(companies.id, id))
+          .limit(1);
+
+        if (result.length === 0) {
+          return { success: false, error: "Company not found" };
+        }
+
+        const company = result[0];
+        const enhancedCompany = { ...company };
+
+        // Add base64 encoded logo if logo filename exists
+        if (company.logoFileName) {
+          try {
+            enhancedCompany.logo = fileService.getBase64File(company.logoFileName);
+            log.debug(`✓ Logo loaded for company: ${company.companyName}`);
+          } catch (e) {
+            log.error(`❌ Error loading logo for company ${company.companyName}:`, e);
+          }
+        }
+
+        // Add base64 encoded signature if signature filename exists
+        if (company.signatureFileName) {
+          try {
+            enhancedCompany.signature = fileService.getBase64File(company.signatureFileName);
+            log.debug(`✓ Signature loaded for company: ${company.companyName}`);
+          } catch (e) {
+            log.error(`❌ Error loading signature for company ${company.companyName}:`, e);
+          }
+        }
+
+        return { success: true, company: enhancedCompany };
+      } catch (err) {
+        log.error("❌ Error fetching company by ID:", {
+          error: err.message,
+          stack: err.stack,
+          companyId: id,
+          errorType: err.name
+        });
+        return { success: false, error: err.message };
+      }
+    });
+    log.info("✅ IPC handler 'get-company-by-id' registered successfully");
+
   } catch (err) {
     log.error("❌ Error registering Company Dashboard IPC handlers:", {
       error: err.message,

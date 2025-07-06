@@ -20,20 +20,44 @@ import {
 } from "../ui/select";
 import { Card, CardContent } from "../ui/card";
 
-const ItemForm = ({ isOpen, onClose, onSave }) => {
+const ItemForm = ({ isOpen, onClose, onSave, editItem = null }) => {
   const [formData, setFormData] = useState({
     // Schema-defined fields
-    type: "Goods",           // Required, defaulted
+    type: "Goods",           // Required, defaulted to 'Goods' (only 'Goods' or 'Service' allowed)
     name: "",               // Required
     hsnSacCode: "",         // Optional
     unit: "",              // Optional
     sellingPrice: "",       // Required
-    currency: "INR",        // Optional, defaulted
+    currency: "INR",        // Fixed to INR as per schema
     description: "",        // Optional
-
-    // UI-only fields (not in schema)
-    purchasePrice: "",
   });
+
+  // Initialize form with edit data when editItem changes
+  React.useEffect(() => {
+    if (editItem) {
+      setFormData({
+        type: editItem.type || "Goods",
+        name: editItem.name || "",
+        hsnSacCode: editItem.hsnSacCode || "",
+        unit: editItem.unit || "",
+        sellingPrice: editItem.sellingPrice?.toString() || "",
+        currency: editItem.currency || "INR",
+        description: editItem.description || "",
+      });
+    } else {
+      // Reset form when not editing
+      setFormData({
+        type: "Goods",
+        name: "",
+        hsnSacCode: "",
+        unit: "",
+        sellingPrice: "",
+        currency: "INR",
+        description: "",
+      });
+    }
+    setErrors({});
+  }, [editItem, isOpen]);
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -51,7 +75,7 @@ const ItemForm = ({ isOpen, onClose, onSave }) => {
     "PAIR",
   ];
 
-  const typeOptions = ["Goods", "Service"];
+  const typeOptions = ["Goods", "Service"]; // Explicitly limited as per schema
 
   // Function to generate dummy item data
   const generateDummyData = () => {
@@ -69,8 +93,6 @@ const ItemForm = ({ isOpen, onClose, onSave }) => {
       unit: randomUnit,
       sellingPrice: randomPrice.toString(),
       currency: "INR",
-      // Additional fields (not in schema)
-      purchasePrice: (randomPrice * 0.7).toFixed(2), // 70% of selling price
     };
 
     setFormData(dummyData);
@@ -91,12 +113,19 @@ const ItemForm = ({ isOpen, onClose, onSave }) => {
     }
   };
 
+  // Function to validate HSN/SAC code format
+  const validateHSNSACCode = (code) => {
+    if (!code) return true; // Optional field
+    // HSN codes are typically 4-8 digits
+    return /^\d{4,8}$/.test(code);
+  };
+
   const validateForm = () => {
     const newErrors = {};
 
     // Required fields validation as per schema
-    if (!formData.type) {
-      newErrors.type = "Item type is required";
+    if (!formData.type || !["Goods", "Service"].includes(formData.type)) {
+      newErrors.type = "Item type must be either 'Goods' or 'Service'";
     }
     if (!formData.name.trim()) {
       newErrors.name = "Item name is required";
@@ -107,9 +136,9 @@ const ItemForm = ({ isOpen, onClose, onSave }) => {
       newErrors.sellingPrice = "Must be a valid positive number";
     }
 
-    // Optional field validations (for UI purposes)
-    if (formData.purchasePrice && (isNaN(parseFloat(formData.purchasePrice)) || parseFloat(formData.purchasePrice) < 0)) {
-      newErrors.purchasePrice = "Must be a valid non-negative number";
+    // Optional field validations
+    if (formData.hsnSacCode && !validateHSNSACCode(formData.hsnSacCode)) {
+      newErrors.hsnSacCode = "HSN/SAC code must be 4-8 digits";
     }
 
     setErrors(newErrors);
@@ -137,8 +166,15 @@ const ItemForm = ({ isOpen, onClose, onSave }) => {
         description: formData.description.trim() || null,
       };
 
-      await window.electron.addItems(itemData);
-      if (onSave) onSave(itemData);
+      if (editItem) {
+        // Update existing item
+        await window.electron.updateItem({ ...itemData, id: editItem.id });
+        if (onSave) onSave({ ...itemData, id: editItem.id });
+      } else {
+        // Create new item
+        await window.electron.addItems(itemData);
+        if (onSave) onSave(itemData);
+      }
       onClose();
     } catch (error) {
       console.error("Error saving item:", error);
@@ -155,7 +191,7 @@ const ItemForm = ({ isOpen, onClose, onSave }) => {
           <div className="flex justify-between items-center">
             <DialogTitle className="flex items-center gap-2 text-base">
               <Package className="w-4 h-4 text-primary" />
-              Create New Item
+              {editItem ? "Edit Item" : "Create New Item"}
             </DialogTitle>
             <Button
               variant="outline"
@@ -252,12 +288,18 @@ const ItemForm = ({ isOpen, onClose, onSave }) => {
                   <div className="relative">
                     <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
                     <Input
-                      placeholder="Enter HSN/SAC code"
+                      placeholder="Enter 4-8 digit HSN/SAC code"
                       value={formData.hsnSacCode}
                       onChange={(e) => handleInputChange("hsnSacCode", e.target.value)}
-                      className="pl-8"
+                      className={`pl-8 ${errors.hsnSacCode ? "border-destructive" : ""}`}
                     />
                   </div>
+                  {errors.hsnSacCode && (
+                    <p className="text-destructive text-[10px] flex items-center gap-1">
+                      <AlertCircle className="w-2.5 h-2.5" />
+                      {errors.hsnSacCode}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -281,51 +323,28 @@ const ItemForm = ({ isOpen, onClose, onSave }) => {
                 <h3 className="text-xs font-medium">Pricing</h3>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">
-                    Selling Price
-                    <span className="text-destructive ml-0.5">*</span>
-                  </Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">₹</span>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={formData.sellingPrice}
-                      onChange={(e) => handleInputChange("sellingPrice", e.target.value)}
-                      className={`pl-7 ${errors.sellingPrice ? "border-destructive" : ""}`}
-                    />
-                  </div>
-                  {errors.sellingPrice && (
-                    <p className="text-destructive text-[10px] flex items-center gap-1">
-                      <AlertCircle className="w-2.5 h-2.5" />
-                      {errors.sellingPrice}
-                    </p>
-                  )}
+              <div className="space-y-1.5">
+                <Label className="text-xs">
+                  Selling Price
+                  <span className="text-destructive ml-0.5">*</span>
+                </Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">₹</span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={formData.sellingPrice}
+                    onChange={(e) => handleInputChange("sellingPrice", e.target.value)}
+                    className={`pl-7 ${errors.sellingPrice ? "border-destructive" : ""}`}
+                  />
                 </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Purchase Price</Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">₹</span>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={formData.purchasePrice}
-                      onChange={(e) => handleInputChange("purchasePrice", e.target.value)}
-                      className={`pl-7 ${errors.purchasePrice ? "border-destructive" : ""}`}
-                    />
-                  </div>
-                  {errors.purchasePrice && (
-                    <p className="text-destructive text-[10px] flex items-center gap-1">
-                      <AlertCircle className="w-2.5 h-2.5" />
-                      {errors.purchasePrice}
-                    </p>
-                  )}
-                </div>
+                {errors.sellingPrice && (
+                  <p className="text-destructive text-[10px] flex items-center gap-1">
+                    <AlertCircle className="w-2.5 h-2.5" />
+                    {errors.sellingPrice}
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -355,7 +374,7 @@ const ItemForm = ({ isOpen, onClose, onSave }) => {
               disabled={isSubmitting}
               className="h-8 text-xs min-w-[80px]"
             >
-              {isSubmitting ? "Saving..." : "Save Item"}
+              {isSubmitting ? "Saving..." : editItem ? "Update Item" : "Save Item"}
             </Button>
           </DialogFooter>
         </form>

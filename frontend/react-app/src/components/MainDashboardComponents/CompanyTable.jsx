@@ -1,9 +1,54 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Building2, TrendingUp, Users, MapPin } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { BaseTable } from "../ui/base-table";
+import { ActionButtons } from "../ui/action-buttons";
+import { ConfirmationDialog } from "../ui/confirmation-dialog";
+import CompanyView from "../Elements/CompanyView";
+import CompanyForm from "../Elements/CompanyForm";
 
-const CompanyTable = ({ data = [], loading = false }) => {
+const CompanyTable = ({ data = [], loading = false, onRefresh }) => {
+    const [viewCompany, setViewCompany] = useState(null);
+    const [editCompany, setEditCompany] = useState(null);
+    const [deleteCompany, setDeleteCompany] = useState(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const handleView = (company) => {
+        setViewCompany(company);
+    };
+
+    const handleEdit = (company) => {
+        setEditCompany(company);
+    };
+
+    const handleDelete = (company) => {
+        setDeleteCompany(company);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteCompany) return;
+
+        setIsDeleting(true);
+        try {
+            const result = await window.electron.deleteCompany(deleteCompany.id);
+            if (result.success) {
+                if (onRefresh) onRefresh();
+                setDeleteCompany(null);
+            } else {
+                console.error("Error deleting company:", result.error);
+            }
+        } catch (error) {
+            console.error("Error deleting company:", error);
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    const handleSave = (savedCompany) => {
+        if (onRefresh) onRefresh();
+        setEditCompany(null);
+    };
+
     const columns = [
         {
             header: "Company",
@@ -110,18 +155,69 @@ const CompanyTable = ({ data = [], loading = false }) => {
                     </span>
                 </div>
             )
+        },
+        {
+            header: "Actions",
+            accessor: "actions",
+            sortable: false,
+            cell: (row) => (
+                <ActionButtons
+                    onView={() => handleView(row)}
+                    onEdit={() => handleEdit(row)}
+                    onDelete={() => handleDelete(row)}
+                    viewLabel="View Company Details"
+                    editLabel="Edit Company"
+                    deleteLabel="Delete Company"
+                    showDuplicate={false}
+                    showExport={false}
+                />
+            )
         }
     ];
 
     return (
-        <BaseTable
-            data={data}
-            columns={columns}
-            title="Company Directory"
-            rowColorAccessor="rowClassName"
-            defaultSort={{ column: "companyName", direction: "asc" }}
-            loading={loading}
-        />
+        <>
+            <BaseTable
+                data={data}
+                columns={columns}
+                title="Company Directory"
+                rowColorAccessor="rowClassName"
+                defaultSort={{ column: "companyName", direction: "asc" }}
+                loading={loading}
+            />
+
+            {/* View Company Dialog */}
+            <CompanyView
+                open={!!viewCompany}
+                onOpenChange={(open) => !open && setViewCompany(null)}
+                company={viewCompany}
+            />
+
+            {/* Edit Company Dialog */}
+            {editCompany && (
+                <CompanyForm
+                    open={!!editCompany}
+                    onOpenChange={(open) => !open && setEditCompany(null)}
+                    onSave={handleSave}
+                    editCompany={editCompany}
+                />
+            )}
+
+            {/* Delete Confirmation Dialog */}
+            <ConfirmationDialog
+                open={!!deleteCompany}
+                onOpenChange={(open) => !open && setDeleteCompany(null)}
+                onConfirm={confirmDelete}
+                title="Delete Company"
+                description="This action cannot be undone."
+                confirmText="Delete"
+                cancelText="Cancel"
+                variant="destructive"
+                isLoading={isDeleting}
+                itemName={deleteCompany?.companyName}
+                itemType="company"
+            />
+        </>
     );
 };
 

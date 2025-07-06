@@ -1,6 +1,7 @@
 // src/main/ipc/invoiceIpc.js
 
 const { ipcMain } = require("electron");
+const log = require('electron-log/main');
 const { eq } = require("drizzle-orm");
 const DatabaseManager = require("../db/db");
 const { invoices } = require("../db/schema/Invoice");
@@ -10,12 +11,12 @@ const { customers } = require("../db/schema/Customer");
 const { sql } = require("drizzle-orm");
 const dbManager = DatabaseManager.getInstance();
 const db = dbManager.getDatabase();
-console.log("Database instance initialized:", !!db);
+log.debug("Database instance initialized:", !!db);
 function registerInvoiceGeneratorIpc() {
   // Create a new invoice
   ipcMain.handle("add-invoice", async (event, invoiceData) => {
     try {
-      console.log("Creating new invoice with data:", invoiceData);
+      log.info("Creating new invoice with data:", invoiceData);
 
       // Validate required fields
       if (
@@ -97,9 +98,9 @@ function registerInvoiceGeneratorIpc() {
         })
         .returning();
 
-      console.log("max");
+      log.info("max");
       const invoiceId = insertedInvoice[0].id;
-      console.log("Inserted invoice ID:", invoiceId);
+      log.info("Inserted invoice ID:", invoiceId);
 
       // Process invoice items if they exist
       if (
@@ -108,7 +109,7 @@ function registerInvoiceGeneratorIpc() {
         invoiceData.items.length > 0
       ) {
         // Transform items to match the database schema
-        console.log("Items shubh:", invoiceData.items);
+        log.info("Items shubh:", invoiceData.items);
         const itemsToInsert = invoiceData.items.map((item) => ({
           invoiceId: invoiceId,
           itemId: item.id || 0, // If new item, use 0 or null as appropriate
@@ -118,23 +119,23 @@ function registerInvoiceGeneratorIpc() {
           amount: parseFloat(item.amount) || 0,
         }));
 
-        console.log("Items to insert:", itemsToInsert);
+        log.info("Items to insert:", itemsToInsert);
         // Insert all items in a batch
         await db.insert(invoiceItems).values(itemsToInsert);
 
-        console.log(
+        log.info(
           `Added ${itemsToInsert.length} items to invoice ${invoiceId}`
         );
       }
 
-      console.log("Invoice created successfully:", insertedInvoice);
+      log.info("Invoice created successfully:", insertedInvoice);
 
       return {
         success: true,
         data: insertedInvoice[0],
       };
     } catch (error) {
-      console.error("Error creating invoice:", error);
+      log.error("Error creating invoice:", error);
       return {
         success: false,
         error: error.message,
@@ -151,7 +152,7 @@ function registerInvoiceGeneratorIpc() {
         invoices: allInvoices,
       };
     } catch (error) {
-      console.error("Error fetching invoices:", error);
+      log.error("Error fetching invoices:", error);
       return {
         success: false,
         error: error.message,
@@ -180,7 +181,7 @@ function registerInvoiceGeneratorIpc() {
         invoice: invoice[0],
       };
     } catch (error) {
-      console.error(`Error fetching invoice with ID ${id}:`, error);
+      log.error(`Error fetching invoice with ID ${id}:`, error);
       return {
         success: false,
         error: error.message,
@@ -217,7 +218,7 @@ function registerInvoiceGeneratorIpc() {
 
       return { success: true, companies: companiesWithInvoices };
     } catch (error) {
-      console.error("Error fetching companies with invoice data:", error);
+      log.error("Error fetching companies with invoice data:", error);
       return { success: false, error: error.message };
     }
   });
@@ -285,7 +286,7 @@ function registerInvoiceGeneratorIpc() {
   //       invoice: updatedInvoice[0],
   //     };
   //   } catch (error) {
-  //     console.error(`Error updating invoice with ID ${id}:`, error);
+  //     log.error(`Error updating invoice with ID ${id}:`, error);
   //     return {
   //       success: false,
   //       error: error.message,
@@ -302,7 +303,7 @@ function registerInvoiceGeneratorIpc() {
   //       success: true,
   //     };
   //   } catch (error) {
-  //     console.error(`Error deleting invoice with ID ${id}:`, error);
+  //     log.error(`Error deleting invoice with ID ${id}:`, error);
   //     return {
   //       success: false,
   //       error: error.message,
@@ -315,7 +316,7 @@ function registerInvoiceItemsIpc() {
   // Handle adding invoice items
   ipcMain.handle("add-invoice-items", async (event, items, invoiceId) => {
     try {
-      console.log(`Adding ${items.length} items for invoice ID: ${invoiceId}`);
+      log.info(`Adding ${items.length} items for invoice ID: ${invoiceId}`);
 
       if (!invoiceId) {
         return {
@@ -347,14 +348,14 @@ function registerInvoiceItemsIpc() {
         .values(itemsToInsert)
         .returning();
 
-      console.log(`Successfully added ${insertedItems.length} invoice items`);
+      log.info(`Successfully added ${insertedItems.length} invoice items`);
 
       return {
         success: true,
         data: insertedItems,
       };
     } catch (error) {
-      console.error("Error adding invoice items:", error);
+      log.error("Error adding invoice items:", error);
       return {
         success: false,
         error: error.message,
@@ -384,7 +385,7 @@ function registerInvoiceItemsIpc() {
         data: items,
       };
     } catch (error) {
-      console.error("Error fetching invoice items:", error);
+      log.error("Error fetching invoice items:", error);
       return {
         success: false,
         error: error.message,

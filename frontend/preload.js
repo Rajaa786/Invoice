@@ -1,14 +1,28 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electron", {
+  // Item operations
   addItems: (data) => ipcRenderer.invoke("add-items", data),
+  getItem: () => ipcRenderer.invoke("get-Item"),
+  getItemById: (id) => ipcRenderer.invoke("get-item-by-id", id),
+  updateItem: (data) => ipcRenderer.invoke("update-item", data),
+  deleteItem: (id) => ipcRenderer.invoke("delete-item", id),
+
+  // Company operations
   addCompany: (data) => ipcRenderer.invoke("add-company", data),
   getCompany: () => ipcRenderer.invoke("get-company"),
+  getCompanyById: (id) => ipcRenderer.invoke("get-company-by-id", id),
+  updateCompany: (id, data) => ipcRenderer.invoke("update-company", id, data),
+  deleteCompany: (id) => ipcRenderer.invoke("delete-company", id),
   getCompanyImage: (imagePath) =>
     ipcRenderer.invoke("get-company-image", imagePath),
-  getItem: () => ipcRenderer.invoke("get-Item"),
+
+  // Customer operations
   addCustomer: (data) => ipcRenderer.invoke("add-customer", data),
   getCustomer: () => ipcRenderer.invoke("get-customer"),
+  getCustomerById: (id) => ipcRenderer.invoke("get-customer-by-id", id),
+  updateCustomer: (data) => ipcRenderer.invoke("update-customer", data),
+  deleteCustomer: (id) => ipcRenderer.invoke("delete-customer", id),
   checkTallyRunning: (port) => ipcRenderer.invoke("check-tally-running", port),
   importLedgers: (companyName, port) =>
     ipcRenderer.invoke("import-ledgers", companyName, port),
