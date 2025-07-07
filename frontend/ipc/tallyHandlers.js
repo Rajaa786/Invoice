@@ -84,9 +84,15 @@ function registerTallyIpc() {
         .update(transactions)
         .set({ imported: 1 })
         .where(inArray(transactions.id, transactionIds));
+      log.info(`✅ Updated status for ${transactionIds.length} transactions`);
       return true;
     } catch (error) {
-      console.error("Error updating transaction status:", error);
+      log.error("❌ Error updating transaction status:", {
+        error: error.message,
+        stack: error.stack,
+        transactionIds,
+        errorType: error.name
+      });
       return false;
     }
   });
@@ -244,19 +250,23 @@ function registerTallyIpc() {
   );
 
   ipcMain.handle("import-ledgers", async (event, companyName, port) => {
-    log.info({ companyName, port });
+    log.info("📊 Starting ledger import for company:", companyName);
+    log.debug("Using port:", port);
 
     try {
       const response = await fetchLedgersForAllCompanies(port);
-
-      console.log({ response });
-
-      // const response = await fetchLedgerData(companyName);
+      log.info(`✅ Successfully fetched ledgers for company: ${companyName}`);
+      log.debug("Ledger response:", response);
 
       const ledgers = response;
       return { success: true, ledgerData: ledgers };
     } catch (error) {
-      console.error(`Ledger Import Failed (Server Error): ${error.message}`);
+      log.error("❌ Ledger Import Failed:", {
+        error: error.message,
+        stack: error.stack,
+        companyName,
+        errorType: error.name
+      });
       return { success: false, error: error.message };
     }
   });
@@ -284,10 +294,10 @@ function registerTallyIpc() {
       try {
         // This handler is specifically for sales data only
         console.log("Processing sales data for tallySalesVoucher table");
-        
+
         // Step 1: Verify this is sales data and has invoice IDs
-        const isSalesData = uploadData.length > 0 && 
-          uploadData[0].hasOwnProperty('VoucherNumber') && 
+        const isSalesData = uploadData.length > 0 &&
+          uploadData[0].hasOwnProperty('VoucherNumber') &&
           uploadData[0].hasOwnProperty('customerName') &&
           uploadData[0].hasOwnProperty('invoiceId');
 
@@ -300,7 +310,7 @@ function registerTallyIpc() {
 
         // Step 2: Extract invoice IDs and verify they exist in the database
         const invoiceIds = uploadData.map(item => item.invoiceId).filter(Boolean);
-        
+
         if (invoiceIds.length === 0) {
           return {
             success: false,
@@ -327,7 +337,7 @@ function registerTallyIpc() {
         const salesRecords = uploadData.map((salesItem) => {
           // Check if this sales item was successful
           const isSuccessful = uploadResponse.successIds.includes(salesItem.id);
-          
+
           // Extract failed reason if it exists
           let failedReason = "";
           if (!isSuccessful) {

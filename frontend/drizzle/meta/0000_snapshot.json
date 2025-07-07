@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "76d557f4-dbcf-4866-a9af-4c9700f3d9b5",
+  "id": "ea78b806-1028-4fdf-9001-825d267f4d23",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "cases": {
@@ -1261,8 +1261,8 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "tally_voucher": {
-      "name": "tally_voucher",
+    "tally_sales_voucher": {
+      "name": "tally_sales_voucher",
       "columns": {
         "id": {
           "name": "id",
@@ -1271,8 +1271,8 @@
           "notNull": true,
           "autoincrement": true
         },
-        "transaction_id": {
-          "name": "transaction_id",
+        "invoice_id": {
+          "name": "invoice_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -1319,25 +1319,25 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 1751605877402
+          "default": 1751814360190
         }
       },
       "indexes": {
-        "tally_voucher_transaction_id_unique": {
-          "name": "tally_voucher_transaction_id_unique",
+        "tally_sales_voucher_invoice_id_unique": {
+          "name": "tally_sales_voucher_invoice_id_unique",
           "columns": [
-            "transaction_id"
+            "invoice_id"
           ],
           "isUnique": true
         }
       },
       "foreignKeys": {
-        "tally_voucher_transaction_id_transactions_id_fk": {
-          "name": "tally_voucher_transaction_id_transactions_id_fk",
-          "tableFrom": "tally_voucher",
-          "tableTo": "transactions",
+        "tally_sales_voucher_invoice_id_invoices_id_fk": {
+          "name": "tally_sales_voucher_invoice_id_invoices_id_fk",
+          "tableFrom": "tally_sales_voucher",
+          "tableTo": "invoices",
           "columnsFrom": [
-            "transaction_id"
+            "invoice_id"
           ],
           "columnsTo": [
             "id"
@@ -1439,7 +1439,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 1751605877402
+          "default": 1751814360191
         }
       },
       "indexes": {},

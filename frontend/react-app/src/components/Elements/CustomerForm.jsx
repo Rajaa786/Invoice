@@ -25,7 +25,7 @@ import { Badge } from "../ui/badge";
 import { Switch } from "../ui/switch";
 import { cn } from "../../lib/utils";
 
-const CustomerForm = ({ open, onOpenChange, onSave }) => {
+const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
   const [formData, setFormData] = useState({
     // Customer info (Required fields)
     customerType: "Business", // Default value matching schema
@@ -63,53 +63,123 @@ const CustomerForm = ({ open, onOpenChange, onSave }) => {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Initialize form with edit data when editCustomer changes
+  React.useEffect(() => {
+    if (editCustomer) {
+      setFormData({
+        customerType: editCustomer.customerType || "Business",
+        salutation: editCustomer.salutation || "Mr.",
+        firstName: editCustomer.firstName || "",
+        lastName: editCustomer.lastName || "",
+        panNumber: editCustomer.panNumber || "",
+        companyName: editCustomer.companyName || "",
+        currency: editCustomer.currency || "INR",
+        gstApplicable: editCustomer.gstApplicable || "No",
+        gstin: editCustomer.gstin || "",
+        stateCode: editCustomer.stateCode || "",
+        billingCountry: editCustomer.billingCountry || "India",
+        billingState: editCustomer.billingState || "",
+        billingCity: editCustomer.billingCity || "",
+        billingAddressLine1: editCustomer.billingAddressLine1 || "",
+        billingAddressLine2: editCustomer.billingAddressLine2 || "",
+        billingContactNo: editCustomer.billingContactNo || "",
+        billingEmail: editCustomer.billingEmail || "",
+        billingAlternateContactNo: editCustomer.billingAlternateContactNo || "",
+        shippingCountry: editCustomer.shippingCountry || "India",
+        shippingState: editCustomer.shippingState || "",
+        shippingCity: editCustomer.shippingCity || "",
+        shippingAddressLine1: editCustomer.shippingAddressLine1 || "",
+        shippingAddressLine2: editCustomer.shippingAddressLine2 || "",
+        shippingContactNo: editCustomer.shippingContactNo || "",
+        shippingEmail: editCustomer.shippingEmail || "",
+        shippingAlternateContactNo: editCustomer.shippingAlternateContactNo || "",
+      });
+    } else {
+      // Reset form when not editing
+      setFormData({
+        customerType: "Business",
+        salutation: "Mr.",
+        firstName: "",
+        lastName: "",
+        panNumber: "",
+        companyName: "",
+        currency: "INR",
+        gstApplicable: "No",
+        gstin: "",
+        stateCode: "",
+        billingCountry: "India",
+        billingState: "",
+        billingCity: "",
+        billingAddressLine1: "",
+        billingAddressLine2: "",
+        billingContactNo: "",
+        billingEmail: "",
+        billingAlternateContactNo: "",
+        shippingCountry: "India",
+        shippingState: "",
+        shippingCity: "",
+        shippingAddressLine1: "",
+        shippingAddressLine2: "",
+        shippingContactNo: "",
+        shippingEmail: "",
+        shippingAlternateContactNo: "",
+      });
+    }
+    setErrors({});
+  }, [editCustomer, open]);
+
   const stateCityMapping = {
-    "andhra pradesh": ["Visakhapatnam", "Vijayawada", "Guntur"],
-    "arunachal pradesh": ["Itanagar", "Tawang", "Ziro"],
-    assam: ["Guwahati", "Silchar", "Dibrugarh"],
-    bihar: ["Patna", "Gaya", "Bhagalpur"],
-    chhattisgarh: ["Raipur", "Bhilai", "Bilaspur"],
-    goa: ["Panaji", "Margao", "Vasco da Gama"],
-    gujarat: ["Ahmedabad", "Surat", "Vadodara"],
-    haryana: ["Gurgaon", "Faridabad", "Panipat"],
-    "himachal pradesh": ["Shimla", "Manali", "Dharamshala"],
-    jharkhand: ["Ranchi", "Jamshedpur", "Dhanbad"],
-    karnataka: ["Bengaluru", "Mysuru", "Hubli"],
-    kerala: ["Thiruvananthapuram", "Kochi", "Kozhikode"],
-    "madhya pradesh": ["Bhopal", "Indore", "Gwalior"],
-    maharashtra: ["Mumbai", "Pune", "Nagpur"],
-    manipur: ["Imphal", "Thoubal", "Churachandpur"],
-    meghalaya: ["Shillong", "Tura", "Jowai"],
-    mizoram: ["Aizawl", "Lunglei", "Champhai"],
-    nagaland: ["Kohima", "Dimapur", "Mokokchung"],
-    odisha: ["Bhubaneswar", "Cuttack", "Rourkela"],
-    punjab: ["Ludhiana", "Amritsar", "Jalandhar"],
-    rajasthan: ["Jaipur", "Udaipur", "Jodhpur"],
-    sikkim: ["Gangtok", "Namchi", "Gyalshing"],
-    "tamil nadu": ["Chennai", "Coimbatore", "Madurai"],
-    telangana: ["Hyderabad", "Warangal", "Nizamabad"],
-    tripura: ["Agartala", "Dharmanagar", "Udaipur"],
-    "uttar pradesh": ["Lucknow", "Kanpur", "Varanasi"],
-    uttarakhand: ["Dehradun", "Haridwar", "Nainital"],
-    "west bengal": ["Kolkata", "Asansol", "Siliguri"],
-    delhi: ["New Delhi", "Dwarka", "Karol Bagh"],
-    "jammu and kashmir": ["Srinagar", "Jammu", "Leh"],
-    ladakh: ["Leh", "Kargil"],
-    puducherry: ["Puducherry", "Karaikal", "Yanam"],
-    chandigarh: ["Chandigarh"],
-    "andaman and nicobar islands": ["Port Blair"],
-    "dadra and nagar haveli and daman and diu": ["Daman", "Diu", "Silvassa"],
-    lakshadweep: ["Kavaratti"],
+    "Andhra Pradesh": ["Visakhapatnam", "Vijayawada", "Guntur"],
+    "Arunachal Pradesh": ["Itanagar", "Tawang", "Ziro"],
+    "Assam": ["Guwahati", "Silchar", "Dibrugarh"],
+    "Bihar": ["Patna", "Gaya", "Bhagalpur"],
+    "Chhattisgarh": ["Raipur", "Bhilai", "Bilaspur"],
+    "Goa": ["Panaji", "Margao", "Vasco da Gama"],
+    "Gujarat": ["Ahmedabad", "Surat", "Vadodara"],
+    "Haryana": ["Gurgaon", "Faridabad", "Panipat"],
+    "Himachal Pradesh": ["Shimla", "Manali", "Dharamshala"],
+    "Jharkhand": ["Ranchi", "Jamshedpur", "Dhanbad"],
+    "Karnataka": ["Bengaluru", "Mysuru", "Hubli"],
+    "Kerala": ["Thiruvananthapuram", "Kochi", "Kozhikode"],
+    "Madhya Pradesh": ["Bhopal", "Indore", "Gwalior"],
+    "Maharashtra": ["Mumbai", "Pune", "Nagpur"],
+    "Manipur": ["Imphal", "Thoubal", "Churachandpur"],
+    "Meghalaya": ["Shillong", "Tura", "Jowai"],
+    "Mizoram": ["Aizawl", "Lunglei", "Champhai"],
+    "Nagaland": ["Kohima", "Dimapur", "Mokokchung"],
+    "Odisha": ["Bhubaneswar", "Cuttack", "Rourkela"],
+    "Punjab": ["Ludhiana", "Amritsar", "Jalandhar"],
+    "Rajasthan": ["Jaipur", "Udaipur", "Jodhpur"],
+    "Sikkim": ["Gangtok", "Namchi", "Gyalshing"],
+    "Tamil Nadu": ["Chennai", "Coimbatore", "Madurai"],
+    "Telangana": ["Hyderabad", "Warangal", "Nizamabad"],
+    "Tripura": ["Agartala", "Dharmanagar", "Udaipur"],
+    "Uttar Pradesh": ["Lucknow", "Kanpur", "Varanasi"],
+    "Uttarakhand": ["Dehradun", "Haridwar", "Nainital"],
+    "West Bengal": ["Kolkata", "Asansol", "Siliguri"],
+    "Delhi": ["New Delhi", "Dwarka", "Karol Bagh"],
+    "Jammu and Kashmir": ["Srinagar", "Jammu", "Leh"],
+    "Ladakh": ["Leh", "Kargil"],
+    "Puducherry": ["Puducherry", "Karaikal", "Yanam"],
+    "Chandigarh": ["Chandigarh"],
+    "Andaman and Nicobar Islands": ["Port Blair"],
+    "Dadra and Nagar Haveli and Daman and Diu": ["Daman", "Diu", "Silvassa"],
+    "Lakshadweep": ["Kavaratti"],
   };
 
-  const indianStates = Object.keys(stateCityMapping);
+  const indianStates = Object.keys(stateCityMapping).sort();
 
   // Get available cities based on the selected state
   const getBillingCities = () => stateCityMapping[formData.billingState] || [];
-  const getShippingCities = () =>
-    stateCityMapping[formData.shippingState] || [];
+  const getShippingCities = () => stateCityMapping[formData.shippingState] || [];
 
   const handleInputChange = (field, value) => {
+    // For state fields, ensure proper capitalization
+    if (field === "billingState" || field === "shippingState") {
+      // Convert first letter of each word to uppercase
+      value = value.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+    }
+
     setFormData((prev) => ({
       ...prev,
       [field]: value,
@@ -222,42 +292,19 @@ const CustomerForm = ({ open, onOpenChange, onSave }) => {
     try {
       console.log("Submitting customer data:", formData);
 
-      const result = await window.electron.addCustomer(formData);
+      let result;
+      if (editCustomer) {
+        // Update existing customer
+        result = await window.electron.updateCustomer({ ...formData, id: editCustomer.id });
+      } else {
+        // Create new customer
+        result = await window.electron.addCustomer(formData);
+      }
+
       if (result.success) {
         console.log("Customer saved:", result.result);
         if (onSave) onSave(result.result);
         onOpenChange(false);
-
-        // Reset form
-        setFormData({
-          customerType: "Business",
-          salutation: "Mr.",
-          firstName: "",
-          lastName: "",
-          panNumber: "",
-          companyName: "",
-          currency: "INR",
-          gstApplicable: "No",
-          gstin: "",
-          stateCode: "",
-          billingCountry: "India",
-          billingState: "",
-          billingCity: "",
-          billingAddressLine1: "",
-          billingAddressLine2: "",
-          billingContactNo: "",
-          billingEmail: "",
-          billingAlternateContactNo: "",
-          shippingCountry: "India",
-          shippingState: "",
-          shippingCity: "",
-          shippingAddressLine1: "",
-          shippingAddressLine2: "",
-          shippingContactNo: "",
-          shippingEmail: "",
-          shippingAlternateContactNo: "",
-        });
-        setErrors({});
       } else {
         console.error("Failed to save customer:", result.error);
         setErrors({ submit: result.error });
@@ -273,7 +320,7 @@ const CustomerForm = ({ open, onOpenChange, onSave }) => {
   // Function to generate dummy customer data
   const generateDummyData = () => {
     const randomNum = Math.floor(Math.random() * 1000);
-    const randomState = indianStates[Math.floor(Math.random() * indianStates.length)].toLowerCase();
+    const randomState = indianStates[Math.floor(Math.random() * indianStates.length)];
     const randomCity = stateCityMapping[randomState][0];
     const isGstApplicable = Math.random() > 0.5 ? "Yes" : "No";
 
@@ -319,7 +366,7 @@ const CustomerForm = ({ open, onOpenChange, onSave }) => {
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex justify-between items-center">
-            <DialogTitle>New Customer</DialogTitle>
+            <DialogTitle>{editCustomer ? "Edit Customer" : "New Customer"}</DialogTitle>
             <Button
               variant="outline"
               size="sm"
@@ -813,7 +860,7 @@ const CustomerForm = ({ open, onOpenChange, onSave }) => {
               disabled={isSubmitting}
               className="h-9 text-xs min-w-[80px]"
             >
-              {isSubmitting ? "Saving..." : "Save Customer"}
+              {isSubmitting ? "Saving..." : editCustomer ? "Update Customer" : "Save Customer"}
             </Button>
           </DialogFooter>
         </form>

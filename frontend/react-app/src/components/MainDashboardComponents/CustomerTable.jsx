@@ -1,9 +1,59 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Users, Building2, MapPin } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { BaseTable } from "../ui/base-table";
+import { ActionButtons } from "../ui/action-buttons";
+import { ConfirmationDialog } from "../ui/confirmation-dialog";
+import CustomerView from "../Elements/CustomerView";
+import CustomerForm from "../Elements/CustomerForm";
 
-const CustomerTable = ({ data = [], loading = false }) => {
+const CustomerTable = ({ data = [], loading = false, onRefresh }) => {
+    const [viewCustomer, setViewCustomer] = useState(null);
+    const [editCustomer, setEditCustomer] = useState(null);
+    const [deleteCustomer, setDeleteCustomer] = useState(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const handleView = (customer) => {
+        setViewCustomer(customer);
+    };
+
+    const handleEdit = (customer) => {
+        setEditCustomer(customer);
+    };
+
+    const handleDelete = (customer) => {
+        setDeleteCustomer(customer);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteCustomer) return;
+
+        setIsDeleting(true);
+        try {
+            const result = await window.electron.deleteCustomer(deleteCustomer.id);
+            if (result.success) {
+                if (onRefresh) onRefresh();
+                setDeleteCustomer(null);
+            } else {
+                console.error("Error deleting customer:", result.error);
+            }
+        } catch (error) {
+            console.error("Error deleting customer:", error);
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    const handleSave = (savedCustomer) => {
+        if (onRefresh) onRefresh();
+        setEditCustomer(null);
+    };
+
+    const getCustomerDisplayName = (customer) => {
+        if (customer.companyName) return customer.companyName;
+        return `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || 'N/A';
+    };
+
     const columns = [
         {
             header: "Customer",
@@ -103,18 +153,67 @@ const CustomerTable = ({ data = [], loading = false }) => {
                     Active
                 </Badge>
             )
+        },
+        {
+            header: "Actions",
+            accessor: "actions",
+            sortable: false,
+            cell: (row) => (
+                <ActionButtons
+                    onView={() => handleView(row)}
+                    onEdit={() => handleEdit(row)}
+                    onDelete={() => handleDelete(row)}
+                    viewLabel="View Customer Details"
+                    editLabel="Edit Customer"
+                    deleteLabel="Delete Customer"
+                    showDuplicate={false}
+                    showExport={false}
+                />
+            )
         }
     ];
 
     return (
-        <BaseTable
-            data={data}
-            columns={columns}
-            title="Customer Directory"
-            rowColorAccessor="rowClassName"
-            defaultSort={{ column: "companyName", direction: "asc" }}
-            loading={loading}
-        />
+        <>
+            <BaseTable
+                data={data}
+                columns={columns}
+                title="Customer Directory"
+                rowColorAccessor="rowClassName"
+                defaultSort={{ column: "companyName", direction: "asc" }}
+                loading={loading}
+            />
+
+            {/* View Customer Dialog */}
+            <CustomerView
+                open={!!viewCustomer}
+                onOpenChange={(open) => !open && setViewCustomer(null)}
+                customer={viewCustomer}
+            />
+
+            {/* Edit Customer Dialog */}
+            <CustomerForm
+                open={!!editCustomer}
+                onOpenChange={(open) => !open && setEditCustomer(null)}
+                onSave={handleSave}
+                editCustomer={editCustomer}
+            />
+
+            {/* Delete Confirmation Dialog */}
+            <ConfirmationDialog
+                open={!!deleteCustomer}
+                onOpenChange={(open) => !open && setDeleteCustomer(null)}
+                onConfirm={confirmDelete}
+                title="Delete Customer"
+                description="This action cannot be undone."
+                confirmText="Delete"
+                cancelText="Cancel"
+                variant="destructive"
+                isLoading={isDeleting}
+                itemName={deleteCustomer ? getCustomerDisplayName(deleteCustomer) : ""}
+                itemType="customer"
+            />
+        </>
     );
 };
 

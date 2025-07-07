@@ -181,19 +181,19 @@ CREATE TABLE `statements` (
 	FOREIGN KEY (`case_id`) REFERENCES `cases`(`id`) ON UPDATE no action ON DELETE CASCADE
 );
 --> statement-breakpoint
-CREATE TABLE `tally_voucher` (
+CREATE TABLE `tally_sales_voucher` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`transaction_id` integer NOT NULL,
+	`invoice_id` integer NOT NULL,
 	`effective_date` integer,
 	`bill_reference` text,
 	`failed_reason` text,
 	`bank_ledger` text NOT NULL,
 	`result` integer,
-	`created_at` integer DEFAULT 1751605877402 NOT NULL,
-	FOREIGN KEY (`transaction_id`) REFERENCES `transactions`(`id`) ON UPDATE no action ON DELETE CASCADE
+	`created_at` integer DEFAULT 1751814360190 NOT NULL,
+	FOREIGN KEY (`invoice_id`) REFERENCES `invoices`(`id`) ON UPDATE no action ON DELETE CASCADE
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `tally_voucher_transaction_id_unique` ON `tally_voucher` (`transaction_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `tally_sales_voucher_invoice_id_unique` ON `tally_sales_voucher` (`invoice_id`);--> statement-breakpoint
 CREATE TABLE `transactions` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`statement_id` text NOT NULL,
@@ -206,7 +206,7 @@ CREATE TABLE `transactions` (
 	`bank` text DEFAULT 'unknown' NOT NULL,
 	`entity` text DEFAULT 'unknown' NOT NULL,
 	`voucher_type` text DEFAULT 'unknown',
-	`created_at` integer DEFAULT 1751605877402 NOT NULL,
+	`created_at` integer DEFAULT 1751814360191 NOT NULL,
 	FOREIGN KEY (`statement_id`) REFERENCES `statements`(`id`) ON UPDATE no action ON DELETE CASCADE
 );
 --> statement-breakpoint
