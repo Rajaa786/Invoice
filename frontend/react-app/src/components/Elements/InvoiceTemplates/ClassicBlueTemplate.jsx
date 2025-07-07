@@ -267,6 +267,136 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
 
+    // Subtotal Row
+    subtotalRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        padding: 8,
+        backgroundColor: colors.white,
+        borderBottom: `0.5pt solid ${colors.border}`,
+    },
+
+    subtotalLabel: {
+        fontSize: 9,
+        color: colors.text,
+        fontWeight: 'bold',
+    },
+
+    subtotalAmount: {
+        fontSize: 9,
+        color: colors.text,
+        fontWeight: 'bold',
+    },
+
+    // Taxable Value Section
+    taxableValueSection: {
+        marginBottom: 8,
+        borderRadius: 4,
+        overflow: 'hidden',
+        border: `1pt solid ${colors.border}`,
+        backgroundColor: colors.white,
+    },
+
+    taxableValueHeader: {
+        flexDirection: 'row',
+        backgroundColor: colors.primary,
+        padding: 6,
+    },
+
+    taxableValueHeaderCell: {
+        color: colors.white,
+        fontSize: 8,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
+
+    taxableValueRow: {
+        flexDirection: 'row',
+        padding: 6,
+        borderBottom: `0.5pt solid ${colors.border}`,
+        minHeight: 16,
+        alignItems: 'center',
+    },
+
+    taxableValueCell: {
+        fontSize: 8,
+        color: colors.text,
+        paddingHorizontal: 3,
+        paddingVertical: 1,
+        display: 'flex',
+        alignItems: 'center',
+        lineHeight: 1.2,
+    },
+
+    // Bank Details Section
+    bankDetailsSection: {
+        marginBottom: 8,
+        padding: 8,
+        backgroundColor: colors.background,
+        borderRadius: 4,
+        border: `1pt solid ${colors.border}`,
+        borderLeft: `3pt solid ${colors.primary}`,
+    },
+
+    bankDetailsTitle: {
+        fontSize: 9,
+        fontWeight: 'bold',
+        color: colors.primary,
+        marginBottom: 4,
+        textTransform: 'uppercase',
+    },
+
+    bankDetailsRow: {
+        flexDirection: 'row',
+        marginBottom: 3,
+    },
+
+    bankDetailsLabel: {
+        fontSize: 8,
+        fontWeight: 'bold',
+        color: colors.textSecondary,
+        width: '30%',
+    },
+
+    bankDetailsValue: {
+        fontSize: 8,
+        color: colors.text,
+        width: '70%',
+    },
+
+    // Company Tax Info Section
+    companyTaxInfoSection: {
+        flexDirection: 'row',
+        marginBottom: 8,
+        justifyContent: 'space-between',
+    },
+
+    companyTaxInfoItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.background,
+        padding: 6,
+        borderRadius: 4,
+        border: `1pt solid ${colors.border}`,
+        flex: 1,
+        marginRight: 4,
+    },
+
+    companyTaxInfoLabel: {
+        fontSize: 8,
+        fontWeight: 'bold',
+        color: colors.primary,
+        marginRight: 4,
+    },
+
+    companyTaxInfoValue: {
+        fontSize: 8,
+        color: colors.text,
+        fontWeight: 'bold',
+    },
+
     totalRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -405,6 +535,135 @@ const styles = StyleSheet.create({
         fontSize: 8,
         color: colors.textSecondary,
         lineHeight: 1.3,
+    },
+
+    // Subtotal Row
+    subtotalRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        padding: 6,
+        backgroundColor: colors.background,
+        borderBottom: `0.5pt solid ${colors.border}`,
+    },
+
+    subtotalLabel: {
+        fontSize: 9,
+        color: colors.text,
+        fontWeight: 'bold',
+    },
+
+    subtotalAmount: {
+        fontSize: 9,
+        color: colors.text,
+        fontWeight: 'bold',
+    },
+
+    // Taxable Value Section
+    taxableValueSection: {
+        marginBottom: 8,
+        borderRadius: 4,
+        overflow: 'hidden',
+        border: `1pt solid ${colors.border}`,
+        backgroundColor: colors.white,
+    },
+
+    taxableValueHeader: {
+        flexDirection: 'row',
+        backgroundColor: colors.primary,
+        padding: 6,
+    },
+
+    taxableValueHeaderCell: {
+        color: colors.white,
+        fontSize: 8,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
+
+    taxableValueRow: {
+        flexDirection: 'row',
+        padding: 4,
+        borderBottom: `0.5pt solid ${colors.border}`,
+        minHeight: 16,
+        alignItems: 'center',
+    },
+
+    taxableValueCell: {
+        fontSize: 8,
+        color: colors.text,
+        paddingHorizontal: 3,
+        paddingVertical: 1,
+    },
+
+    // Bank Details Section
+    bankDetailsSection: {
+        marginBottom: 8,
+        padding: 8,
+        backgroundColor: colors.background,
+        borderRadius: 4,
+        border: `1pt solid ${colors.border}`,
+        borderLeft: `3pt solid ${colors.primary}`,
+    },
+
+    bankDetailsTitle: {
+        fontSize: 9,
+        fontWeight: 'bold',
+        color: colors.primary,
+        marginBottom: 6,
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+        borderBottom: `1pt solid ${colors.border}`,
+        paddingBottom: 3,
+    },
+
+    bankDetailsRow: {
+        flexDirection: 'row',
+        marginBottom: 4,
+        alignItems: 'center',
+    },
+
+    bankDetailsLabel: {
+        fontSize: 8,
+        fontWeight: 'bold',
+        color: colors.textSecondary,
+        width: '25%',
+    },
+
+    bankDetailsValue: {
+        fontSize: 8,
+        color: colors.text,
+        fontWeight: 'bold',
+    },
+
+    // Company Tax Info Section
+    companyTaxInfoSection: {
+        flexDirection: 'row',
+        marginBottom: 8,
+        padding: 8,
+        backgroundColor: colors.background,
+        borderRadius: 4,
+        border: `1pt solid ${colors.border}`,
+    },
+
+    companyTaxInfoItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginRight: 20,
+    },
+
+    companyTaxInfoLabel: {
+        fontSize: 8,
+        fontWeight: 'bold',
+        color: colors.textSecondary,
+        marginRight: 4,
+    },
+
+    companyTaxInfoValue: {
+        fontSize: 8,
+        color: colors.primary,
+        fontWeight: 'bold',
     },
 });
 
@@ -774,6 +1033,12 @@ const ItemsTable = ({ invoice, totals, dynamicStyles }) => {
                 );
             })}
 
+            {/* Subtotal Row */}
+            <View style={styles.subtotalRow}>
+                <Text style={styles.subtotalLabel}>Sub Total</Text>
+                <Text style={styles.subtotalAmount}>{formatCurrency(totals.subtotal)}</Text>
+            </View>
+
             {/* Smart GST display based on multiple factors */}
             {totals.shouldShowSplit ? (
                 <>
@@ -800,6 +1065,67 @@ const ItemsTable = ({ invoice, totals, dynamicStyles }) => {
         </View>
     );
 };
+
+const TaxableValueSection = ({ totals, dynamicStyles }) => (
+    <View style={styles.taxableValueSection}>
+        <View style={styles.taxableValueHeader}>
+            <Text style={[styles.taxableValueHeaderCell, { width: '25%' }]}>TAXABLE VALUE</Text>
+            <Text style={[styles.taxableValueHeaderCell, { width: '15%' }]}>CENTRAL TAX</Text>
+            <Text style={[styles.taxableValueHeaderCell, { width: '15%' }]}>RATE</Text>
+            <Text style={[styles.taxableValueHeaderCell, { width: '15%' }]}>AMOUNT</Text>
+            <Text style={[styles.taxableValueHeaderCell, { width: '15%' }]}>STATE TAX</Text>
+            <Text style={[styles.taxableValueHeaderCell, { width: '15%' }]}>AMOUNT</Text>
+        </View>
+        <View style={styles.taxableValueRow}>
+            <Text style={[styles.taxableValueCell, { width: '25%', textAlign: 'left' }]}>{formatCurrency(totals.subtotal)}</Text>
+            <Text style={[styles.taxableValueCell, { width: '15%', textAlign: 'center' }]}>CGST</Text>
+            <Text style={[styles.taxableValueCell, { width: '15%', textAlign: 'center' }]}>{totals.cgstRate}%</Text>
+            <Text style={[styles.taxableValueCell, { width: '15%', textAlign: 'right' }]}>{formatCurrency(totals.cgstAmount)}</Text>
+            <Text style={[styles.taxableValueCell, { width: '15%', textAlign: 'center' }]}>SGST</Text>
+            <Text style={[styles.taxableValueCell, { width: '15%', textAlign: 'right' }]}>{formatCurrency(totals.sgstAmount)}</Text>
+        </View>
+        <View style={[styles.taxableValueRow, { backgroundColor: colors.background }]}>
+            <Text style={[styles.taxableValueCell, { width: '25%', textAlign: 'left', fontWeight: 'bold' }]}>Total Tax Amount</Text>
+            <Text style={[styles.taxableValueCell, { width: '60%', textAlign: 'center', fontWeight: 'bold' }]}>INR {numberToWords(totals.totalGST)}</Text>
+            <Text style={[styles.taxableValueCell, { width: '15%', textAlign: 'right', fontWeight: 'bold' }]}>{formatCurrency(totals.totalGST)}</Text>
+        </View>
+    </View>
+);
+
+const CompanyTaxInfo = ({ invoice, dynamicStyles }) => (
+    <View style={styles.companyTaxInfoSection}>
+        <View style={styles.companyTaxInfoItem}>
+            <Text style={styles.companyTaxInfoLabel}>PAN:</Text>
+            <Text style={styles.companyTaxInfoValue}>{invoice.company?.pan || "AAKCC9857C"}</Text>
+        </View>
+        <View style={[styles.companyTaxInfoItem, { marginRight: 0 }]}>
+            <Text style={styles.companyTaxInfoLabel}>GSTIN:</Text>
+            <Text style={styles.companyTaxInfoValue}>{invoice.company?.gstin || "27AAKCC9857C1ZB"}</Text>
+        </View>
+    </View>
+);
+
+const BankDetails = ({ invoice, dynamicStyles }) => (
+    <View style={styles.bankDetailsSection}>
+        <Text style={styles.bankDetailsTitle}>Company's Bank Details</Text>
+        <View style={styles.bankDetailsRow}>
+            <Text style={styles.bankDetailsLabel}>BANK NAME:</Text>
+            <Text style={styles.bankDetailsValue}>{invoice.company?.bankName || "Karnataka Bank"}</Text>
+        </View>
+        <View style={styles.bankDetailsRow}>
+            <Text style={styles.bankDetailsLabel}>A/C NO.:</Text>
+            <Text style={styles.bankDetailsValue}>{invoice.company?.accountNumber || "6272000100026401"}</Text>
+        </View>
+        <View style={styles.bankDetailsRow}>
+            <Text style={styles.bankDetailsLabel}>IFSC CODE:</Text>
+            <Text style={styles.bankDetailsValue}>{invoice.company?.ifscCode || "KARB0000627"}</Text>
+        </View>
+        <View style={styles.bankDetailsRow}>
+            <Text style={styles.bankDetailsLabel}>BRANCH:</Text>
+            <Text style={styles.bankDetailsValue}>{invoice.company?.bankBranch || "CBS"}</Text>
+        </View>
+    </View>
+);
 
 const AmountInWords = ({ amount, dynamicStyles }) => (
     <View style={styles.amountWordsSection}>
@@ -940,6 +1266,18 @@ export const ClassicBlueTemplate = (invoice) => {
                     <CustomerInfo invoice={invoice} dynamicStyles={dynamicStyles} />
                     <ItemsTable invoice={invoice} totals={totals} dynamicStyles={dynamicStyles} />
                     <AmountInWords amount={totals.grandTotal} dynamicStyles={dynamicStyles} />
+
+                    {/* Taxable Value Section */}
+                    {(totals.shouldShowSplit || totals.igstAmount > 0) && (
+                        <TaxableValueSection totals={totals} dynamicStyles={dynamicStyles} />
+                    )}
+
+                    {/* Company Tax Info Section */}
+                    <CompanyTaxInfo invoice={invoice} dynamicStyles={dynamicStyles} />
+
+                    {/* Bank Details Section */}
+                    <BankDetails invoice={invoice} dynamicStyles={dynamicStyles} />
+
                     <Footer invoice={invoice} dynamicStyles={dynamicStyles} />
 
                     {invoice.customerNotes && (
