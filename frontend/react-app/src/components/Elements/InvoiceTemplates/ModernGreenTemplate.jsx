@@ -42,17 +42,18 @@ const styles = StyleSheet.create({
     headerLeft: {
         flex: 1,
         flexDirection: 'row',
-        alignItems: 'center',
-    },
-
-    logoContainer: {
-        width: 80,
-        height: 40,
-        marginRight: 15,
+        alignItems: 'flex-start',
     },
 
     companyInfo: {
         flex: 1,
+    },
+
+    logoContainer: {
+        maxWidth: 160,
+        height: 70,
+        marginRight: 15,
+        objectFit: 'contain',
     },
 
     headerCompanyName: {
@@ -495,9 +496,21 @@ const ModernHeader = ({ invoice, dynamicStyles }) => (
         <View style={styles.headerContent}>
             <View style={styles.headerLeft}>
                 <View style={styles.companyInfo}>
-                    <View style={{ width: 120, height: 'auto', marginBottom: 8 }}>
+                    <View style={{
+                        maxWidth: 160,
+                        height: 70,
+                        marginBottom: 4,
+                        alignSelf: 'flex-start',
+                        padding: 0
+                    }}>
                         <Image
                             src={invoice.company?.logo || "/cyphersol-logo.png"}
+                            style={{
+                                maxWidth: '100%',
+                                height: '100%',
+                                objectFit: 'contain',
+                                display: 'block'
+                            }}
                         />
                     </View>
                     <Text style={styles.headerTagline}>
@@ -507,7 +520,7 @@ const ModernHeader = ({ invoice, dynamicStyles }) => (
             </View>
 
             <View style={styles.headerRight}>
-                <Text style={dynamicStyles?.taxInvoiceTitle || styles.taxInvoiceTitle}>
+                <Text style={[dynamicStyles?.taxInvoiceTitle || styles.taxInvoiceTitle, { fontWeight: 'bold' }]}>
                     TAX INVOICE
                 </Text>
                 <Text style={styles.invoiceNumberText}>

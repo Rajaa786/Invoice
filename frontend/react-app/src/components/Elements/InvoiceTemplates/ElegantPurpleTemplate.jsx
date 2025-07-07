@@ -37,29 +37,25 @@ const styles = StyleSheet.create({
 
     headerContent: {
         flexDirection: 'row',
-        alignItems: 'center',
         justifyContent: 'space-between',
+        alignItems: 'flex-start',
     },
 
     headerLeft: {
         flex: 1,
-        alignItems: 'center',
+        flexDirection: 'row',
+        alignItems: 'flex-start',
     },
 
-    headerCenter: {
-        flex: 2,
-        alignItems: 'center',
-    },
-
-    headerRight: {
+    companyInfo: {
         flex: 1,
-        alignItems: 'flex-end',
     },
 
     logoContainer: {
-        width: 120,
-        height: 60,
-        marginBottom: 5,
+        maxWidth: 160,
+        height: 70,
+        marginRight: 15,
+        objectFit: 'contain',
     },
 
     headerTitle: {
@@ -536,19 +532,38 @@ const calculateTotals = (items, invoice) => {
 
 // Elegant Purple Template Components
 const ElegantHeader = ({ invoice, dynamicStyles }) => (
-    <View style={dynamicStyles.header}>
-        <View style={dynamicStyles.headerContent}>
-            <View style={dynamicStyles.headerLeft}>
-                <View style={{ width: 120, height: 'auto', marginBottom: 8 }}>
-                    <Image
-                        src={invoice.company?.logo || "/cyphersol-logo.png"}
-                    />
+    <View style={styles.header}>
+        <View style={styles.headerContent}>
+            <View style={styles.headerLeft}>
+                <View style={styles.companyInfo}>
+                    <View style={{
+                        maxWidth: 160,
+                        height: 70,
+                        marginBottom: 4,
+                        alignSelf: 'flex-start',
+                        padding: 0
+                    }}>
+                        <Image
+                            src={invoice.company?.logo || "/cyphersol-logo.png"}
+                            style={{
+                                maxWidth: '100%',
+                                height: '100%',
+                                objectFit: 'contain',
+                                display: 'block'
+                            }}
+                        />
+                    </View>
+                    <Text style={styles.headerTagline}>
+                        {invoice.company?.companyName || "Cyphersol Technologies"}
+                    </Text>
                 </View>
             </View>
 
-            <View style={dynamicStyles.headerRight}>
-                <Text style={dynamicStyles.taxInvoiceTitle}>TAX INVOICE</Text>
-                <Text style={dynamicStyles.invoiceNumber}>
+            <View style={styles.headerRight}>
+                <Text style={[dynamicStyles?.taxInvoiceTitle || styles.taxInvoiceTitle, { fontWeight: 'bold' }]}>
+                    TAX INVOICE
+                </Text>
+                <Text style={styles.invoiceNumberText}>
                     {invoice.invoiceNumber || "INV-001"}
                 </Text>
             </View>
