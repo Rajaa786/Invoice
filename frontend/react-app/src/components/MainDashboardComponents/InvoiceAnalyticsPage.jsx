@@ -21,15 +21,15 @@ export default function InvoiceAnalyticsPage() {
         <AnalyticsProvider>
             <div className="p-6 space-y-8">
                 {/* 🎯 AI-Powered Business Intelligence Section */}
-                <div className="mb-8">
+                {/* <div className="mb-8">
                     <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
                         🧠 AI Business Intelligence
                     </h2>
                     <AIBusinessIntelligence />
-                </div>
+                </div> */}
 
                 {/* 💰 Advanced Financial Analytics */}
-                <div className="mb-8">
+                {/* <div className="mb-8">
                     <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
                         💰 Financial Intelligence
                     </h2>
@@ -37,7 +37,7 @@ export default function InvoiceAnalyticsPage() {
                         <CashFlowPredictor />
                         <CustomerMatrix />
                     </div>
-                </div>
+                </div> */}
 
                 {/* 📊 Traditional Analytics (Enhanced) */}
                 <div>

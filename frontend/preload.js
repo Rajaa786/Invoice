@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld("electron", {
   getItemById: (id) => ipcRenderer.invoke("get-item-by-id", id),
   updateItem: (data) => ipcRenderer.invoke("update-item", data),
   deleteItem: (id) => ipcRenderer.invoke("delete-item", id),
+  getItemCompanies: (itemId) => ipcRenderer.invoke("get-item-companies", itemId),
+  updateItemCompanies: (itemId, companyIds) => ipcRenderer.invoke("update-item-companies", itemId, companyIds),
 
   // Company operations
   addCompany: (data) => ipcRenderer.invoke("add-company", data),
@@ -23,6 +25,8 @@ contextBridge.exposeInMainWorld("electron", {
   getCustomerById: (id) => ipcRenderer.invoke("get-customer-by-id", id),
   updateCustomer: (data) => ipcRenderer.invoke("update-customer", data),
   deleteCustomer: (id) => ipcRenderer.invoke("delete-customer", id),
+  getCustomerCompanies: (customerId) => ipcRenderer.invoke("get-customer-companies", customerId),
+  updateCustomerCompanies: (customerId, companyIds) => ipcRenderer.invoke("update-customer-companies", customerId, companyIds),
   checkTallyRunning: (port) => ipcRenderer.invoke("check-tally-running", port),
   importLedgers: (companyName, port) =>
     ipcRenderer.invoke("import-ledgers", companyName, port),

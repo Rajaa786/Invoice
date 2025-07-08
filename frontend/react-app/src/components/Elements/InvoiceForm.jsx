@@ -182,9 +182,12 @@ const InvoiceForm = () => {
           }));
           console.log("Formatted items:", formattedItems);
 
-          setDbItems(formattedItems);
-          // Replace the static itemsList with the database items
-          setItemsList(formattedItems);
+          // Only load all items if no company is selected
+          if (!selectedCompany || !selectedCompany.id) {
+            setDbItems(formattedItems);
+            // Replace the static itemsList with the database items
+            setItemsList(formattedItems);
+          }
         } else {
           console.error("Failed to fetch items:", response.error);
         }
@@ -196,7 +199,7 @@ const InvoiceForm = () => {
     };
 
     fetchItems();
-  }, []);
+  }, [selectedCompany]);
   useEffect(() => {
     const fetchCustomers = async () => {
       setIsLoadingCustomers(true);
@@ -210,7 +213,10 @@ const InvoiceForm = () => {
           const customersData = response.customers || response.data || [];
           console.log("Customers data:", customersData);
 
-          setCustomers(customersData);
+          // Only load all customers if no company is selected
+          if (!selectedCompany || !selectedCompany.id) {
+            setCustomers(customersData);
+          }
         } else {
           console.error("Failed to fetch customers:", response.error);
         }
@@ -222,7 +228,7 @@ const InvoiceForm = () => {
     };
 
     fetchCustomers();
-  }, []);
+  }, [selectedCompany]);
   // Add this with your other useEffects
   useEffect(() => {
     if (companyInitials) {
@@ -306,6 +312,12 @@ const InvoiceForm = () => {
     if (selectedCompany && selectedCompany.id) {
       // Fetch company-specific latest invoice
       fetchCompanyLatestInvoice(selectedCompany.id, companyInitials);
+      
+      // Fetch customers associated with this company
+      fetchCompanyCustomers(selectedCompany.id);
+      
+      // Fetch items associated with this company
+      fetchCompanyItems(selectedCompany.id);
     }
   }, [selectedCompany]); // This should run when selectedCompany changes
 
@@ -446,6 +458,85 @@ const InvoiceForm = () => {
       fileInputRef.current.value = "";
     }
   };
+  
+  // Fetch customers associated with a specific company
+  const fetchCompanyCustomers = async (companyId) => {
+    try {
+      setIsLoadingCustomers(true);
+      // First get all customers
+      const allCustomersResponse = await window.electron.getCustomer();
+      
+      if (allCustomersResponse.success) {
+        // Get customers associated with this company
+        const companyCustomersPromises = allCustomersResponse.customers.map(async (customer) => {
+          const customerCompaniesResponse = await window.electron.getCustomerCompanies(customer.id);
+          if (customerCompaniesResponse.success && customerCompaniesResponse.result) {
+            // Check if this customer is associated with the selected company
+            return customerCompaniesResponse.result.some(company => company.id === companyId) ? customer : null;
+          }
+          return null;
+        });
+        
+        const companyCustomersResults = await Promise.all(companyCustomersPromises);
+        const filteredCustomers = companyCustomersResults.filter(customer => customer !== null);
+        
+        setCustomers(filteredCustomers);
+        console.log(`Loaded ${filteredCustomers.length} customers for company ID ${companyId}`);
+      } else {
+        console.error("Failed to fetch customers:", allCustomersResponse.error);
+      }
+    } catch (error) {
+      console.error("Error fetching company customers:", error);
+    } finally {
+      setIsLoadingCustomers(false);
+    }
+  };
+  
+  // Fetch items associated with a specific company
+  const fetchCompanyItems = async (companyId) => {
+    try {
+      setIsLoadingItems(true);
+      // First get all items
+      const allItemsResponse = await window.electron.getItem();
+      
+      if (allItemsResponse.success) {
+        // Get items associated with this company
+        const companyItemsPromises = allItemsResponse.items.map(async (item) => {
+          const itemCompaniesResponse = await window.electron.getItemCompanies(item.id);
+          if (itemCompaniesResponse.success && itemCompaniesResponse.companies) {
+            // Check if this item is associated with the selected company
+            return itemCompaniesResponse.companies.some(company => company.id === companyId) ? item : null;
+          }
+          return null;
+        });
+        
+        const companyItemsResults = await Promise.all(companyItemsPromises);
+        const filteredItems = companyItemsResults.filter(item => item !== null);
+        
+        // Transform the items to match the format needed for the dropdown
+        const formattedItems = filteredItems.map((item) => ({
+          id: item.id,
+          name: item.name,
+          rate: item.sellingPrice?.toString() || "0.00",
+          description: item.description || "",
+          unit: item.unit || "",
+          hsn: item.hsnSacCode || "", // Include HSN code
+        }));
+        
+        setDbItems(formattedItems);
+        // Also update the itemsList for the dropdown
+        setItemsList(formattedItems);
+        console.log(`Loaded ${formattedItems.length} items for company ID ${companyId}`);
+      } else {
+        console.error("Failed to fetch items:", allItemsResponse.error);
+      }
+    } catch (error) {
+      console.error("Error fetching company items:", error);
+    } finally {
+      setIsLoadingItems(false);
+    }
+  };
+  
   // Handle saving new customer
   const handleSaveCustomer = (customerData) => {
     console.log("New customer data:", customerData);

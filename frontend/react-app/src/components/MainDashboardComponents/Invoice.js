@@ -126,44 +126,64 @@ export default function GenerateReport() {
               let customerDetails = null;
 
               // Try to get customer details
-              try {
-                const customerResponse = await window.electron.getCustomerById(invoice.customerId);
-                console.log('👤 [Invoice] Customer lookup result:', {
-                  success: customerResponse.success,
-                  customerId: invoice.customerId
-                });
+              if (invoice.customerId) {
+                try {
+                  const customerResponse = await window.electron.getCustomerById(invoice.customerId);
+                  console.log('👤 [Invoice] Customer lookup result:', {
+                    success: customerResponse.success,
+                    customerId: invoice.customerId
+                  });
 
-                if (customerResponse.success) {
-                  customerName = customerResponse.customer.name;
-                  customerDetails = customerResponse.customer;
-                  console.log('✅ [Invoice] Customer details found:', {
-                    name: customerName,
-                    state: customerDetails.state,
-                    gstin: customerDetails.gstin,
-                    gstApplicable: customerDetails.gstApplicable,
-                    stateCode: customerDetails.stateCode
+                  if (customerResponse.success && customerResponse.customer) {
+                    // Construct customer name from firstName and lastName
+                    customerName = customerResponse.customer.firstName && customerResponse.customer.lastName
+                      ? `${customerResponse.customer.firstName} ${customerResponse.customer.lastName}`
+                      : customerResponse.customxer.companyName || "Unknown Customer";
+
+                    customerDetails = customerResponse.customer;
+                    console.log('✅ [Invoice] Customer details found:', {
+                      name: customerName,
+                      state: customerDetails.state,
+                      gstin: customerDetails.gstin,
+                      gstApplicable: customerDetails.gstApplicable,
+                      stateCode: customerDetails.stateCode
+                    });
+                  } else {
+                    console.warn('⚠️ [Invoice] Customer not found:', invoice.customerId);
+                  }
+                } catch (error) {
+                  console.error('❌ [Invoice] Error fetching customer:', {
+                    customerId: invoice.customerId,
+                    error: error.message
                   });
                 }
-              } catch (error) {
-                console.warn('⚠️ [Invoice] Could not fetch customer details:', {
-                  customerId: invoice.customerId,
-                  error: error.message
-                });
+              } else {
+                console.warn('⚠️ [Invoice] No customerId in invoice:', invoice.invoiceNo);
               }
 
               // Get customer's state code for GST calculation
               const customerStateCode = getCustomerStateCode(customerDetails);
-              
-              // Calculate subtotal and GST
-              const subtotal = invoice.items?.reduce((sum, item) => sum + (item.quantity * item.rate), 0) || 0;
-              console.log('💰 [Invoice] Calculated subtotal:', {
+
+              // Use the totalAmount from the invoice record
+              const amount = parseFloat(invoice.totalAmount) || 0;
+              const subtotal = parseFloat(invoice.subtotal) || 0;
+              const gstDetails = {
+                cgstAmount: parseFloat(invoice.cgstAmount) || 0,
+                sgstAmount: parseFloat(invoice.sgstAmount) || 0,
+                totalGST: (parseFloat(invoice.cgstAmount) || 0) + (parseFloat(invoice.sgstAmount) || 0),
+                cgstRate: parseFloat(invoice.cgstRate) || 0,
+                sgstRate: parseFloat(invoice.sgstRate) || 0,
+                isIntraState: customerStateCode === "27"
+              };
+
+              console.log('💰 [Invoice] Amount details:', {
                 invoiceNo: invoice.invoiceNo,
-                itemCount: invoice.items?.length,
-                subtotal: subtotal?.toFixed(2)
+                totalAmount: amount?.toFixed(2),
+                subtotal: subtotal?.toFixed(2),
+                cgstAmount: invoice.cgstAmount?.toFixed(2),
+                sgstAmount: invoice.sgstAmount?.toFixed(2)
               });
 
-              const gstDetails = calculateGSTAmounts(subtotal, customerStateCode);
-              
               const dueDateObj = new Date(invoice.dueDate);
               const today = new Date();
               today.setHours(0, 0, 0, 0);
@@ -172,7 +192,7 @@ export default function GenerateReport() {
               const diffTime = dueDateObj - today;
               const daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-              const status = calculateStatus(daysUntilDue, invoice.isPaid);
+              const status = calculateStatus(daysUntilDue, invoice.status === 'paid');
               const statusConfig = INVOICE_STATUS[status];
 
               console.log('📅 [Invoice] Due date calculation:', {
@@ -180,7 +200,7 @@ export default function GenerateReport() {
                 dueDate: invoice.dueDate,
                 daysUntilDue,
                 status,
-                isPaid: invoice.isPaid
+                isPaid: invoice.status === 'paid'
               });
 
               const processedInvoice = {
@@ -188,9 +208,9 @@ export default function GenerateReport() {
                 invoiceNo: invoice.invoiceNo,
                 invoiceDate: formatDate(invoice.invoiceDate),
                 dueDate: formatDate(invoice.dueDate),
-                amount: subtotal + gstDetails.totalGST,
+                amount: amount,
                 subtotal: subtotal,
-                formattedAmount: formatCurrency(subtotal + gstDetails.totalGST),
+                formattedAmount: formatCurrency(amount),
                 customerName,
                 customerStateCode,
                 ...gstDetails,

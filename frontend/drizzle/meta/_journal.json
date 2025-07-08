@@ -8,6 +8,13 @@
       "when": 1751960977757,
       "tag": "0000_new_karma",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1751988832914,
+      "tag": "0001_chubby_elektra",
+      "breakpoints": true
     }
   ]
 }

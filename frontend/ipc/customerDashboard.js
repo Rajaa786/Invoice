@@ -4,7 +4,9 @@ const { ipcMain } = require("electron");
 const log = require('electron-log/main');
 const DatabaseManager = require("../db/db");
 const { customers } = require("../db/schema/Customer");
-const { eq } = require("drizzle-orm");
+const { companyCustomers } = require("../db/schema/CompanyCustomers");
+const { companies } = require("../db/schema/Company");
+const { eq, and } = require("drizzle-orm");
 
 function registerCustomerDashboardIpc() {
   try {
@@ -219,6 +221,99 @@ function registerCustomerDashboardIpc() {
     });
     log.info("✅ IPC handler 'get-customer-by-id' registered successfully");
 
+    // Register the IPC handler for getting companies associated with a customer
+    ipcMain.handle("get-customer-companies", async (event, customerId) => {
+      try {
+        log.debug("📋 Received get-customer-companies request for customer ID:", customerId);
+        
+        // First, check if the customer exists
+        const customerExists = await db
+          .select({ id: customers.id })
+          .from(customers)
+          .where(eq(customers.id, customerId))
+          .get();
+          
+        if (!customerExists) {
+          log.warn("⚠️ No customer found with ID:", customerId);
+          return { success: false, error: "Customer not found" };
+        }
+        
+        // Get all company IDs associated with this customer
+        const companyCustomersResult = await db
+          .select({ companyId: companyCustomers.companyId })
+          .from(companyCustomers)
+          .where(eq(companyCustomers.customerId, customerId));
+          
+        // Get the full company details for each company ID
+        const companiesResult = await db
+          .select()
+          .from(companies)
+          .where(eq(companies.id, companyCustomersResult.map(cc => cc.companyId)));
+          
+        log.info(`✅ Retrieved ${companiesResult.length} companies for customer ID: ${customerId}`);
+        return { success: true, result: companiesResult };
+      } catch (err) {
+        log.error("❌ Error fetching customer companies:", {
+          error: err.message,
+          stack: err.stack,
+          customerId,
+          errorType: err.name
+        });
+        return { success: false, error: err.message };
+      }
+    });
+    log.info("✅ IPC handler 'get-customer-companies' registered successfully");
+    
+    // Register the IPC handler for updating companies associated with a customer
+    ipcMain.handle("update-customer-companies", async (event, customerId, companyIds) => {
+      try {
+        log.info("📝 Updating companies for customer ID:", customerId);
+        log.debug("📝 New company IDs:", companyIds);
+        
+        // First, check if the customer exists
+        const customerExists = await db
+          .select({ id: customers.id })
+          .from(customers)
+          .where(eq(customers.id, customerId))
+          .get();
+          
+        if (!customerExists) {
+          log.warn("⚠️ No customer found with ID:", customerId);
+          return { success: false, error: "Customer not found" };
+        }
+        
+        // Delete all existing associations for this customer
+        await db
+          .delete(companyCustomers)
+          .where(eq(companyCustomers.customerId, customerId));
+          
+        // If there are company IDs to add, insert them
+        if (companyIds && companyIds.length > 0) {
+          // Create an array of objects for batch insert
+          const companyCustomersToInsert = companyIds.map(companyId => ({
+            customerId,
+            companyId
+          }));
+          
+          // Insert all new associations
+          await db.insert(companyCustomers).values(companyCustomersToInsert);
+        }
+        
+        log.info(`✅ Updated companies for customer ID: ${customerId}. Added ${companyIds?.length || 0} associations.`);
+        return { success: true };
+      } catch (err) {
+        log.error("❌ Error updating customer companies:", {
+          error: err.message,
+          stack: err.stack,
+          customerId,
+          companyIds,
+          errorType: err.name
+        });
+        return { success: false, error: err.message };
+      }
+    });
+    log.info("✅ IPC handler 'update-customer-companies' registered successfully");
+    
   } catch (err) {
     log.error("❌ Failed to initialize customer dashboard IPC:", {
       error: err.message,

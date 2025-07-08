@@ -80,7 +80,9 @@ const InvoiceTable = ({ data = [], loading = false }) => {
             accessor: "customerName",
             sortable: true,
             cell: (row) => (
-                <span className="font-medium">{row.customerName}</span>
+                <span className="font-medium">
+                    {row.customerName || "Unknown Customer"}
+                </span>
             )
         },
         {
