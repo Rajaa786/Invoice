@@ -1078,15 +1078,15 @@ const TaxableValueSection = ({ totals, dynamicStyles }) => (
         </View>
         <View style={styles.taxableValueRow}>
             <Text style={[styles.taxableValueCell, { width: '25%', textAlign: 'left' }]}>{formatCurrency(totals.subtotal)}</Text>
-            <Text style={[styles.taxableValueCell, { width: '15%', textAlign: 'center' }]}>CGST</Text>
-            <Text style={[styles.taxableValueCell, { width: '15%', textAlign: 'center' }]}>{totals.cgstRate}%</Text>
-            <Text style={[styles.taxableValueCell, { width: '15%', textAlign: 'right' }]}>{formatCurrency(totals.cgstAmount)}</Text>
-            <Text style={[styles.taxableValueCell, { width: '15%', textAlign: 'center' }]}>SGST</Text>
-            <Text style={[styles.taxableValueCell, { width: '15%', textAlign: 'right' }]}>{formatCurrency(totals.sgstAmount)}</Text>
+            <Text style={[styles.taxableValueCell, { width: '15%', textAlign: 'center' }]}>{totals.shouldShowSplit ? 'CGST' : 'IGST'}</Text>
+            <Text style={[styles.taxableValueCell, { width: '15%', textAlign: 'center' }]}>{totals.shouldShowSplit ? totals.cgstRate : totals.igstRate}%</Text>
+            <Text style={[styles.taxableValueCell, { width: '15%', textAlign: 'right' }]}>{formatCurrency(totals.shouldShowSplit ? totals.cgstAmount : totals.igstAmount)}</Text>
+            <Text style={[styles.taxableValueCell, { width: '15%', textAlign: 'center' }]}>{totals.shouldShowSplit ? 'SGST' : ''}</Text>
+            <Text style={[styles.taxableValueCell, { width: '15%', textAlign: 'right' }]}>{totals.shouldShowSplit ? formatCurrency(totals.sgstAmount) : ''}</Text>
         </View>
         <View style={[styles.taxableValueRow, { backgroundColor: colors.background }]}>
-            <Text style={[styles.taxableValueCell, { width: '25%', textAlign: 'left', fontWeight: 'bold' }]}>Total Tax Amount</Text>
-            <Text style={[styles.taxableValueCell, { width: '60%', textAlign: 'center', fontWeight: 'bold' }]}>INR {numberToWords(totals.totalGST)}</Text>
+            <Text style={[styles.taxableValueCell, { width: '40%', textAlign: 'left', fontWeight: 'bold' }]}>Total Tax Amount</Text>
+            <Text style={[styles.taxableValueCell, { width: '45%', textAlign: 'left', fontWeight: 'bold' }]}>INR {numberToWords(totals.totalGST)}</Text>
             <Text style={[styles.taxableValueCell, { width: '15%', textAlign: 'right', fontWeight: 'bold' }]}>{formatCurrency(totals.totalGST)}</Text>
         </View>
     </View>
@@ -1128,9 +1128,9 @@ const BankDetails = ({ invoice, dynamicStyles }) => (
 );
 
 const AmountInWords = ({ amount, dynamicStyles }) => (
-    <View style={styles.amountWordsSection}>
-        <Text style={styles.amountWordsTitle}>Amount in Words:</Text>
-        <Text style={styles.amountWordsText}>
+    <View style={[styles.amountWordsSection, { flexDirection: 'row', alignItems: 'center' }]}>
+        <Text style={[styles.amountWordsTitle, { marginBottom: 0, marginRight: 4 }]}>Amount in Words:</Text>
+        <Text style={[styles.amountWordsText, { flex: 1 }]}>
             INR {numberToWords(amount)}
         </Text>
     </View>
@@ -1258,6 +1258,11 @@ export const ClassicBlueTemplate = (invoice) => {
     });
 
     try {
+
+        console.log('🧩 Page Size Type:', typeof pageSize);
+        console.log('🧩 Page Size Constructor:', pageSize?.constructor?.name);
+        console.log('🧩 Page Size:', pageSize);
+
         return (
             <Document>
                 <Page size={pageSize} style={dynamicStyles.page}>
@@ -1267,10 +1272,8 @@ export const ClassicBlueTemplate = (invoice) => {
                     <ItemsTable invoice={invoice} totals={totals} dynamicStyles={dynamicStyles} />
                     <AmountInWords amount={totals.grandTotal} dynamicStyles={dynamicStyles} />
 
-                    {/* Taxable Value Section */}
-                    {(totals.shouldShowSplit || totals.igstAmount > 0) && (
-                        <TaxableValueSection totals={totals} dynamicStyles={dynamicStyles} />
-                    )}
+                    {/* Always show Taxable Value Section when there's a subtotal */}
+                    <TaxableValueSection totals={totals} dynamicStyles={dynamicStyles} />
 
                     {/* Company Tax Info Section */}
                     <CompanyTaxInfo invoice={invoice} dynamicStyles={dynamicStyles} />

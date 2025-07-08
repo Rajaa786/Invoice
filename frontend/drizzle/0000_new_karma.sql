@@ -189,7 +189,7 @@ CREATE TABLE `tally_sales_voucher` (
 	`failed_reason` text,
 	`bank_ledger` text NOT NULL,
 	`result` integer,
-	`created_at` integer DEFAULT 1751814360190 NOT NULL,
+	`created_at` integer DEFAULT 1751960977750 NOT NULL,
 	FOREIGN KEY (`invoice_id`) REFERENCES `invoices`(`id`) ON UPDATE no action ON DELETE CASCADE
 );
 --> statement-breakpoint
@@ -206,7 +206,7 @@ CREATE TABLE `transactions` (
 	`bank` text DEFAULT 'unknown' NOT NULL,
 	`entity` text DEFAULT 'unknown' NOT NULL,
 	`voucher_type` text DEFAULT 'unknown',
-	`created_at` integer DEFAULT 1751814360191 NOT NULL,
+	`created_at` integer DEFAULT 1751960977752 NOT NULL,
 	FOREIGN KEY (`statement_id`) REFERENCES `statements`(`id`) ON UPDATE no action ON DELETE CASCADE
 );
 --> statement-breakpoint
