@@ -52,7 +52,7 @@ const GST_RATES = {
 // Helper function to get state code from state name
 const getStateCodeFromName = (stateName) => {
   console.log('🔍 [getStateCodeFromName] Attempting to get state code for:', stateName);
-  
+
   if (!stateName) {
     console.log('⚠️ [getStateCodeFromName] No state name provided');
     return null;
@@ -61,7 +61,7 @@ const getStateCodeFromName = (stateName) => {
   const normalizedStateName = stateName.toLowerCase().trim();
   console.log('🔄 [getStateCodeFromName] Normalized state name:', normalizedStateName);
 
-  const entry = Object.entries(STATE_CODES).find(([_, name]) => 
+  const entry = Object.entries(STATE_CODES).find(([_, name]) =>
     name.toLowerCase() === normalizedStateName
   );
 
@@ -170,7 +170,7 @@ const getCustomerStateCode = (customer) => {
   if (customer?.gstin && customer.gstin.length >= 2) {
     const stateCode = customer.gstin.substring(0, 2);
     console.log('🔄 [getCustomerStateCode] Extracted state code from GST:', stateCode);
-    
+
     if (isValidStateCode(stateCode)) {
       console.log('✅ [getCustomerStateCode] Valid state code from GST:', stateCode, '(', STATE_CODES[stateCode], ')');
       console.groupEnd();
@@ -181,7 +181,7 @@ const getCustomerStateCode = (customer) => {
   } else {
     console.log('ℹ️ [getCustomerStateCode] No valid GST number found, trying state name');
   }
-  
+
   // If no valid GST number, try to get from state name
   if (customer?.state) {
     const stateCode = getStateCodeFromName(customer.state);
@@ -195,7 +195,7 @@ const getCustomerStateCode = (customer) => {
   } else {
     console.log('⚠️ [getCustomerStateCode] No state name provided');
   }
-  
+
   console.log('❌ [getCustomerStateCode] Could not determine state code');
   console.groupEnd();
   return null;

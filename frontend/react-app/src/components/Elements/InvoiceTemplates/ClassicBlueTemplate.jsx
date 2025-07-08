@@ -195,23 +195,23 @@ const styles = StyleSheet.create({
     tableHeader: {
         flexDirection: 'row',
         backgroundColor: colors.primary,
-        padding: 6,
+        padding: 8,
+        borderBottom: `1pt solid ${colors.border}`,
     },
 
     tableHeaderCell: {
         color: colors.white,
-        fontSize: 8,
+        fontSize: 9,
         fontWeight: 'bold',
-        textAlign: 'center',
         textTransform: 'uppercase',
         letterSpacing: 0.3,
     },
 
     tableRow: {
         flexDirection: 'row',
-        padding: 3,
+        padding: 6,
         borderBottom: `0.5pt solid ${colors.border}`,
-        minHeight: 16,
+        minHeight: 24,
         alignItems: 'center',
     },
 
@@ -220,12 +220,8 @@ const styles = StyleSheet.create({
     },
 
     tableCell: {
-        fontSize: 8,
+        fontSize: 9,
         color: colors.text,
-        paddingHorizontal: 3,
-        paddingVertical: 1,
-        display: 'flex',
-        alignItems: 'center',
         lineHeight: 1.2,
     },
 
@@ -290,10 +286,8 @@ const styles = StyleSheet.create({
 
     // Taxable Value Section
     taxableValueSection: {
+        marginTop: 8,
         marginBottom: 8,
-        borderRadius: 4,
-        overflow: 'hidden',
-        border: `1pt solid ${colors.border}`,
         backgroundColor: colors.white,
     },
 
@@ -301,33 +295,25 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         backgroundColor: colors.primary,
         padding: 6,
+        marginBottom: 2,
     },
 
     taxableValueHeaderCell: {
         color: colors.white,
         fontSize: 8,
         fontWeight: 'bold',
-        textAlign: 'center',
-        textTransform: 'uppercase',
-        letterSpacing: 0.3,
+        padding: '4 2',
     },
 
     taxableValueRow: {
         flexDirection: 'row',
-        padding: 6,
-        borderBottom: `0.5pt solid ${colors.border}`,
-        minHeight: 16,
-        alignItems: 'center',
+        padding: 4,
+        marginBottom: 1,
     },
 
     taxableValueCell: {
         fontSize: 8,
-        color: colors.text,
-        paddingHorizontal: 3,
-        paddingVertical: 1,
-        display: 'flex',
-        alignItems: 'center',
-        lineHeight: 1.2,
+        padding: '3 2',
     },
 
     // Bank Details Section
@@ -399,14 +385,15 @@ const styles = StyleSheet.create({
 
     totalRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 10,
+        padding: 8,
         backgroundColor: colors.success,
+        alignItems: 'center',
+        width: '100%',
+        marginTop: 1,
     },
 
     totalLabel: {
-        fontSize: 11,
+        fontSize: 10,
         color: colors.white,
         fontWeight: 'bold',
         textTransform: 'uppercase',
@@ -414,7 +401,7 @@ const styles = StyleSheet.create({
     },
 
     totalAmount: {
-        fontSize: 12,
+        fontSize: 10,
         color: colors.white,
         fontWeight: 'bold',
     },
@@ -537,132 +524,29 @@ const styles = StyleSheet.create({
         lineHeight: 1.3,
     },
 
-    // Subtotal Row
-    subtotalRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        padding: 6,
-        backgroundColor: colors.background,
-        borderBottom: `0.5pt solid ${colors.border}`,
-    },
-
-    subtotalLabel: {
-        fontSize: 9,
-        color: colors.text,
-        fontWeight: 'bold',
-    },
-
-    subtotalAmount: {
-        fontSize: 9,
-        color: colors.text,
-        fontWeight: 'bold',
-    },
-
-    // Taxable Value Section
-    taxableValueSection: {
-        marginBottom: 8,
-        borderRadius: 4,
-        overflow: 'hidden',
-        border: `1pt solid ${colors.border}`,
+    summarySection: {
         backgroundColor: colors.white,
+        borderTop: `1pt solid ${colors.border}`,
+        width: '100%',
     },
 
-    taxableValueHeader: {
+    summaryRow: {
         flexDirection: 'row',
-        backgroundColor: colors.primary,
         padding: 6,
-    },
-
-    taxableValueHeaderCell: {
-        color: colors.white,
-        fontSize: 8,
-        fontWeight: 'bold',
-        textAlign: 'center',
-        textTransform: 'uppercase',
-        letterSpacing: 0.3,
-    },
-
-    taxableValueRow: {
-        flexDirection: 'row',
-        padding: 4,
         borderBottom: `0.5pt solid ${colors.border}`,
-        minHeight: 16,
         alignItems: 'center',
+        width: '100%',
     },
 
-    taxableValueCell: {
-        fontSize: 8,
-        color: colors.text,
-        paddingHorizontal: 3,
-        paddingVertical: 1,
-    },
-
-    // Bank Details Section
-    bankDetailsSection: {
-        marginBottom: 8,
-        padding: 8,
-        backgroundColor: colors.background,
-        borderRadius: 4,
-        border: `1pt solid ${colors.border}`,
-        borderLeft: `3pt solid ${colors.primary}`,
-    },
-
-    bankDetailsTitle: {
+    summaryLabel: {
         fontSize: 9,
-        fontWeight: 'bold',
-        color: colors.primary,
-        marginBottom: 6,
-        textTransform: 'uppercase',
-        letterSpacing: 0.3,
-        borderBottom: `1pt solid ${colors.border}`,
-        paddingBottom: 3,
-    },
-
-    bankDetailsRow: {
-        flexDirection: 'row',
-        marginBottom: 4,
-        alignItems: 'center',
-    },
-
-    bankDetailsLabel: {
-        fontSize: 8,
-        fontWeight: 'bold',
-        color: colors.textSecondary,
-        width: '25%',
-    },
-
-    bankDetailsValue: {
-        fontSize: 8,
         color: colors.text,
         fontWeight: 'bold',
     },
 
-    // Company Tax Info Section
-    companyTaxInfoSection: {
-        flexDirection: 'row',
-        marginBottom: 8,
-        padding: 8,
-        backgroundColor: colors.background,
-        borderRadius: 4,
-        border: `1pt solid ${colors.border}`,
-    },
-
-    companyTaxInfoItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginRight: 20,
-    },
-
-    companyTaxInfoLabel: {
-        fontSize: 8,
-        fontWeight: 'bold',
-        color: colors.textSecondary,
-        marginRight: 4,
-    },
-
-    companyTaxInfoValue: {
-        fontSize: 8,
-        color: colors.primary,
+    summaryValue: {
+        fontSize: 9,
+        color: colors.text,
         fontWeight: 'bold',
     },
 });
@@ -978,119 +862,122 @@ const ItemsTable = ({ invoice, totals, dynamicStyles }) => {
 
     return (
         <View style={styles.tableContainer}>
+            {/* Header Row */}
             <View style={styles.tableHeader}>
-                <Text style={[tableHeaderCellStyle, styles.col1]}>Sl.</Text>
-                <Text style={[tableHeaderCellStyle, styles.col2]}>Description</Text>
-                <Text style={[tableHeaderCellStyle, styles.col3]}>HSN/SAC</Text>
-                <Text style={[tableHeaderCellStyle, styles.col4]}>QTY</Text>
-                <Text style={[tableHeaderCellStyle, styles.col5]}>RATE</Text>
-                <Text style={[tableHeaderCellStyle, styles.col6]}>UNIT</Text>
-                <Text style={[tableHeaderCellStyle, styles.col7]}>AMOUNT</Text>
+                <Text style={[tableHeaderCellStyle, { width: '5%', textAlign: 'right', paddingRight: 8 }]}>NO.</Text>
+                <Text style={[tableHeaderCellStyle, { width: '35%', textAlign: 'left', paddingLeft: 4 }]}>DESCRIPTION</Text>
+                <Text style={[tableHeaderCellStyle, { width: '15%', textAlign: 'right', paddingRight: 8 }]}>HSN/SAC</Text>
+                <Text style={[tableHeaderCellStyle, { width: '10%', textAlign: 'right', paddingRight: 8 }]}>QTY</Text>
+                <Text style={[tableHeaderCellStyle, { width: '13%', textAlign: 'right', paddingRight: 8 }]}>RATE</Text>
+                <Text style={[tableHeaderCellStyle, { width: '10%', textAlign: 'right', paddingRight: 8 }]}>UNIT</Text>
+                <Text style={[tableHeaderCellStyle, { width: '12%', textAlign: 'right', paddingRight: 8 }]}>AMOUNT</Text>
             </View>
 
+            {/* Item Rows */}
             {items.map((item, index) => {
                 const qty = parseFloat(item.quantity) || 1;
-                const isEven = index % 2 === 0;
+                const rate = parseFloat(item.rate) || 0;
+                const amount = parseFloat(item.amount) || (qty * rate);
 
                 return (
-                    <View key={index} style={[styles.tableRow, !isEven && styles.tableRowAlt]}>
-                        <View style={[styles.col1]}>
-                            <Text style={[tableCellStyle, styles.tableCellCenter]}>
-                                {index + 1}
-                            </Text>
-                        </View>
-                        <View style={[styles.col2]}>
-                            <Text style={[tableCellStyle]}>
-                                {item.details || item.name || "Item"}
-                            </Text>
-                        </View>
-                        <View style={[styles.col3]}>
-                            <Text style={[tableCellStyle, styles.tableCellCenter]}>
-                                {item.hsn || ""}
-                            </Text>
-                        </View>
-                        <View style={[styles.col4]}>
-                            <Text style={[tableCellStyle, styles.tableCellCenter]}>
-                                {qty}
-                            </Text>
-                        </View>
-                        <View style={[styles.col5]}>
-                            <Text style={[tableCellStyle, styles.tableCellRight]}>
-                                {formatCurrency(item.rate || 0).replace('₹', '')}
-                            </Text>
-                        </View>
-                        <View style={[styles.col6]}>
-                            <Text style={[tableCellStyle, styles.tableCellCenter]}>
-                                {item.per || "Nos"}
-                            </Text>
-                        </View>
-                        <View style={[styles.col7]}>
-                            <Text style={[tableCellStyle, styles.tableCellRight]}>
-                                {formatCurrency(item.amount || (qty * (item.rate || 0))).replace('₹', '')}
-                            </Text>
-                        </View>
+                    <View key={index} style={[styles.tableRow, index % 2 === 1 && { backgroundColor: colors.background }]}>
+                        <Text style={[tableCellStyle, { width: '5%', textAlign: 'right', paddingRight: 8 }]}>{index + 1}</Text>
+                        <Text style={[tableCellStyle, { width: '35%', textAlign: 'left', paddingLeft: 4 }]}>{item.details || item.name || "Item"}</Text>
+                        <Text style={[tableCellStyle, { width: '15%', textAlign: 'right', paddingRight: 8 }]}>{item.hsn || "998391"}</Text>
+                        <Text style={[tableCellStyle, { width: '10%', textAlign: 'right', paddingRight: 8 }]}>{qty}</Text>
+                        <Text style={[tableCellStyle, { width: '13%', textAlign: 'right', paddingRight: 8 }]}>{formatCurrency(rate).replace('₹', '')}</Text>
+                        <Text style={[tableCellStyle, { width: '10%', textAlign: 'right', paddingRight: 8 }]}>{item.per || "Nos"}</Text>
+                        <Text style={[tableCellStyle, { width: '12%', textAlign: 'right', paddingRight: 8 }]}>{formatCurrency(amount).replace('₹', '')}</Text>
                     </View>
                 );
             })}
 
-            {/* Subtotal Row */}
-            <View style={styles.subtotalRow}>
-                <Text style={styles.subtotalLabel}>Sub Total</Text>
-                <Text style={styles.subtotalAmount}>{formatCurrency(totals.subtotal)}</Text>
-            </View>
-
-            {/* Smart GST display based on multiple factors */}
-            {totals.shouldShowSplit ? (
-                <>
-                    <View style={styles.taxRow}>
-                        <Text style={styles.taxLabel}>CGST ({totals.cgstRate}%)</Text>
-                        <Text style={styles.taxAmount}>{formatCurrency(totals.cgstAmount)}</Text>
-                    </View>
-                    <View style={styles.taxRow}>
-                        <Text style={styles.taxLabel}>SGST ({totals.sgstRate}%)</Text>
-                        <Text style={styles.taxAmount}>{formatCurrency(totals.sgstAmount)}</Text>
-                    </View>
-                </>
-            ) : (
-                <View style={styles.taxRow}>
-                    <Text style={styles.taxLabel}>IGST ({totals.igstRate}%)</Text>
-                    <Text style={styles.taxAmount}>{formatCurrency(totals.igstAmount)}</Text>
+            {/* Summary Section */}
+            <View style={styles.summarySection}>
+                {/* Subtotal */}
+                <View style={styles.summaryRow}>
+                    <Text style={[styles.summaryLabel, { width: '88%', textAlign: 'right', paddingRight: 8 }]}>Sub Total:</Text>
+                    <Text style={[styles.summaryValue, { width: '12%', textAlign: 'right', paddingRight: 8 }]}>{formatCurrency(totals.subtotal).replace('₹', '')}</Text>
                 </View>
-            )}
 
-            <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>GRAND TOTAL</Text>
-                <Text style={styles.totalAmount}>{formatCurrency(totals.grandTotal)}</Text>
+                {/* GST Section */}
+                {totals.shouldShowSplit ? (
+                    <>
+                        <View style={styles.summaryRow}>
+                            <Text style={[styles.summaryLabel, { width: '88%', textAlign: 'right', paddingRight: 8 }]}>CGST ({totals.cgstRate}%):</Text>
+                            <Text style={[styles.summaryValue, { width: '12%', textAlign: 'right', paddingRight: 8 }]}>{formatCurrency(totals.cgstAmount).replace('₹', '')}</Text>
+                        </View>
+                        <View style={styles.summaryRow}>
+                            <Text style={[styles.summaryLabel, { width: '88%', textAlign: 'right', paddingRight: 8 }]}>SGST ({totals.sgstRate}%):</Text>
+                            <Text style={[styles.summaryValue, { width: '12%', textAlign: 'right', paddingRight: 8 }]}>{formatCurrency(totals.sgstAmount).replace('₹', '')}</Text>
+                        </View>
+                    </>
+                ) : (
+                    <View style={styles.summaryRow}>
+                        <Text style={[styles.summaryLabel, { width: '88%', textAlign: 'right', paddingRight: 8 }]}>IGST ({totals.igstRate}%):</Text>
+                        <Text style={[styles.summaryValue, { width: '12%', textAlign: 'right', paddingRight: 8 }]}>{formatCurrency(totals.igstAmount).replace('₹', '')}</Text>
+                    </View>
+                )}
+
+                {/* Grand Total */}
+                <View style={styles.totalRow}>
+                    <Text style={[styles.totalLabel, { width: '88%', textAlign: 'right', paddingRight: 8 }]}>GRAND TOTAL:</Text>
+                    <Text style={[styles.totalAmount, { width: '12%', textAlign: 'right', paddingRight: 8 }]}>{formatCurrency(totals.grandTotal).replace('₹', '')}</Text>
+                </View>
             </View>
         </View>
     );
 };
 
-const TaxableValueSection = ({ totals, dynamicStyles }) => (
-    <View style={styles.taxableValueSection}>
-        <View style={styles.taxableValueHeader}>
-            <Text style={[styles.taxableValueHeaderCell, { width: '25%' }]}>TAXABLE VALUE</Text>
-            <Text style={[styles.taxableValueHeaderCell, { width: '15%' }]}>CENTRAL TAX</Text>
-            <Text style={[styles.taxableValueHeaderCell, { width: '15%' }]}>RATE</Text>
-            <Text style={[styles.taxableValueHeaderCell, { width: '15%' }]}>AMOUNT</Text>
-            <Text style={[styles.taxableValueHeaderCell, { width: '15%' }]}>STATE TAX</Text>
-            <Text style={[styles.taxableValueHeaderCell, { width: '15%' }]}>AMOUNT</Text>
+const TaxableValueSection = ({ totals, dynamicStyles }) => {
+    // Determine if we should show split GST (CGST + SGST) or IGST
+    const showSplit = totals.shouldShowSplit;
+    const subtotal = totals.subtotal || 0;
+
+    return (
+        <View style={styles.taxableValueSection}>
+            <View style={styles.taxableValueHeader}>
+                <Text style={[styles.taxableValueHeaderCell, { width: '30%', textAlign: 'left' }]}>TAXABLE VALUE</Text>
+                <Text style={[styles.taxableValueHeaderCell, { width: '20%', textAlign: 'center' }]}>TAX TYPE</Text>
+                <Text style={[styles.taxableValueHeaderCell, { width: '20%', textAlign: 'center' }]}>RATE</Text>
+                <Text style={[styles.taxableValueHeaderCell, { width: '30%', textAlign: 'right' }]}>AMOUNT</Text>
+            </View>
+
+            {showSplit ? (
+                // Show CGST + SGST rows
+                <>
+                    <View style={styles.taxableValueRow}>
+                        <Text style={[styles.taxableValueCell, { width: '30%', textAlign: 'left' }]}>{formatCurrency(subtotal)}</Text>
+                        <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'center' }]}>CGST</Text>
+                        <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'center' }]}>{totals.cgstRate}%</Text>
+                        <Text style={[styles.taxableValueCell, { width: '30%', textAlign: 'right' }]}>{formatCurrency(totals.cgstAmount)}</Text>
+                    </View>
+                    <View style={styles.taxableValueRow}>
+                        <Text style={[styles.taxableValueCell, { width: '30%', textAlign: 'left' }]}>{formatCurrency(subtotal)}</Text>
+                        <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'center' }]}>SGST</Text>
+                        <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'center' }]}>{totals.sgstRate}%</Text>
+                        <Text style={[styles.taxableValueCell, { width: '30%', textAlign: 'right' }]}>{formatCurrency(totals.sgstAmount)}</Text>
+                    </View>
+                </>
+            ) : (
+                // Show IGST row
+                <View style={styles.taxableValueRow}>
+                    <Text style={[styles.taxableValueCell, { width: '30%', textAlign: 'left' }]}>{formatCurrency(subtotal)}</Text>
+                    <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'center' }]}>IGST</Text>
+                    <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'center' }]}>{totals.igstRate}%</Text>
+                    <Text style={[styles.taxableValueCell, { width: '30%', textAlign: 'right' }]}>{formatCurrency(totals.igstAmount)}</Text>
+                </View>
+            )}
+
+            {/* Total Tax Amount row */}
+            <View style={[styles.taxableValueRow, { backgroundColor: colors.background }]}>
+                <Text style={[styles.taxableValueCell, { width: '50%', textAlign: 'left', fontWeight: 'bold' }]}>Total Tax Amount</Text>
+                <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'left', fontWeight: 'bold' }]}>INR {numberToWords(totals.totalGST)}</Text>
+                <Text style={[styles.taxableValueCell, { width: '30%', textAlign: 'right', fontWeight: 'bold' }]}>{formatCurrency(totals.totalGST)}</Text>
+            </View>
         </View>
-        <View style={styles.taxableValueRow}>
-            <Text style={[styles.taxableValueCell, { width: '25%', textAlign: 'left' }]}>{formatCurrency(totals.subtotal)}</Text>
-            <Text style={[styles.taxableValueCell, { width: '15%', textAlign: 'center' }]}>{totals.shouldShowSplit ? 'CGST' : 'IGST'}</Text>
-            <Text style={[styles.taxableValueCell, { width: '15%', textAlign: 'center' }]}>{totals.shouldShowSplit ? totals.cgstRate : totals.igstRate}%</Text>
-            <Text style={[styles.taxableValueCell, { width: '15%', textAlign: 'right' }]}>{formatCurrency(totals.shouldShowSplit ? totals.cgstAmount : totals.igstAmount)}</Text>
-            <Text style={[styles.taxableValueCell, { width: '15%', textAlign: 'center' }]}>{totals.shouldShowSplit ? 'SGST' : ''}</Text>
-            <Text style={[styles.taxableValueCell, { width: '15%', textAlign: 'right' }]}>{totals.shouldShowSplit ? formatCurrency(totals.sgstAmount) : ''}</Text>
-        </View>
-        <View style={[styles.taxableValueRow, { backgroundColor: colors.background }]}>
-            <Text style={[styles.taxableValueCell, { width: '40%', textAlign: 'left', fontWeight: 'bold' }]}>Total Tax Amount</Text>
-            <Text style={[styles.taxableValueCell, { width: '45%', textAlign: 'left', fontWeight: 'bold' }]}>INR {numberToWords(totals.totalGST)}</Text>
-            <Text style={[styles.taxableValueCell, { width: '15%', textAlign: 'right', fontWeight: 'bold' }]}>{formatCurrency(totals.totalGST)}</Text>
-        </View>
-    </View>
-);
+    );
+};
 
 const CompanyTaxInfo = ({ invoice, dynamicStyles }) => (
     <View style={styles.companyTaxInfoSection}>
@@ -1217,11 +1104,11 @@ export const ClassicBlueTemplate = (invoice) => {
             },
             tableHeaderCell: {
                 ...styles.tableHeaderCell,
-                fontSize: (styles.tableHeaderCell?.fontSize || 8) * fontScale,
+                fontSize: (styles.tableHeaderCell?.fontSize || 9) * fontScale,
             },
             tableCell: {
                 ...styles.tableCell,
-                fontSize: (styles.tableCell?.fontSize || 8) * fontScale,
+                fontSize: (styles.tableCell?.fontSize || 9) * fontScale,
             }
         });
     } catch (error) {
