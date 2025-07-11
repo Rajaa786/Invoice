@@ -46,6 +46,24 @@ CREATE TABLE `companies` (
 	`compliance_standards` text
 );
 --> statement-breakpoint
+CREATE TABLE `company_customers` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`company_id` integer NOT NULL,
+	`customer_id` integer NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`company_id`) REFERENCES `companies`(`id`) ON UPDATE no action ON DELETE CASCADE,
+	FOREIGN KEY (`customer_id`) REFERENCES `customers`(`id`) ON UPDATE no action ON DELETE CASCADE
+);
+--> statement-breakpoint
+CREATE TABLE `company_items` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`company_id` integer NOT NULL,
+	`item_id` integer NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`company_id`) REFERENCES `companies`(`id`) ON UPDATE no action ON DELETE CASCADE,
+	FOREIGN KEY (`item_id`) REFERENCES `items`(`id`) ON UPDATE no action ON DELETE CASCADE
+);
+--> statement-breakpoint
 CREATE TABLE `customers` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`customer_type` text NOT NULL,
@@ -189,7 +207,7 @@ CREATE TABLE `tally_sales_voucher` (
 	`failed_reason` text,
 	`bank_ledger` text NOT NULL,
 	`result` integer,
-	`created_at` integer DEFAULT 1751960977750 NOT NULL,
+	`created_at` integer DEFAULT 1752039937187 NOT NULL,
 	FOREIGN KEY (`invoice_id`) REFERENCES `invoices`(`id`) ON UPDATE no action ON DELETE CASCADE
 );
 --> statement-breakpoint
@@ -206,7 +224,7 @@ CREATE TABLE `transactions` (
 	`bank` text DEFAULT 'unknown' NOT NULL,
 	`entity` text DEFAULT 'unknown' NOT NULL,
 	`voucher_type` text DEFAULT 'unknown',
-	`created_at` integer DEFAULT 1751960977752 NOT NULL,
+	`created_at` integer DEFAULT 1752039937196 NOT NULL,
 	FOREIGN KEY (`statement_id`) REFERENCES `statements`(`id`) ON UPDATE no action ON DELETE CASCADE
 );
 --> statement-breakpoint

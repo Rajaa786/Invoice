@@ -58,7 +58,8 @@ function registerCompanyDashboardIpc() {
           operatingHours: data.operatingHours || null,
           timezone: data.timezone || "Asia/Kolkata",
           fiscalYearStart: data.fiscalYearStart || null,
-          taxId: data.taxId || null
+          taxId: data.taxId || null,
+          invoicePrefix: data.invoicePrefix || null
         };
 
         log.debug("📊 Database insert data:", {
@@ -240,7 +241,8 @@ function registerCompanyDashboardIpc() {
           operatingHours: data.operatingHours || null,
           timezone: data.timezone || "Asia/Kolkata",
           fiscalYearStart: data.fiscalYearStart || null,
-          taxId: data.taxId || null
+          taxId: data.taxId || null,
+          invoicePrefix: data.invoicePrefix || null
         };
 
         const result = await db
@@ -381,6 +383,62 @@ function registerCompanyDashboardIpc() {
       }
     });
     log.info("✅ IPC handler 'get-company-by-id' registered successfully");
+
+    // Register the IPC handler for getting company invoice prefix
+    ipcMain.handle("get-company-invoice-prefix", async (event, companyId) => {
+      try {
+        log.debug("📋 Received get-company-invoice-prefix request for ID:", companyId);
+        const result = await db
+          .select({ invoicePrefix: companies.invoicePrefix })
+          .from(companies)
+          .where(eq(companies.id, companyId))
+          .limit(1);
+
+        if (result.length === 0) {
+          return { success: false, error: "Company not found" };
+        }
+
+        return { success: true, invoicePrefix: result[0].invoicePrefix };
+      } catch (err) {
+        log.error("❌ Error fetching company invoice prefix:", {
+          error: err.message,
+          stack: err.stack,
+          companyId,
+          errorType: err.name
+        });
+        return { success: false, error: err.message };
+      }
+    });
+    log.info("✅ IPC handler 'get-company-invoice-prefix' registered successfully");
+
+    // Register the IPC handler for setting company invoice prefix
+    ipcMain.handle("set-company-invoice-prefix", async (event, companyId, invoicePrefix) => {
+      try {
+        log.info("📝 Setting invoice prefix for company ID:", companyId, "to:", invoicePrefix);
+        const result = await db
+          .update(companies)
+          .set({ invoicePrefix })
+          .where(eq(companies.id, companyId))
+          .returning({ id: companies.id, invoicePrefix: companies.invoicePrefix });
+
+        if (result.length === 0) {
+          return { success: false, error: "Company not found" };
+        }
+
+        log.info("✅ Company invoice prefix updated successfully:", result[0]);
+        return { success: true, result: result[0] };
+      } catch (err) {
+        log.error("❌ Company invoice prefix update failed:", {
+          error: err.message,
+          stack: err.stack,
+          companyId,
+          invoicePrefix,
+          errorType: err.name
+        });
+        return { success: false, error: err.message };
+      }
+    });
+    log.info("✅ IPC handler 'set-company-invoice-prefix' registered successfully");
 
   } catch (err) {
     log.error("❌ Error registering Company Dashboard IPC handlers:", {

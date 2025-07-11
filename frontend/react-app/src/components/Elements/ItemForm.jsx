@@ -5,6 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "../ui/dialog";
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
@@ -283,11 +284,42 @@ const ItemForm = ({ isOpen, onClose, onSave, editItem = null }) => {
       } else {
         // Create new item
         const result = await window.electron.addItems(itemData);
+        console.log("Item added successfully: ", result);
+
         // Add company association for the new item
-        if (result.success && result.id && formData.companyId) {
-          await window.electron.updateItemCompanies(result.id, [formData.companyId]);
+        if (result.success && formData.companyId) {
+          const newItemId = result.result.lastInsertRowid; // Use lastInsertRowid for new item
+          const updateCompanyResult = await window.electron.updateItemCompanies(
+            newItemId,
+            [formData.companyId]
+          );
+
+          if (!updateCompanyResult.success) {
+            console.error("Failed to add item-company association:", updateCompanyResult.error);
+          }
         }
-        if (onSave) onSave(result.success ? { ...itemData, id: result.id } : itemData);
+
+        if (result.success) {
+          console.log("Item saved:", result.result);
+          if (onSave) onSave(result.result);
+
+          // Reset form state after successful save
+          setFormData({
+            type: "Goods",
+            name: "",
+            hsnSacCode: "",
+            unit: "",
+            sellingPrice: "",
+            currency: "INR",
+            description: "",
+            companyId: "",
+          });
+          setSelectedCompany(null);
+          setErrors({});
+        } else {
+          console.error("Failed to save item:", result.error);
+          setErrors({ submit: result.error });
+        }
       }
       onClose();
     } catch (error) {
@@ -303,7 +335,24 @@ const ItemForm = ({ isOpen, onClose, onSave, editItem = null }) => {
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editItem ? "Edit Item" : "Add New Item"}</DialogTitle>
+            <div className="flex flex-row items-center justify-between">
+              <div>
+                <DialogTitle>{editItem ? "Edit Item" : "Add New Item"}</DialogTitle>
+                <DialogDescription className="sr-only">
+                  {editItem ? "Edit existing item details" : "Add a new item to the system"}
+                </DialogDescription>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={generateDummyData}
+              >
+                <Wand2 className="w-3 h-3 mr-1" />
+                Generate Test Data
+              </Button>
+            </div>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">

@@ -23,8 +23,9 @@ function registerCustomerDashboardIpc() {
           type: data.customerType || "Individual"
         });
 
-        const gstin = data.gstApplicable === true ? data.gstin : null;
-        const stateCode = data.gstApplicable === true ? data.stateCode : null;
+        // Handle GST fields based on gstApplicable value
+        const gstin = data.gstApplicable === "Yes" ? data.gstin : null;
+        const stateCode = data.gstApplicable === "Yes" ? data.stateCode : null;
 
         const result = await db.insert(customers).values({
           customerType: data.customerType || "Individual",
@@ -36,7 +37,7 @@ function registerCustomerDashboardIpc() {
           companyName: data.companyName,
           currency: data.currency || "INR",
 
-          gstApplicable: data.gstApplicable === true ? "Yes" : "No",
+          gstApplicable: data.gstApplicable || "No",
           gstin,
           stateCode,
 
@@ -105,8 +106,9 @@ function registerCustomerDashboardIpc() {
           type: data.customerType || "Individual"
         });
 
-        const gstin = data.gstApplicable === true ? data.gstin : null;
-        const stateCode = data.gstApplicable === true ? data.stateCode : null;
+        // Handle GST fields based on gstApplicable value
+        const gstin = data.gstApplicable === "Yes" ? data.gstin : null;
+        const stateCode = data.gstApplicable === "Yes" ? data.stateCode : null;
 
         const result = await db
           .update(customers)
@@ -120,7 +122,7 @@ function registerCustomerDashboardIpc() {
             companyName: data.companyName,
             currency: data.currency || "INR",
 
-            gstApplicable: data.gstApplicable === true ? "Yes" : "No",
+            gstApplicable: data.gstApplicable || "No",
             gstin,
             stateCode,
 
@@ -292,7 +294,8 @@ function registerCustomerDashboardIpc() {
           // Create an array of objects for batch insert
           const companyCustomersToInsert = companyIds.map(companyId => ({
             customerId,
-            companyId
+            companyId,
+            createdAt: new Date() // Add timestamp for new associations
           }));
           
           // Insert all new associations

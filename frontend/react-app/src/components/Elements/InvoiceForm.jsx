@@ -93,7 +93,6 @@ const InvoiceForm = () => {
   const [companyInitials, setCompanyInitials] = useState("");
   const [invoiceSequence, setInvoiceSequence] = useState("0001");
   const [companySignature, setCompanySignature] = useState(null);
-  const [companyInitialsMap, setCompanyInitialsMap] = useState({});
   // const [paymentTerms, setPaymentTerms] = useState("");
   const [termSelectOpen, setTermSelectOpen] = useState(false);
   const [customTerm, setCustomTerm] = useState(""); // track typed input
@@ -105,6 +104,49 @@ const InvoiceForm = () => {
 
   // Change this line
   const [invoiceNumber, setInvoiceNumber] = useState(""); // Remove the default "INV-000002"
+
+  // Helper function to generate company initials from company name
+  const generateCompanyInitials = (companyName) => {
+    if (!companyName || typeof companyName !== 'string') return "";
+
+    // Clean the company name - remove extra spaces and special characters for processing
+    const cleanName = companyName.trim().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ');
+
+    if (!cleanName) return "";
+
+    // Split by spaces to get words
+    const words = cleanName.split(' ').filter(word => word.length > 0);
+
+    if (words.length === 0) return "";
+
+    if (words.length === 1) {
+      // Single word: take first 3-6 characters depending on length
+      const singleWord = words[0].toUpperCase();
+      if (singleWord.length <= 3) {
+        return singleWord; // "IBM" → "IBM", "3M" → "3M"
+      } else if (singleWord.length <= 6) {
+        return singleWord.substring(0, 4); // "Apple" → "APPL", "Google" → "GOOG"
+      } else {
+        return singleWord.substring(0, 3); // "Microsoft" → "MIC", "Facebook" → "FAC"
+      }
+    } else {
+      // Multiple words: take first letter of each word
+      const initials = words
+        .map(word => word[0]?.toUpperCase() || "")
+        .join("")
+        .substring(0, 6);
+
+      // If we get very short initials from multiple words, pad with more letters
+      if (initials.length < 3 && words.length === 2) {
+        // For 2 words with short result, take 2 chars from first word + 1 from second
+        const firstWord = words[0].toUpperCase();
+        const secondWord = words[1].toUpperCase();
+        return (firstWord.substring(0, 2) + secondWord.substring(0, 1)).substring(0, 6);
+      }
+
+      return initials;
+    }
+  };
 
   // Additional schema fields
   const [status, setStatus] = useState("draft");
@@ -185,8 +227,6 @@ const InvoiceForm = () => {
           // Only load all items if no company is selected
           if (!selectedCompany || !selectedCompany.id) {
             setDbItems(formattedItems);
-            // Replace the static itemsList with the database items
-            setItemsList(formattedItems);
           }
         } else {
           console.error("Failed to fetch items:", response.error);
@@ -232,75 +272,59 @@ const InvoiceForm = () => {
   // Add this with your other useEffects
   useEffect(() => {
     if (companyInitials) {
-      setInvoiceNumber(`${companyInitials}-${invoiceSequence}`);
+      setInvoiceNumber(`${companyInitials}${invoiceSequence}`);
     }
   }, [companyInitials, invoiceSequence]);
 
-  // Load company initials from local storage on component mount
-  useEffect(() => {
-    const savedInitials = localStorage.getItem("companyInitialsMap");
-    if (savedInitials) {
-      try {
-        setCompanyInitialsMap(JSON.parse(savedInitials));
-      } catch (e) {
-        console.error("Error loading saved company initials", e);
-      }
-    }
-  }, []);
 
-  // Save company initials to local storage when they change
-  useEffect(() => {
-    if (Object.keys(companyInitialsMap).length > 0) {
-      localStorage.setItem(
-        "companyInitialsMap",
-        JSON.stringify(companyInitialsMap)
-      );
-    }
-  }, [companyInitialsMap]);
   useEffect(() => {
     // Fetch all invoices to find the latest invoice number
     const fetchLatestInvoiceNumber = async () => {
       try {
-        const response = await window.electron.getAllInvoices();
+        if (!companyInitials) {
+          console.log("No company initials available");
+          return;
+        }
 
-        if (
-          response.success &&
-          response.invoices &&
-          response.invoices.length > 0
-        ) {
-          // Sort invoices by ID in descending order to get the latest one
-          const sortedInvoices = [...response.invoices].sort(
-            (a, b) => b.id - a.id
-          );
-          const latestInvoice = sortedInvoices[0];
+        const prefix = companyInitials;
+        console.log("Fetching invoice number with prefix:", prefix);
 
-          console.log("Latest invoice:", latestInvoice);
+        const response = await window.electron.getNextInvoiceNumber(prefix);
+        console.log("Got invoice number response:", response);
 
-          if (latestInvoice && latestInvoice.invoiceNo) {
-            // Extract the sequence number part from the latest invoice number
-            const parts = latestInvoice.invoiceNo.split("-");
-            if (parts.length === 2) {
-              const latestInitials = parts[0];
-              const latestSequence = parts[1];
+        if (!response || !response.success) {
+          console.error("Error getting next invoice number:", response?.error || "Unknown error");
+          // Set a default invoice number as fallback
+          const fallbackNumber = `${prefix}0001`;
+          console.log("Using fallback invoice number:", fallbackNumber);
+          setInvoiceNumber(fallbackNumber);
+          setInvoiceSequence("0001");
+          return;
+        }
 
-              // Increment the sequence number
-              const sequenceNumber = parseInt(latestSequence, 10);
-              if (!isNaN(sequenceNumber)) {
-                const newSequence = (sequenceNumber + 1)
-                  .toString()
-                  .padStart(4, "0");
-                setInvoiceSequence(newSequence);
+        const invoiceNumber = response.invoiceNumber;
+        console.log("Received invoice number:", invoiceNumber);
 
-                // If company is already selected, update the full invoice number
-                if (companyInitials) {
-                  setInvoiceNumber(`${companyInitials}-${newSequence}`);
-                }
-              }
-            }
-          }
+        // Extract sequence number from the end of the invoice number
+        const prefixLength = prefix.length;
+        const sequence = invoiceNumber.substring(prefixLength);
+
+        if (sequence && !isNaN(parseInt(sequence, 10))) {
+          console.log("Setting invoice number to:", invoiceNumber);
+          setInvoiceNumber(invoiceNumber);
+          setInvoiceSequence(sequence);
+        } else {
+          console.warn("Invalid sequence number:", sequence);
+          setInvoiceNumber(`${prefix}0001`);
+          setInvoiceSequence("0001");
         }
       } catch (error) {
-        console.error("Error fetching latest invoice number:", error);
+        console.error("Error in fetchLatestInvoiceNumber:", error);
+        // Set a default invoice number as fallback
+        const fallbackNumber = `${companyInitials}0001`;
+        console.log("Using fallback invoice number after error:", fallbackNumber);
+        setInvoiceNumber(fallbackNumber);
+        setInvoiceSequence("0001");
       }
     };
 
@@ -312,16 +336,15 @@ const InvoiceForm = () => {
     if (selectedCompany && selectedCompany.id) {
       // Fetch company-specific latest invoice
       fetchCompanyLatestInvoice(selectedCompany.id, companyInitials);
-      
+
       // Fetch customers associated with this company
       fetchCompanyCustomers(selectedCompany.id);
-      
+
       // Fetch items associated with this company
       fetchCompanyItems(selectedCompany.id);
     }
   }, [selectedCompany]); // This should run when selectedCompany changes
 
-  // Add companyInitials as dependency to update when company changes
   // State for invoice items
   const [items, setItems] = useState([
     {
@@ -330,11 +353,10 @@ const InvoiceForm = () => {
       quantity: "1.00",
       rate: "0.00",
       amount: "0.00",
-      hsn: "", // Add this line
+      hsn: "",
+      dbItemId: null, // Add this field to store the actual database item ID
     },
   ]);
-
-  const [itemsList, setItemsList] = useState();
 
   // State for calculations
   const [subtotal, setSubtotal] = useState(0);
@@ -427,6 +449,8 @@ const InvoiceForm = () => {
         quantity: "1.00",
         rate: "0.00",
         amount: "0.00",
+        hsn: "",
+        dbItemId: null, // Initialize dbItemId as null for new rows
       },
     ]);
   };
@@ -458,14 +482,14 @@ const InvoiceForm = () => {
       fileInputRef.current.value = "";
     }
   };
-  
+
   // Fetch customers associated with a specific company
   const fetchCompanyCustomers = async (companyId) => {
     try {
       setIsLoadingCustomers(true);
       // First get all customers
       const allCustomersResponse = await window.electron.getCustomer();
-      
+
       if (allCustomersResponse.success) {
         // Get customers associated with this company
         const companyCustomersPromises = allCustomersResponse.customers.map(async (customer) => {
@@ -476,10 +500,10 @@ const InvoiceForm = () => {
           }
           return null;
         });
-        
+
         const companyCustomersResults = await Promise.all(companyCustomersPromises);
         const filteredCustomers = companyCustomersResults.filter(customer => customer !== null);
-        
+
         setCustomers(filteredCustomers);
         console.log(`Loaded ${filteredCustomers.length} customers for company ID ${companyId}`);
       } else {
@@ -491,14 +515,14 @@ const InvoiceForm = () => {
       setIsLoadingCustomers(false);
     }
   };
-  
+
   // Fetch items associated with a specific company
   const fetchCompanyItems = async (companyId) => {
     try {
       setIsLoadingItems(true);
       // First get all items
       const allItemsResponse = await window.electron.getItem();
-      
+
       if (allItemsResponse.success) {
         // Get items associated with this company
         const companyItemsPromises = allItemsResponse.items.map(async (item) => {
@@ -509,10 +533,10 @@ const InvoiceForm = () => {
           }
           return null;
         });
-        
+
         const companyItemsResults = await Promise.all(companyItemsPromises);
         const filteredItems = companyItemsResults.filter(item => item !== null);
-        
+
         // Transform the items to match the format needed for the dropdown
         const formattedItems = filteredItems.map((item) => ({
           id: item.id,
@@ -522,10 +546,8 @@ const InvoiceForm = () => {
           unit: item.unit || "",
           hsn: item.hsnSacCode || "", // Include HSN code
         }));
-        
+
         setDbItems(formattedItems);
-        // Also update the itemsList for the dropdown
-        setItemsList(formattedItems);
         console.log(`Loaded ${formattedItems.length} items for company ID ${companyId}`);
       } else {
         console.error("Failed to fetch items:", allItemsResponse.error);
@@ -536,14 +558,14 @@ const InvoiceForm = () => {
       setIsLoadingItems(false);
     }
   };
-  
+
   // Handle saving new customer
   const handleSaveCustomer = (customerData) => {
     console.log("New customer data:", customerData);
   };
   // Add after your other handler functions
   const handleCompanySelect = async (companyId) => {
-    console.log("Selecting company with ID:", companyId);
+    console.log("🏢 Selecting company with ID:", companyId);
 
     // Find the company
     const company = companies.find(
@@ -553,32 +575,38 @@ const InvoiceForm = () => {
     if (company) {
       setSelectedCompany(company);
 
-      // Check if we already have custom initials for this company
-      let initials;
+      try {
+        // Use configuration service which already handles database-first approach
+        let initials = await getCompanyInitials(company.id);
 
-      // Try to get from new configuration system first
-      const savedInitials = await getCompanyInitials(company.id);
-      if (savedInitials) {
-        initials = savedInitials;
-      } else if (companyInitialsMap[company.id]) {
-        // Fallback to old system
-        initials = companyInitialsMap[company.id];
-        // Migrate to new system
-        await saveCompanyInitials(company.id, initials);
-      } else {
-        // Generate default initials
-        initials = generateCompanyInitials(company.companyName);
-        // Store in both systems
-        setCompanyInitialsMap((prev) => ({ ...prev, [company.id]: initials }));
-        await saveCompanyInitials(company.id, initials);
+        // If no initials found, generate from company name and save
+        if (!initials) {
+          initials = generateCompanyInitials(company.companyName);
+          console.log("✅ Generated new initials:", initials);
+
+          // Save the new initials (configuration service handles database + local storage)
+          await saveCompanyInitials(company.id, initials);
+          console.log("✅ Saved new initials to storage");
+        } else {
+          console.log("✅ Retrieved existing initials:", initials);
+        }
+
+        setCompanyInitials(initials);
+
+        // Get company-specific latest invoice number
+        fetchCompanyLatestInvoice(company.id, initials);
+
+        // Fetch company-specific customers and items
+        fetchCompanyCustomers(company.id);
+        fetchCompanyItems(company.id);
+      } catch (error) {
+        console.error("❌ Error handling company selection:", error);
+
+        // Fallback: generate initials from company name
+        const fallbackInitials = generateCompanyInitials(company.companyName);
+        setCompanyInitials(fallbackInitials);
+        console.log("🔄 Using fallback initials:", fallbackInitials);
       }
-
-      setCompanyInitials(initials);
-
-      // Get company-specific latest invoice number
-      fetchCompanyLatestInvoice(company.id, initials);
-
-      // Other company-related updates...
     }
   };
   const fetchCompanyLatestInvoice = async (companyId, initials) => {
@@ -599,27 +627,26 @@ const InvoiceForm = () => {
           const latestInvoice = companyInvoices[0];
 
           if (latestInvoice && latestInvoice.invoiceNo) {
-            // Extract the sequence number part from the latest invoice number
-            const parts = latestInvoice.invoiceNo.split("-");
-            if (parts.length === 2) {
-              const latestSequence = parts[1];
-              const sequenceNumber = parseInt(latestSequence, 10);
+            // Extract the sequence number from the end of the invoice number
+            const invoiceNo = latestInvoice.invoiceNo;
+            const prefixLength = initials.length;
+            const latestSequence = invoiceNo.substring(prefixLength);
+            const sequenceNumber = parseInt(latestSequence, 10);
 
-              if (!isNaN(sequenceNumber)) {
-                const newSequence = (sequenceNumber + 1)
-                  .toString()
-                  .padStart(4, "0");
-                setInvoiceSequence(newSequence);
-                setInvoiceNumber(`${initials}-${newSequence}`);
-                return;
-              }
+            if (!isNaN(sequenceNumber)) {
+              const newSequence = (sequenceNumber + 1)
+                .toString()
+                .padStart(4, "0");
+              setInvoiceSequence(newSequence);
+              setInvoiceNumber(`${initials}${newSequence}`);
+              return;
             }
           }
         }
 
         // If no invoices found for this company or invalid format, start from 0001
         setInvoiceSequence("0001");
-        setInvoiceNumber(`${initials}-0001`);
+        setInvoiceNumber(`${initials}0001`);
       }
     } catch (error) {
       console.error("Error fetching company invoices:", error);
@@ -632,23 +659,29 @@ const InvoiceForm = () => {
   // Add function to update company initials
   const updateCompanyInitials = async (newInitials) => {
     if (selectedCompany) {
-      // Save to new configuration system
-      await saveCompanyInitials(selectedCompany.id, newInitials);
+      try {
+        console.log("🔄 Updating company initials to:", newInitials);
 
-      // Update the map (for backward compatibility)
-      setCompanyInitialsMap((prev) => ({
-        ...prev,
-        [selectedCompany.id]: newInitials,
-      }));
-      // Update current initials
-      setCompanyInitials(newInitials);
-      // Update invoice number
-      setInvoiceNumber(`${newInitials}-${invoiceSequence}`);
+        // Use configuration service which handles database + local storage
+        const success = await saveCompanyInitials(selectedCompany.id, newInitials);
+
+        if (success) {
+          // Update current initials
+          setCompanyInitials(newInitials);
+          // Update invoice number
+          setInvoiceNumber(`${newInitials}${invoiceSequence}`);
+          console.log("✅ Company initials updated successfully");
+        } else {
+          console.error("❌ Failed to save company initials");
+        }
+      } catch (error) {
+        console.error("❌ Error updating company initials:", error);
+      }
     }
   };
   const handleSequenceChange = (value) => {
     setInvoiceSequence(value);
-    setInvoiceNumber(`${companyInitials}-${value}`);
+    setInvoiceNumber(`${companyInitials}${value}`);
   };
   // Create a new function to find existing items
   const findExistingItem = (items, itemId) => {
@@ -689,6 +722,7 @@ const InvoiceForm = () => {
         ...existingItem,
         quantity: newQuantity.toString(),
         amount: (newQuantity * parseFloat(existingItem.rate || 0)).toFixed(2),
+        dbItemId: selectedItem.id, // Ensure dbItemId is set for duplicate items too
       };
 
       // If this was a new empty row, we should remove it
@@ -715,8 +749,9 @@ const InvoiceForm = () => {
     // Item doesn't exist yet, add it normally
     const updatedItems = items.map((item) => {
       if (item.id === rowId) {
-        // Add debugging to verify HSN value
-        console.log("HSN from selected item:", selectedItem.hsn);
+        // Add debugging to verify values
+        console.log("Selected item:", selectedItem);
+        console.log("Setting dbItemId to:", selectedItem.id);
         return {
           ...item,
           details: selectedItem.name,
@@ -726,6 +761,7 @@ const InvoiceForm = () => {
             (parseFloat(item.quantity) || 1) *
             (parseFloat(selectedItem.rate) || 0)
           ).toFixed(2),
+          dbItemId: selectedItem.id, // Set the database item ID here
         };
       }
       return item;
@@ -789,7 +825,6 @@ const InvoiceForm = () => {
       const calculatedTotal = subtotal + calculatedCgst + calculatedSgst;
 
       console.log("items max", items);
-      console.log("iiitem", itemsList);
       // Step 3: Prepare invoice data for database
       const invoiceForDB = {
         companyId: selectedCompany.id,
@@ -800,7 +835,7 @@ const InvoiceForm = () => {
         paymentTerms: paymentTerms,
         incomeLedger: incomeLedger,
         items: items.map((item) => ({
-          id: item.id,
+          id: item.dbItemId, // Use the actual database item ID (backend expects 'id' field)
           details: item.details || "",
           quantity: parseFloat(item.quantity) || 0,
           rate: parseFloat(item.rate) || 0,
@@ -970,6 +1005,7 @@ const InvoiceForm = () => {
         rate: "0.00",
         amount: "0.00",
         hsn: "",
+        dbItemId: null, // Initialize dbItemId as null for new rows
       },
     ]);
     setCustomerName("");
@@ -996,17 +1032,7 @@ const InvoiceForm = () => {
     console.log("Invoice saved and form reset");
   };
 
-  // Add this after your useState declarations
-  const generateCompanyInitials = (companyName) => {
-    if (!companyName) return "";
 
-    // Split the company name by spaces and take first letter of each word
-    return companyName
-      .split(/\s+/)
-      .map((word) => word[0]?.toUpperCase() || "")
-      .join("")
-      .substring(0, 6); // Changed from 3 to 6 to allow up to 6 characters
-  };
   const formatPaymentTerms = (value) => {
     return value ? `Net ${value}` : "Select or enter terms";
   };
@@ -1405,7 +1431,6 @@ const InvoiceForm = () => {
                       maxLength={6}
                       placeholder="ABC"
                     />
-                    <div className="flex items-center px-2 bg-gray-100 border rounded">-</div>
                     <Input
                       value={invoiceSequence}
                       onChange={(e) => handleSequenceChange(e.target.value)}
@@ -1583,6 +1608,7 @@ const InvoiceForm = () => {
                         rate: "0.00",
                         amount: "0.00",
                         hsn: "",
+                        dbItemId: null, // Initialize dbItemId as null for new rows
                       }));
                       setItems([...items, ...newRows]);
                     }}

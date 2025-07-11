@@ -253,8 +253,38 @@ export class ConfigurationService {
      */
     async getCompanyInitials(companyId) {
         await this.ensureInitialized();
-        const initialsMap = await this.settingsService.get(SETTINGS_KEYS.COMPANY_INITIALS_MAP) || {};
-        return initialsMap[companyId];
+        
+        try {
+            // First try to get from database
+            if (window.electron && window.electron.getCompanyInvoicePrefix) {
+                const response = await window.electron.getCompanyInvoicePrefix(companyId);
+                if (response.success && response.invoicePrefix) {
+                    console.log('✅ Got company initials from database:', response.invoicePrefix);
+                    return response.invoicePrefix;
+                }
+            }
+            
+            // // Check local storage for migration purposes only
+            // const initialsMap = await this.settingsService.get(SETTINGS_KEYS.COMPANY_INITIALS_MAP) || {};
+            // if (initialsMap[companyId]) {
+            //     console.log('🔄 Found initials in local storage, migrating to database:', initialsMap[companyId]);
+                
+            //     // Migrate to database
+            //     if (window.electron && window.electron.setCompanyInvoicePrefix) {
+            //         await window.electron.setCompanyInvoicePrefix(companyId, initialsMap[companyId]);
+            //         console.log('✅ Migrated initials to database');
+            //     }
+                
+            //     return initialsMap[companyId];
+            // }
+            
+            // No initials found - return empty string (caller will generate)
+            console.log('❌ No company initials found for company ID:', companyId);
+            return '';
+        } catch (error) {
+            console.error('❌ Error getting company initials:', error);
+            return '';
+        }
     }
 
     /**
@@ -265,9 +295,32 @@ export class ConfigurationService {
      */
     async setCompanyInitials(companyId, initials) {
         await this.ensureInitialized();
-        const current = await this.settingsService.get(SETTINGS_KEYS.COMPANY_INITIALS_MAP) || {};
-        current[companyId] = initials;
-        return await this.settingsService.set(SETTINGS_KEYS.COMPANY_INITIALS_MAP, current);
+        
+        try {
+            // Primary: Save to database
+            if (window.electron && window.electron.setCompanyInvoicePrefix) {
+                const response = await window.electron.setCompanyInvoicePrefix(companyId, initials);
+                if (response.success) {
+                    console.log('✅ Company initials saved to database:', initials);
+                    
+                    // Also save to local storage for backward compatibility during migration period
+                    const current = await this.settingsService.get(SETTINGS_KEYS.COMPANY_INITIALS_MAP) || {};
+                    current[companyId] = initials;
+                    await this.settingsService.set(SETTINGS_KEYS.COMPANY_INITIALS_MAP, current);
+                    
+                    return true;
+                } else {
+                    console.error('❌ Failed to save company initials to database:', response.error || 'Unknown error');
+                    return false;
+                }
+            }
+            
+            console.warn('⚠️ Database API not available, cannot save company initials');
+            return false;
+        } catch (error) {
+            console.error('❌ Error setting company initials:', error);
+            return false;
+        }
     }
 
     /**

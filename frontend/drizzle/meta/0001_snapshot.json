@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "3eef24b8-367e-4b43-907b-28d27d709400",
-  "prevId": "4e20c370-5995-4bc4-9331-6bbad0910865",
+  "id": "de60fed0-604e-447e-8d25-d7af0078ccce",
+  "prevId": "cb8cdbf8-9efc-4794-997c-e4391a4c9549",
   "tables": {
     "cases": {
       "name": "cases",
@@ -314,6 +314,13 @@
         },
         "compliance_standards": {
           "name": "compliance_standards",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "invoice_prefix": {
+          "name": "invoice_prefix",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -1449,7 +1456,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 1751988832903
+          "default": 1752136475057
         }
       },
       "indexes": {
@@ -1569,7 +1576,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 1751988832904
+          "default": 1752136475065
         }
       },
       "indexes": {},

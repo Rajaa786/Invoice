@@ -6,6 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "../ui/dialog";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -387,6 +388,9 @@ const CompanyForm = ({ open, onOpenChange, onSave }) => {
             <Building2 className="h-4 w-4" />
             Create New Company
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Create a new company profile with business and contact information
+          </DialogDescription>
           <Button
             onClick={fillDummyData}
             className="absolute right-12 top-4 bg-gray-100 hover:bg-gray-200 text-gray-900 text-xs"

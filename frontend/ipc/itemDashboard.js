@@ -239,7 +239,8 @@ function registerItemDashboardIpc() {
           // Create an array of objects for batch insert
           const companyItemsToInsert = companyIds.map(companyId => ({
             itemId,
-            companyId
+            companyId,
+            createdAt: new Date() // Add timestamp for new associations
           }));
           
           // Insert all new associations

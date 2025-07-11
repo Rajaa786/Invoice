@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Button } from '../ui/button';
@@ -20,7 +20,8 @@ import {
     RefreshCw,
     Check,
     AlertCircle,
-    Info
+    Info,
+    Building
 } from 'lucide-react';
 import InvoiceTemplateSettings from './InvoiceTemplateSettings';
 import SettingsDebugger from './SettingsDebugger';
@@ -29,7 +30,8 @@ import {
     useTemplateConfiguration,
     useAppConfiguration,
     useInvoiceConfiguration,
-    useUIConfiguration
+    useUIConfiguration,
+    useCompanyConfiguration
 } from '../../hooks/useConfiguration';
 
 const SettingsPage = () => {
@@ -69,6 +71,98 @@ const SettingsPage = () => {
         setNotifications,
         loading: uiLoading
     } = useUIConfiguration();
+
+    // Company configuration
+    const {
+        getCompanyInitials,
+        setCompanyInitials,
+        isInitialized: companyConfigInitialized
+    } = useCompanyConfiguration();
+
+    // State for company prefix management
+    const [companies, setCompanies] = useState([]);
+    const [companyPrefixes, setCompanyPrefixes] = useState({});
+    const [isLoadingCompanies, setIsLoadingCompanies] = useState(false);
+    const [prefixUpdateStatus, setPrefixUpdateStatus] = useState({});
+
+    // Load companies and their prefixes
+    useEffect(() => {
+        const loadCompaniesAndPrefixes = async () => {
+            if (!companyConfigInitialized) return;
+
+            setIsLoadingCompanies(true);
+            try {
+                // Fetch companies
+                if (window.electron && window.electron.getCompany) {
+                    const response = await window.electron.getCompany();
+                    if (response.success) {
+                        const companiesData = response.companies || [];
+                        setCompanies(companiesData);
+
+                        // Load prefixes for each company
+                        const prefixes = {};
+                        for (const company of companiesData) {
+                            try {
+                                const prefix = await getCompanyInitials(company.id);
+                                prefixes[company.id] = prefix || generateCompanyInitials(company.companyName);
+                            } catch (error) {
+                                console.error(`Error loading prefix for company ${company.id}:`, error);
+                                prefixes[company.id] = generateCompanyInitials(company.companyName);
+                            }
+                        }
+                        setCompanyPrefixes(prefixes);
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading companies and prefixes:', error);
+            } finally {
+                setIsLoadingCompanies(false);
+            }
+        };
+
+        loadCompaniesAndPrefixes();
+    }, [companyConfigInitialized, getCompanyInitials]);
+
+    // Helper function to generate company initials
+    const generateCompanyInitials = (companyName) => {
+        if (!companyName) return '';
+        return companyName
+            .split(/\s+/)
+            .map(word => word[0]?.toUpperCase() || '')
+            .join('')
+            .substring(0, 6);
+    };
+
+    // Update company prefix
+    const updateCompanyPrefix = async (companyId, newPrefix) => {
+        if (!newPrefix.trim()) return;
+
+        setPrefixUpdateStatus(prev => ({ ...prev, [companyId]: 'updating' }));
+
+        try {
+            const success = await setCompanyInitials(companyId, newPrefix.trim().toUpperCase());
+            if (success) {
+                setCompanyPrefixes(prev => ({ ...prev, [companyId]: newPrefix.trim().toUpperCase() }));
+                setPrefixUpdateStatus(prev => ({ ...prev, [companyId]: 'success' }));
+
+                // Clear success status after 2 seconds
+                setTimeout(() => {
+                    setPrefixUpdateStatus(prev => ({ ...prev, [companyId]: null }));
+                }, 2000);
+            } else {
+                setPrefixUpdateStatus(prev => ({ ...prev, [companyId]: 'error' }));
+                setTimeout(() => {
+                    setPrefixUpdateStatus(prev => ({ ...prev, [companyId]: null }));
+                }, 3000);
+            }
+        } catch (error) {
+            console.error('Error updating company prefix:', error);
+            setPrefixUpdateStatus(prev => ({ ...prev, [companyId]: 'error' }));
+            setTimeout(() => {
+                setPrefixUpdateStatus(prev => ({ ...prev, [companyId]: null }));
+            }, 3000);
+        }
+    };
 
     const handleSaveSettings = async (section) => {
         setIsLoading(true);
@@ -321,6 +415,103 @@ const SettingsPage = () => {
                                     onChange={(e) => updateInvoiceDefaults({ lateFee: e.target.value })}
                                     placeholder="0"
                                 />
+                            </div>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* Company Invoice Prefixes */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                        <Building className="w-5 h-5 text-blue-600" />
+                        Company Invoice Prefixes
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {isLoadingCompanies ? (
+                        <div className="flex items-center gap-2 text-gray-500">
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            Loading company settings...
+                        </div>
+                    ) : companies.length === 0 ? (
+                        <div className="text-center py-6 text-gray-500">
+                            <Building className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                            <p>No companies found</p>
+                            <p className="text-sm">Add companies to manage their invoice prefixes</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            <div className="text-sm text-gray-600 mb-4">
+                                Set custom invoice prefixes for each company. This will be used to generate invoice numbers (e.g., ABC0001).
+                            </div>
+                            {companies.map((company) => (
+                                <div key={company.id} className="flex items-center gap-3 p-3 border rounded-lg">
+                                    {company.logo && (
+                                        <div className="w-8 h-8 rounded border overflow-hidden flex-shrink-0">
+                                            <img
+                                                src={company.logo}
+                                                alt={`${company.companyName} logo`}
+                                                className="w-full h-full object-contain"
+                                            />
+                                        </div>
+                                    )}
+                                    <div className="flex-1">
+                                        <div className="font-medium text-sm">{company.companyName}</div>
+                                        <div className="text-xs text-gray-500">{company.city}, {company.state}</div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Input
+                                            value={companyPrefixes[company.id] || ''}
+                                            onChange={(e) => {
+                                                const value = e.target.value.toUpperCase().slice(0, 6);
+                                                setCompanyPrefixes(prev => ({
+                                                    ...prev,
+                                                    [company.id]: value
+                                                }));
+                                            }}
+                                            onBlur={(e) => {
+                                                const value = e.target.value.trim();
+                                                if (value && value !== (companyPrefixes[company.id] || '')) {
+                                                    updateCompanyPrefix(company.id, value);
+                                                }
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    const value = e.target.value.trim();
+                                                    if (value && value !== (companyPrefixes[company.id] || '')) {
+                                                        updateCompanyPrefix(company.id, value);
+                                                    }
+                                                }
+                                            }}
+                                            placeholder="ABC"
+                                            className="w-20 text-center text-sm"
+                                            maxLength={6}
+                                        />
+                                        <div className="w-20 text-center">
+                                            {prefixUpdateStatus[company.id] === 'updating' && (
+                                                <RefreshCw className="w-4 h-4 animate-spin text-blue-500 mx-auto" />
+                                            )}
+                                            {prefixUpdateStatus[company.id] === 'success' && (
+                                                <Check className="w-4 h-4 text-green-500 mx-auto" />
+                                            )}
+                                            {prefixUpdateStatus[company.id] === 'error' && (
+                                                <AlertCircle className="w-4 h-4 text-red-500 mx-auto" />
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
+                                <div className="flex items-start gap-2">
+                                    <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                                    <div className="text-sm text-blue-700">
+                                        <strong>Invoice Numbering:</strong> Prefixes are used to generate unique invoice numbers.
+                                        For example, a prefix "ABC" will create invoice numbers like ABC0001, ABC0002, etc.
+                                        Changes are auto-saved when you finish editing.
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}

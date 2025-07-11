@@ -5,6 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "../ui/dialog";
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
@@ -372,10 +373,10 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
 
         // Update customer-company association
         if (result.success) {
-          const updateCompanyResult = await window.electron.updateCustomerCompanies({
-            customerId: editCustomer.id,
-            companyIds: formData.companyId ? [formData.companyId] : []
-          });
+          const updateCompanyResult = await window.electron.updateCustomerCompanies(
+            editCustomer.id,
+            formData.companyId ? [formData.companyId] : []
+          );
 
           if (!updateCompanyResult.success) {
             console.error("Failed to update customer-company association:", updateCompanyResult.error);
@@ -387,11 +388,11 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
 
         // Add customer-company association for new customer
         if (result.success && formData.companyId) {
-          const newCustomerId = result.result.id;
-          const updateCompanyResult = await window.electron.updateCustomerCompanies({
-            customerId: newCustomerId,
-            companyIds: [formData.companyId]
-          });
+          const newCustomerId = result.result.lastInsertRowid; // Use lastInsertRowid for new customer
+          const updateCompanyResult = await window.electron.updateCustomerCompanies(
+            newCustomerId,
+            [formData.companyId]
+          );
 
           if (!updateCompanyResult.success) {
             console.error("Failed to add customer-company association:", updateCompanyResult.error);
@@ -402,6 +403,41 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
       if (result.success) {
         console.log("Customer saved:", result.result);
         if (onSave) onSave(result.result);
+
+        // Reset form state after successful save
+        if (!editCustomer) {
+          setFormData({
+            customerType: "Business",
+            salutation: "Mr.",
+            firstName: "",
+            lastName: "",
+            panNumber: "",
+            companyName: "",
+            currency: "INR",
+            gstApplicable: "No",
+            gstin: "",
+            stateCode: "",
+            companyId: "",
+            billingCountry: "India",
+            billingState: "",
+            billingCity: "",
+            billingAddressLine1: "",
+            billingAddressLine2: "",
+            billingContactNo: "",
+            billingEmail: "",
+            billingAlternateContactNo: "",
+            shippingCountry: "India",
+            shippingState: "",
+            shippingCity: "",
+            shippingAddressLine1: "",
+            shippingAddressLine2: "",
+            shippingContactNo: "",
+            shippingEmail: "",
+            shippingAlternateContactNo: "",
+          });
+          setSelectedCompany(null);
+          setErrors({});
+        }
         onOpenChange(false);
       } else {
         console.error("Failed to save customer:", result.error);
@@ -422,6 +458,16 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
     const randomCity = stateCityMapping[randomState][0];
     const isGstApplicable = Math.random() > 0.5 ? "Yes" : "No";
 
+    // If there are companies available, select a random one
+    if (companies.length > 0) {
+      const randomCompany = companies[Math.floor(Math.random() * companies.length)];
+      setSelectedCompany(randomCompany);
+      setFormData(prev => ({
+        ...prev,
+        companyId: randomCompany.id
+      }));
+    }
+
     const dummyData = {
       customerType: Math.random() > 0.5 ? "Business" : "Individual",
       salutation: "Mr.",
@@ -433,6 +479,7 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
       gstApplicable: isGstApplicable,
       gstin: isGstApplicable === "Yes" ? "27AABCT1234A1Z5" : "",
       stateCode: isGstApplicable === "Yes" ? "27" : "",
+      companyId: selectedCompany?.id || "", // Preserve the selected company ID
 
       // Billing address
       billingCountry: "India",
@@ -475,6 +522,19 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editCustomer ? "Edit Customer" : "Add New Customer"}</DialogTitle>
+            <DialogDescription className="sr-only">
+              {editCustomer ? "Edit existing customer details" : "Add a new customer to the system"}
+            </DialogDescription>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={generateDummyData}
+              className="h-8 text-xs gap-1.5"
+            >
+              <Wand2 className="w-3 h-3" />
+              Generate Test Data
+            </Button>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
@@ -785,57 +845,6 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
                             </Badge>
                           )}
                         </div>
-                      </div>
-                    </div>
-
-                    {/* Company Association Section */}
-                    <div className="pt-4 border-t">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Building className="w-3 h-3 text-primary" />
-                        <h3 className="text-xs font-medium">Company Association</h3>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Associate with Company</Label>
-                        <div className="max-h-[150px] overflow-y-auto border rounded-md p-2">
-                          {isLoadingCompanies ? (
-                            <div className="flex justify-center items-center h-20">
-                              <p className="text-xs text-muted-foreground">Loading companies...</p>
-                            </div>
-                          ) : companies.length === 0 ? (
-                            <div className="flex justify-center items-center h-20">
-                              <p className="text-xs text-muted-foreground">No companies found</p>
-                            </div>
-                          ) : (
-                            <RadioGroup
-                              value={formData.companyId}
-                              onValueChange={handleCompanySelection}
-                              className="space-y-2"
-                            >
-                              {companies.map((company) => (
-                                <div key={company.id} className="flex items-center space-x-2">
-                                  <RadioGroupItem
-                                    value={company.id}
-                                    id={`company-${company.id}`}
-                                    className="text-primary"
-                                  />
-                                  <label htmlFor={`company-${company.id}`} className="text-xs cursor-pointer">
-                                    {company.companyName}
-                                  </label>
-                                </div>
-                              ))}
-                            </RadioGroup>
-                          )}
-                        </div>
-                        {errors.companyId && (
-                          <p className="text-destructive text-[10px] flex items-center gap-1">
-                            <AlertCircle className="w-2.5 h-2.5" />
-                            {errors.companyId}
-                          </p>
-                        )}
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Select the company this customer should be associated with. Customers will only be available for invoices from the selected company.
-                        </p>
                       </div>
                     </div>
 

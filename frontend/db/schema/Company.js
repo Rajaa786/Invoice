@@ -55,6 +55,9 @@ const companies = sqliteTable("companies", {
   // Compliance and Certifications
   certifications: text("certifications"), // JSON string of certifications
   complianceStandards: text("compliance_standards"), // JSON string of standards
+
+  // Invoice Settings
+  invoicePrefix: text("invoice_prefix"), // Custom prefix for invoice numbering (e.g., "ABC", "XYZ-2024")
 });
 
 module.exports = { companies };

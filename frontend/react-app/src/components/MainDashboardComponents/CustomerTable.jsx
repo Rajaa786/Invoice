@@ -57,7 +57,7 @@ const CustomerTable = ({ data = [], loading = false, onRefresh }) => {
     const columns = [
         {
             header: "Customer",
-            accessor: "companyName",
+            accessor: "firstName",
             sortable: true,
             cell: (row) => (
                 <div className="flex items-center gap-1 min-w-0 max-w-[160px]">
@@ -71,7 +71,7 @@ const CustomerTable = ({ data = [], loading = false, onRefresh }) => {
                     </div>
                     <div className="min-w-0 flex-1">
                         <div className="font-medium text-xs truncate">
-                            {row.companyName || `${row.firstName || ''} ${row.lastName || ''}`.trim()}
+                            {`${row.firstName || ''} ${row.lastName || ''}`.trim() || 'N/A'}
                         </div>
                         <div className="text-xs text-gray-500 truncate capitalize">{row.customerType}</div>
                     </div>

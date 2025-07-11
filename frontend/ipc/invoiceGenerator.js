@@ -12,7 +12,205 @@ const { sql } = require("drizzle-orm");
 const dbManager = DatabaseManager.getInstance();
 const db = dbManager.getDatabase();
 log.debug("Database instance initialized:", !!db);
+
+// Helper functions for invoice number pattern recognition and generation
+function analyzeInvoicePattern(invoiceNo) {
+  log.info("🔍 Analyzing invoice number pattern:", invoiceNo);
+
+  // Common patterns:
+  // 1. PREFIX-NUMBER (e.g., INV-0001, R-P-0001)
+  // 2. PREFIX/YYYY/MM/NUMBER (e.g., INV/2024/03/0001)
+  // 3. PREFIX-YYYY-SEQUENCE (e.g., INV-2024-0001)
+  // 4. YYYY-PREFIX-SEQUENCE (e.g., 2024-INV-0001)
+  // 5. Simple sequence with prefix (e.g., INV0001)
+
+  const patterns = [
+    {
+      // Pattern: PREFIX/YYYY/MM/SEQUENCE
+      regex: /^([A-Za-z-]+)\/(\d{4})\/(\d{2})\/(\d+)$/,
+      type: 'date-based',
+      extract: (match) => ({
+        prefix: match[1],
+        year: match[2],
+        month: match[3],
+        sequence: parseInt(match[4], 10),
+        format: 'prefix/year/month/sequence'
+      })
+    },
+    {
+      // Pattern: PREFIX-YYYY-SEQUENCE
+      regex: /^([A-Za-z-]+)-(\d{4})-(\d+)$/,
+      type: 'year-based',
+      extract: (match) => ({
+        prefix: match[1],
+        year: match[2],
+        sequence: parseInt(match[3], 10),
+        format: 'prefix-year-sequence'
+      })
+    },
+    {
+      // Pattern: YYYY-PREFIX-SEQUENCE
+      regex: /^(\d{4})-([A-Za-z-]+)-(\d+)$/,
+      type: 'year-prefix',
+      extract: (match) => ({
+        year: match[1],
+        prefix: match[2],
+        sequence: parseInt(match[3], 10),
+        format: 'year-prefix-sequence'
+      })
+    },
+    {
+      // Pattern: PREFIX-NUMBER (with optional multi-part prefix)
+      regex: /^([A-Za-z]-[A-Za-z]-|[A-Za-z]-|[A-Za-z]+)(\d+)$/,
+      type: 'simple',
+      extract: (match) => ({
+        prefix: match[1],
+        sequence: parseInt(match[2], 10),
+        format: 'prefix-sequence'
+      })
+    }
+  ];
+
+  for (const pattern of patterns) {
+    const match = invoiceNo.match(pattern.regex);
+    if (match) {
+      const result = pattern.extract(match);
+      log.info("✅ Pattern recognized:", {
+        originalNumber: invoiceNo,
+        patternType: pattern.type,
+        ...result
+      });
+      return result;
+    }
+  }
+
+  // If no pattern matches, treat the whole string as a sequence
+  log.warn("⚠️ No standard pattern recognized, treating as simple sequence:", invoiceNo);
+  return {
+    prefix: '',
+    sequence: parseInt(invoiceNo, 10) || 0,
+    format: 'sequence-only'
+  };
+}
+
+function generateNextNumber(pattern, sequence, padding = 4) {
+  const now = new Date();
+  const currentYear = now.getFullYear().toString();
+  const currentMonth = (now.getMonth() + 1).toString().padStart(2, '0');
+  
+  switch (pattern.format) {
+    case 'prefix/year/month/sequence':
+      // Reset sequence if year/month changes
+      if (pattern.year !== currentYear || pattern.month !== currentMonth) {
+        sequence = 1;
+      }
+      return `${pattern.prefix}/${currentYear}/${currentMonth}/${sequence.toString().padStart(padding, '0')}`;
+    
+    case 'prefix-year-sequence':
+      // Reset sequence if year changes
+      if (pattern.year !== currentYear) {
+        sequence = 1;
+      }
+      return `${pattern.prefix}-${currentYear}-${sequence.toString().padStart(padding, '0')}`;
+    
+    case 'year-prefix-sequence':
+      // Reset sequence if year changes
+      if (pattern.year !== currentYear) {
+        sequence = 1;
+      }
+      return `${currentYear}-${pattern.prefix}-${sequence.toString().padStart(padding, '0')}`;
+    
+    case 'prefix-sequence':
+      return `${pattern.prefix}${sequence.toString().padStart(padding, '0')}`;
+    
+    default:
+      return sequence.toString().padStart(padding, '0');
+  }
+}
+
 function registerInvoiceGeneratorIpc() {
+  // Add new handler for getting next invoice number
+  ipcMain.handle("get-next-invoice-number", async (event, prefix = 'R') => {
+    try {
+      log.info("🔄 Starting invoice number generation process");
+      log.info("📌 Requested prefix:", prefix);
+      
+      // Get the latest invoice number with this prefix
+      log.info("🔍 Searching for existing invoices with prefix pattern");
+      const result = await db
+        .select({ invoiceNo: invoices.invoiceNo })
+        .from(invoices)
+        .where(sql`invoice_no LIKE ${prefix + '%'}`)
+        .orderBy(sql`invoice_no DESC`)
+        .limit(1);
+
+      log.info("📊 Database query result:", {
+        found: result.length > 0,
+        existingInvoices: result
+      });
+
+      if (result.length === 0) {
+        // No existing invoices with this prefix
+        // Generate first number based on prefix pattern
+        const now = new Date();
+        const currentYear = now.getFullYear().toString();
+        const currentMonth = (now.getMonth() + 1).toString().padStart(2, '0');
+        
+        // Determine if prefix contains date pattern indicators
+        let newNumber;
+        if (prefix.includes('YYYY') || prefix.includes('MM')) {
+          newNumber = prefix
+            .replace('YYYY', currentYear)
+            .replace('MM', currentMonth)
+            .replace('####', '0001');
+        } else {
+          newNumber = `${prefix}0001`;
+        }
+
+        log.info("✨ Creating first invoice number:", {
+          prefix,
+          newNumber,
+          reason: "No existing invoices with this prefix"
+        });
+        return { success: true, invoiceNumber: newNumber };
+      }
+
+      // Analyze the pattern of the last invoice number
+      const lastInvoiceNo = result[0].invoiceNo;
+      const pattern = analyzeInvoicePattern(lastInvoiceNo);
+      
+      log.info("📝 Analyzed last invoice pattern:", {
+        lastInvoiceNo,
+        pattern
+      });
+
+      // Generate next number based on the pattern
+      const nextSequence = pattern.sequence + 1;
+      const nextNumber = generateNextNumber(pattern, nextSequence);
+
+      log.info("✅ Generated next invoice number:", {
+        lastInvoiceNo,
+        pattern,
+        nextSequence,
+        nextNumber,
+        steps: {
+          patternRecognition: pattern.format,
+          sequenceIncrement: nextSequence,
+          finalNumber: nextNumber
+        }
+      });
+
+      return { success: true, invoiceNumber: nextNumber };
+    } catch (error) {
+      log.error('❌ Error generating next invoice number:', {
+        error: error.message,
+        stack: error.stack,
+        prefix
+      });
+      return { success: false, error: error.message };
+    }
+  });
+
   // Create a new invoice
   ipcMain.handle("add-invoice", async (event, invoiceData) => {
     try {

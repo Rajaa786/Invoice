@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld("electron", {
   deleteCompany: (id) => ipcRenderer.invoke("delete-company", id),
   getCompanyImage: (imagePath) =>
     ipcRenderer.invoke("get-company-image", imagePath),
+  getCompanyInvoicePrefix: (companyId) => ipcRenderer.invoke("get-company-invoice-prefix", companyId),
+  setCompanyInvoicePrefix: (companyId, invoicePrefix) => ipcRenderer.invoke("set-company-invoice-prefix", companyId, invoicePrefix),
 
   // Customer operations
   addCustomer: (data) => ipcRenderer.invoke("add-customer", data),
@@ -40,6 +42,7 @@ contextBridge.exposeInMainWorld("electron", {
 
   getAllInvoices: () => ipcRenderer.invoke("invoice:getAll"),
   getInvoiceById: (id) => ipcRenderer.invoke("invoice:getById", id),
+  getNextInvoiceNumber: (prefix) => ipcRenderer.invoke("get-next-invoice-number", prefix),
   uploadLedgerToTally: (data, port, tallyVersion) =>
     ipcRenderer.invoke("ledger-create", data, port, tallyVersion),
   uploadSalesToTally: (data, port) =>
