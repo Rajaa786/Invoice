@@ -82,6 +82,7 @@ const SettingsPage = () => {
     // State for company prefix management
     const [companies, setCompanies] = useState([]);
     const [companyPrefixes, setCompanyPrefixes] = useState({});
+    const [editBuffers, setEditBuffers] = useState({}); // local edit state for each company
     const [isLoadingCompanies, setIsLoadingCompanies] = useState(false);
     const [prefixUpdateStatus, setPrefixUpdateStatus] = useState({});
 
@@ -101,16 +102,20 @@ const SettingsPage = () => {
 
                         // Load prefixes for each company
                         const prefixes = {};
+                        const buffers = {};
                         for (const company of companiesData) {
                             try {
                                 const prefix = await getCompanyInitials(company.id);
                                 prefixes[company.id] = prefix || generateCompanyInitials(company.companyName);
+                                buffers[company.id] = prefix || generateCompanyInitials(company.companyName);
                             } catch (error) {
                                 console.error(`Error loading prefix for company ${company.id}:`, error);
                                 prefixes[company.id] = generateCompanyInitials(company.companyName);
+                                buffers[company.id] = generateCompanyInitials(company.companyName);
                             }
                         }
                         setCompanyPrefixes(prefixes);
+                        setEditBuffers(buffers);
                     }
                 }
             } catch (error) {
@@ -136,16 +141,13 @@ const SettingsPage = () => {
     // Update company prefix
     const updateCompanyPrefix = async (companyId, newPrefix) => {
         if (!newPrefix.trim()) return;
-
         setPrefixUpdateStatus(prev => ({ ...prev, [companyId]: 'updating' }));
-
         try {
             const success = await setCompanyInitials(companyId, newPrefix.trim().toUpperCase());
             if (success) {
                 setCompanyPrefixes(prev => ({ ...prev, [companyId]: newPrefix.trim().toUpperCase() }));
+                setEditBuffers(prev => ({ ...prev, [companyId]: newPrefix.trim().toUpperCase() }));
                 setPrefixUpdateStatus(prev => ({ ...prev, [companyId]: 'success' }));
-
-                // Clear success status after 2 seconds
                 setTimeout(() => {
                     setPrefixUpdateStatus(prev => ({ ...prev, [companyId]: null }));
                 }, 2000);
@@ -463,36 +465,30 @@ const SettingsPage = () => {
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Input
-                                            value={companyPrefixes[company.id] || ''}
+                                            value={editBuffers[company.id] || ''}
                                             onChange={(e) => {
                                                 const value = e.target.value.toUpperCase().slice(0, 6);
-                                                setCompanyPrefixes(prev => ({
-                                                    ...prev,
-                                                    [company.id]: value
-                                                }));
-                                            }}
-                                            onBlur={(e) => {
-                                                const value = e.target.value.trim();
-                                                if (value && value !== (companyPrefixes[company.id] || '')) {
-                                                    updateCompanyPrefix(company.id, value);
-                                                }
-                                            }}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    const value = e.target.value.trim();
-                                                    if (value && value !== (companyPrefixes[company.id] || '')) {
-                                                        updateCompanyPrefix(company.id, value);
-                                                    }
-                                                }
+                                                setEditBuffers(prev => ({ ...prev, [company.id]: value }));
                                             }}
                                             placeholder="ABC"
                                             className="w-20 text-center text-sm"
                                             maxLength={6}
                                         />
-                                        <div className="w-20 text-center">
-                                            {prefixUpdateStatus[company.id] === 'updating' && (
-                                                <RefreshCw className="w-4 h-4 animate-spin text-blue-500 mx-auto" />
-                                            )}
+                                        {editBuffers[company.id] !== companyPrefixes[company.id] && !!editBuffers[company.id] && (
+                                            <Button
+                                                size="sm"
+                                                onClick={() => updateCompanyPrefix(company.id, editBuffers[company.id])}
+                                                disabled={prefixUpdateStatus[company.id] === 'updating'}
+                                                className="px-3 py-1 text-xs"
+                                            >
+                                                {prefixUpdateStatus[company.id] === 'updating' ? (
+                                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                    'Save'
+                                                )}
+                                            </Button>
+                                        )}
+                                        <div className="w-8 text-center">
                                             {prefixUpdateStatus[company.id] === 'success' && (
                                                 <Check className="w-4 h-4 text-green-500 mx-auto" />
                                             )}

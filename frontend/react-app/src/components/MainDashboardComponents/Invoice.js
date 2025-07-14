@@ -294,70 +294,10 @@ export default function GenerateReport() {
   }, []);
 
   return (
-    <div className="p-8 pt-4 space-y-6 bg-white dark:bg-black">
-      <div className="flex justify-between items-center">
-        <h2 className="text-3xl font-bold tracking-tight">Invoice Generator</h2>
-
-        {/* Status Statistics */}
-        <div className="grid grid-cols-4 gap-4">
-          <Card className="border-red-200">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-red-600 flex items-center gap-1">
-                <AlertTriangle className="h-4 w-4" />
-                Overdue
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-700">{statusStats.overdue}</div>
-              <p className="text-xs text-red-600">{formatCurrency(statusStats.overdueAmount)}</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-yellow-200">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-yellow-600 flex items-center gap-1">
-                <Clock className="h-4 w-4" />
-                Due Soon
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-700">{statusStats.dueSoon}</div>
-              <p className="text-xs text-yellow-600">Within 7 days</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-blue-200">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-blue-600 flex items-center gap-1">
-                <AlertCircle className="h-4 w-4" />
-                Pending
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-700">{statusStats.pending}</div>
-              <p className="text-xs text-blue-600">Not due yet</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-green-200">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-green-600 flex items-center gap-1">
-                <CheckCircle className="h-4 w-4" />
-                Paid
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-700">{statusStats.paid}</div>
-              <p className="text-xs text-green-600">Completed</p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
+    <div className="space-y-2 bg-white dark:bg-black">
       <div>
         <InvoiceForm />
       </div>
-
       <div>
         {loading ? (
           <div className="flex justify-center items-center h-40 space-x-2 text-primary">

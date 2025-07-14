@@ -172,31 +172,31 @@ function registerItemDashboardIpc() {
     ipcMain.handle("get-item-companies", async (event, itemId) => {
       try {
         log.debug("📋 Received get-item-companies request for item ID:", itemId);
-        
+
         // First, check if the item exists
         const itemExists = await db
           .select({ id: items.id })
           .from(items)
           .where(eq(items.id, itemId))
           .get();
-          
+
         if (!itemExists) {
           log.warn("⚠️ No item found with ID:", itemId);
           return { success: false, error: "Item not found" };
         }
-        
+
         // Get all company IDs associated with this item
         const companyItemsResult = await db
           .select({ companyId: companyItems.companyId })
           .from(companyItems)
           .where(eq(companyItems.itemId, itemId));
-          
+
         // Get the full company details for each company ID
         const companiesResult = await db
           .select()
           .from(companies)
           .where(eq(companies.id, companyItemsResult.map(ci => ci.companyId)));
-          
+
         log.info(`✅ Retrieved ${companiesResult.length} companies for item ID: ${itemId}`);
         return { success: true, companies: companiesResult };
       } catch (err) {
@@ -210,30 +210,30 @@ function registerItemDashboardIpc() {
       }
     });
     log.info("✅ IPC handler 'get-item-companies' registered successfully");
-    
+
     // Register the IPC handler for updating companies associated with an item
     ipcMain.handle("update-item-companies", async (event, itemId, companyIds) => {
       try {
         log.info("📝 Updating companies for item ID:", itemId);
         log.debug("📝 New company IDs:", companyIds);
-        
+
         // First, check if the item exists
         const itemExists = await db
           .select({ id: items.id })
           .from(items)
           .where(eq(items.id, itemId))
           .get();
-          
+
         if (!itemExists) {
           log.warn("⚠️ No item found with ID:", itemId);
           return { success: false, error: "Item not found" };
         }
-        
+
         // Delete all existing associations for this item
         await db
           .delete(companyItems)
           .where(eq(companyItems.itemId, itemId));
-          
+
         // If there are company IDs to add, insert them
         if (companyIds && companyIds.length > 0) {
           // Create an array of objects for batch insert
@@ -242,11 +242,11 @@ function registerItemDashboardIpc() {
             companyId,
             createdAt: new Date() // Add timestamp for new associations
           }));
-          
+
           // Insert all new associations
           await db.insert(companyItems).values(companyItemsToInsert);
         }
-        
+
         log.info(`✅ Updated companies for item ID: ${itemId}. Added ${companyIds?.length || 0} associations.`);
         return { success: true };
       } catch (err) {
@@ -261,7 +261,7 @@ function registerItemDashboardIpc() {
       }
     });
     log.info("✅ IPC handler 'update-item-companies' registered successfully");
-    
+
   } catch (err) {
     log.error("❌ Failed to initialize item dashboard IPC:", {
       error: err.message,

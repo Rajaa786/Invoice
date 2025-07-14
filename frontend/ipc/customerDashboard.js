@@ -227,31 +227,31 @@ function registerCustomerDashboardIpc() {
     ipcMain.handle("get-customer-companies", async (event, customerId) => {
       try {
         log.debug("📋 Received get-customer-companies request for customer ID:", customerId);
-        
+
         // First, check if the customer exists
         const customerExists = await db
           .select({ id: customers.id })
           .from(customers)
           .where(eq(customers.id, customerId))
           .get();
-          
+
         if (!customerExists) {
           log.warn("⚠️ No customer found with ID:", customerId);
           return { success: false, error: "Customer not found" };
         }
-        
+
         // Get all company IDs associated with this customer
         const companyCustomersResult = await db
           .select({ companyId: companyCustomers.companyId })
           .from(companyCustomers)
           .where(eq(companyCustomers.customerId, customerId));
-          
+
         // Get the full company details for each company ID
         const companiesResult = await db
           .select()
           .from(companies)
           .where(eq(companies.id, companyCustomersResult.map(cc => cc.companyId)));
-          
+
         log.info(`✅ Retrieved ${companiesResult.length} companies for customer ID: ${customerId}`);
         return { success: true, result: companiesResult };
       } catch (err) {
@@ -265,30 +265,30 @@ function registerCustomerDashboardIpc() {
       }
     });
     log.info("✅ IPC handler 'get-customer-companies' registered successfully");
-    
+
     // Register the IPC handler for updating companies associated with a customer
     ipcMain.handle("update-customer-companies", async (event, customerId, companyIds) => {
       try {
         log.info("📝 Updating companies for customer ID:", customerId);
         log.debug("📝 New company IDs:", companyIds);
-        
+
         // First, check if the customer exists
         const customerExists = await db
           .select({ id: customers.id })
           .from(customers)
           .where(eq(customers.id, customerId))
           .get();
-          
+
         if (!customerExists) {
           log.warn("⚠️ No customer found with ID:", customerId);
           return { success: false, error: "Customer not found" };
         }
-        
+
         // Delete all existing associations for this customer
         await db
           .delete(companyCustomers)
           .where(eq(companyCustomers.customerId, customerId));
-          
+
         // If there are company IDs to add, insert them
         if (companyIds && companyIds.length > 0) {
           // Create an array of objects for batch insert
@@ -297,11 +297,11 @@ function registerCustomerDashboardIpc() {
             companyId,
             createdAt: new Date() // Add timestamp for new associations
           }));
-          
+
           // Insert all new associations
           await db.insert(companyCustomers).values(companyCustomersToInsert);
         }
-        
+
         log.info(`✅ Updated companies for customer ID: ${customerId}. Added ${companyIds?.length || 0} associations.`);
         return { success: true };
       } catch (err) {
@@ -316,7 +316,7 @@ function registerCustomerDashboardIpc() {
       }
     });
     log.info("✅ IPC handler 'update-customer-companies' registered successfully");
-    
+
   } catch (err) {
     log.error("❌ Failed to initialize customer dashboard IPC:", {
       error: err.message,

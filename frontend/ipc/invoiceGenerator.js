@@ -13,134 +13,62 @@ const dbManager = DatabaseManager.getInstance();
 const db = dbManager.getDatabase();
 log.debug("Database instance initialized:", !!db);
 
-// Helper functions for invoice number pattern recognition and generation
-function analyzeInvoicePattern(invoiceNo) {
-  log.info("🔍 Analyzing invoice number pattern:", invoiceNo);
-
-  // Common patterns:
-  // 1. PREFIX-NUMBER (e.g., INV-0001, R-P-0001)
-  // 2. PREFIX/YYYY/MM/NUMBER (e.g., INV/2024/03/0001)
-  // 3. PREFIX-YYYY-SEQUENCE (e.g., INV-2024-0001)
-  // 4. YYYY-PREFIX-SEQUENCE (e.g., 2024-INV-0001)
-  // 5. Simple sequence with prefix (e.g., INV0001)
-
-  const patterns = [
-    {
-      // Pattern: PREFIX/YYYY/MM/SEQUENCE
-      regex: /^([A-Za-z-]+)\/(\d{4})\/(\d{2})\/(\d+)$/,
-      type: 'date-based',
-      extract: (match) => ({
-        prefix: match[1],
-        year: match[2],
-        month: match[3],
-        sequence: parseInt(match[4], 10),
-        format: 'prefix/year/month/sequence'
-      })
-    },
-    {
-      // Pattern: PREFIX-YYYY-SEQUENCE
-      regex: /^([A-Za-z-]+)-(\d{4})-(\d+)$/,
-      type: 'year-based',
-      extract: (match) => ({
-        prefix: match[1],
-        year: match[2],
-        sequence: parseInt(match[3], 10),
-        format: 'prefix-year-sequence'
-      })
-    },
-    {
-      // Pattern: YYYY-PREFIX-SEQUENCE
-      regex: /^(\d{4})-([A-Za-z-]+)-(\d+)$/,
-      type: 'year-prefix',
-      extract: (match) => ({
-        year: match[1],
-        prefix: match[2],
-        sequence: parseInt(match[3], 10),
-        format: 'year-prefix-sequence'
-      })
-    },
-    {
-      // Pattern: PREFIX-NUMBER (with optional multi-part prefix)
-      regex: /^([A-Za-z]-[A-Za-z]-|[A-Za-z]-|[A-Za-z]+)(\d+)$/,
-      type: 'simple',
-      extract: (match) => ({
-        prefix: match[1],
-        sequence: parseInt(match[2], 10),
+// Helper function for invoice number pattern recognition and generation
+/**
+ * Analyzes an invoice number given a known prefix.
+ * Example: invoiceNo = 'PRO-CYP0001', prefix = 'PRO-CYP' => { prefix: 'PRO-CYP', sequence: 1, format: 'prefix-sequence' }
+ */
+function analyzeInvoicePattern(invoiceNo, prefix) {
+  log.info("🔍 Analyzing invoice number pattern:", invoiceNo, "with prefix:", prefix);
+  if (prefix && invoiceNo.startsWith(prefix)) {
+    const sequencePart = invoiceNo.slice(prefix.length);
+    log.info("🔍 Sequence part:", sequencePart);
+    if (/^\d+$/.test(sequencePart)) {
+      log.info("🔍 Sequence part is a number:", sequencePart);
+      return {
+        prefix,
+        sequence: parseInt(sequencePart, 10),
         format: 'prefix-sequence'
-      })
-    }
-  ];
-
-  for (const pattern of patterns) {
-    const match = invoiceNo.match(pattern.regex);
-    if (match) {
-      const result = pattern.extract(match);
-      log.info("✅ Pattern recognized:", {
-        originalNumber: invoiceNo,
-        patternType: pattern.type,
-        ...result
-      });
-      return result;
+      };
     }
   }
-
-  // If no pattern matches, treat the whole string as a sequence
-  log.warn("⚠️ No standard pattern recognized, treating as simple sequence:", invoiceNo);
+  // Fallback: treat as sequence-only if not matching
+  log.warn("⚠️ Invoice number does not match expected prefix+sequence pattern:", invoiceNo, prefix);
   return {
-    prefix: '',
-    sequence: parseInt(invoiceNo, 10) || 0,
-    format: 'sequence-only'
+    prefix: prefix || '',
+    sequence: 0,
+    format: 'prefix-sequence'
   };
 }
 
+/**
+ * Generates the next invoice number given a pattern and sequence.
+ * Example: pattern = { prefix: 'PRO-CYP', sequence: 1 }, nextSequence = 2 => 'PRO-CYP0002'
+ */
 function generateNextNumber(pattern, sequence, padding = 4) {
-  const now = new Date();
-  const currentYear = now.getFullYear().toString();
-  const currentMonth = (now.getMonth() + 1).toString().padStart(2, '0');
-  
-  switch (pattern.format) {
-    case 'prefix/year/month/sequence':
-      // Reset sequence if year/month changes
-      if (pattern.year !== currentYear || pattern.month !== currentMonth) {
-        sequence = 1;
-      }
-      return `${pattern.prefix}/${currentYear}/${currentMonth}/${sequence.toString().padStart(padding, '0')}`;
-    
-    case 'prefix-year-sequence':
-      // Reset sequence if year changes
-      if (pattern.year !== currentYear) {
-        sequence = 1;
-      }
-      return `${pattern.prefix}-${currentYear}-${sequence.toString().padStart(padding, '0')}`;
-    
-    case 'year-prefix-sequence':
-      // Reset sequence if year changes
-      if (pattern.year !== currentYear) {
-        sequence = 1;
-      }
-      return `${currentYear}-${pattern.prefix}-${sequence.toString().padStart(padding, '0')}`;
-    
-    case 'prefix-sequence':
-      return `${pattern.prefix}${sequence.toString().padStart(padding, '0')}`;
-    
-    default:
-      return sequence.toString().padStart(padding, '0');
-  }
+  return `${pattern.prefix}${sequence.toString().padStart(padding, '0')}`;
 }
 
 function registerInvoiceGeneratorIpc() {
-  // Add new handler for getting next invoice number
-  ipcMain.handle("get-next-invoice-number", async (event, prefix = 'R') => {
+  // Add new handler for getting next invoice number with invoice type support
+  ipcMain.handle("get-next-invoice-number", async (event, prefix = 'R', invoiceType = 'tax') => {
     try {
       log.info("🔄 Starting invoice number generation process");
       log.info("📌 Requested prefix:", prefix);
-      
-      // Get the latest invoice number with this prefix
-      log.info("🔍 Searching for existing invoices with prefix pattern");
+      log.info("📌 Invoice type:", invoiceType);
+
+      // Add type-specific prefix for different invoice types
+      let typePrefix = '';
+      if (invoiceType === 'proforma') {
+        typePrefix = 'PRO-';
+      }
+
+      // Get the latest invoice number with this prefix and type
+      log.info("🔍 Searching for existing invoices with prefix pattern and type", `${typePrefix + prefix}`);
       const result = await db
         .select({ invoiceNo: invoices.invoiceNo })
         .from(invoices)
-        .where(sql`invoice_no LIKE ${prefix + '%'}`)
+        .where(sql`invoice_no LIKE ${typePrefix + prefix + '%'} AND invoice_type = ${invoiceType}`)
         .orderBy(sql`invoice_no DESC`)
         .limit(1);
 
@@ -150,35 +78,37 @@ function registerInvoiceGeneratorIpc() {
       });
 
       if (result.length === 0) {
-        // No existing invoices with this prefix
+        // No existing invoices with this prefix and type
         // Generate first number based on prefix pattern
         const now = new Date();
         const currentYear = now.getFullYear().toString();
         const currentMonth = (now.getMonth() + 1).toString().padStart(2, '0');
-        
+
         // Determine if prefix contains date pattern indicators
         let newNumber;
         if (prefix.includes('YYYY') || prefix.includes('MM')) {
-          newNumber = prefix
+          newNumber = typePrefix + prefix
             .replace('YYYY', currentYear)
             .replace('MM', currentMonth)
             .replace('####', '0001');
         } else {
-          newNumber = `${prefix}0001`;
+          newNumber = `${typePrefix}${prefix}0001`;
         }
 
         log.info("✨ Creating first invoice number:", {
           prefix,
+          typePrefix,
+          invoiceType,
           newNumber,
-          reason: "No existing invoices with this prefix"
+          reason: "No existing invoices with this prefix and type"
         });
         return { success: true, invoiceNumber: newNumber };
       }
 
       // Analyze the pattern of the last invoice number
       const lastInvoiceNo = result[0].invoiceNo;
-      const pattern = analyzeInvoicePattern(lastInvoiceNo);
-      
+      const pattern = analyzeInvoicePattern(lastInvoiceNo, typePrefix + prefix);
+
       log.info("📝 Analyzed last invoice pattern:", {
         lastInvoiceNo,
         pattern
@@ -193,6 +123,7 @@ function registerInvoiceGeneratorIpc() {
         pattern,
         nextSequence,
         nextNumber,
+        invoiceType,
         steps: {
           patternRecognition: pattern.format,
           sequenceIncrement: nextSequence,
@@ -205,7 +136,8 @@ function registerInvoiceGeneratorIpc() {
       log.error('❌ Error generating next invoice number:', {
         error: error.message,
         stack: error.stack,
-        prefix
+        prefix,
+        invoiceType
       });
       return { success: false, error: error.message };
     }
@@ -293,6 +225,7 @@ function registerInvoiceGeneratorIpc() {
           createdBy: invoiceData.createdBy || "",
           createdAt: currentTimestamp,
           updatedAt: currentTimestamp,
+          invoiceType: invoiceData.invoiceType || "tax",
         })
         .returning();
 
@@ -337,6 +270,150 @@ function registerInvoiceGeneratorIpc() {
       return {
         success: false,
         error: error.message,
+      };
+    }
+  });
+
+  // Get invoice by ID
+  ipcMain.handle("get-invoice-by-id", async (event, invoiceId) => {
+    try {
+      log.info("🔍 Getting invoice by ID:", invoiceId);
+
+      // Get the invoice
+      const invoice = await db
+        .select()
+        .from(invoices)
+        .where(sql`id = ${invoiceId}`)
+        .limit(1);
+
+      if (invoice.length === 0) {
+        return {
+          success: false,
+          error: "Invoice not found"
+        };
+      }
+
+      // Get the invoice items
+      const items = await db
+        .select()
+        .from(invoiceItems)
+        .where(sql`invoice_id = ${invoiceId}`);
+
+      return {
+        success: true,
+        invoice: {
+          ...invoice[0],
+          items: items
+        }
+      };
+    } catch (error) {
+      log.error("❌ Error getting invoice by ID:", {
+        error: error.message,
+        stack: error.stack,
+        invoiceId
+      });
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  });
+
+  // Convert Proforma invoice to Tax invoice
+  ipcMain.handle("convert-proforma-to-tax", async (event, proformaInvoiceId) => {
+    try {
+      log.info("🔄 Converting Proforma invoice to Tax invoice:", proformaInvoiceId);
+
+      // Get the Proforma invoice
+      const proformaInvoice = await db
+        .select()
+        .from(invoices)
+        .where(sql`id = ${proformaInvoiceId} AND invoice_type = 'proforma'`)
+        .limit(1);
+
+      if (proformaInvoice.length === 0) {
+        return {
+          success: false,
+          error: "Proforma invoice not found"
+        };
+      }
+
+      // Get the Proforma invoice items
+      const proformaItems = await db
+        .select()
+        .from(invoiceItems)
+        .where(sql`invoice_id = ${proformaInvoiceId}`);
+
+      // Generate a new Tax invoice number
+      const companyId = proformaInvoice[0].companyId;
+      const company = await db
+        .select()
+        .from(companies)
+        .where(sql`id = ${companyId}`)
+        .limit(1);
+
+      const companyInitials = company.length > 0 ?
+        (company[0].companyName || '').substring(0, 2).toUpperCase() : 'R';
+
+      // Get next tax invoice number
+      const nextInvoiceNumberResult = await ipcMain.handle("get-next-invoice-number", event, companyInitials, 'tax');
+
+      if (!nextInvoiceNumberResult.success) {
+        throw new Error(nextInvoiceNumberResult.error);
+      }
+
+      // Create a new Tax invoice based on the Proforma invoice
+      const currentTimestamp = new Date();
+      const taxInvoice = {
+        ...proformaInvoice[0],
+        id: undefined, // Remove ID to create a new record
+        invoiceNo: nextInvoiceNumberResult.invoiceNumber,
+        invoiceType: 'tax',
+        convertedFromId: proformaInvoiceId,
+        createdAt: currentTimestamp,
+        updatedAt: currentTimestamp
+      };
+
+      // Insert the Tax invoice
+      const insertedTaxInvoice = await db
+        .insert(invoices)
+        .values(taxInvoice)
+        .returning();
+
+      const taxInvoiceId = insertedTaxInvoice[0].id;
+
+      // Insert the Tax invoice items
+      const taxItemsToInsert = proformaItems.map(item => ({
+        ...item,
+        id: undefined, // Remove ID to create a new record
+        invoiceId: taxInvoiceId
+      }));
+
+      await db.insert(invoiceItems).values(taxItemsToInsert);
+
+      // Update the Proforma invoice status to 'converted'
+      await db
+        .update(invoices)
+        .set({
+          status: 'converted',
+          updatedAt: currentTimestamp
+        })
+        .where(sql`id = ${proformaInvoiceId}`);
+
+      return {
+        success: true,
+        taxInvoice: insertedTaxInvoice[0],
+        message: "Proforma invoice successfully converted to Tax invoice"
+      };
+    } catch (error) {
+      log.error("❌ Error converting Proforma invoice to Tax invoice:", {
+        error: error.message,
+        stack: error.stack,
+        proformaInvoiceId
+      });
+      return {
+        success: false,
+        error: error.message
       };
     }
   });

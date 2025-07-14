@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
 
     // Modern Table Styles
     tableContainer: {
-        marginBottom: 8,
+        marginBottom: 6, // reduced from 8
         borderRadius: 4,
         overflow: 'hidden',
         border: `1pt solid ${colors.border}`,
@@ -286,7 +286,6 @@ const styles = StyleSheet.create({
 
     // Taxable Value Section
     taxableValueSection: {
-        marginTop: 8,
         marginBottom: 8,
         backgroundColor: colors.white,
     },
@@ -694,72 +693,85 @@ const calculateTotals = (items, invoice) => {
 };
 
 // Template Components
+// Refactored Header: Compact, logo left, company info right, GSTIN included
 const InvoiceHeader = ({ invoice, dynamicStyles }) => (
-    <View style={styles.header}>
-        <View style={styles.headerContent}>
-            <View style={styles.headerLeft}>
-                <View style={styles.companyInfo}>
-                    <View style={{
-                        maxWidth: 160,
-                        height: 70,
-                        marginBottom: 4,
-                        alignSelf: 'flex-start',
-                        // backgroundColor: 'red',
-                        padding: 0
-                    }}>
-                        <Image
-                            src={invoice.company?.logo || "/cyphersol-logo.png"}
-                            style={{
-                                maxWidth: '100%',
-                                height: '100%',
-                                objectFit: 'contain',
-                                display: 'block'
-                            }}
-                        />
-                    </View>
-                    <Text style={styles.headerTagline}>
-                        {invoice.company?.companyName || "Cyphersol Technologies"}
-                    </Text>
-                </View>
+    <View style={[styles.header, { marginBottom: 6, paddingBottom: 6 }]}> {/* Reduce spacing */}
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+            {/* Logo on the left */}
+            <View style={{ maxWidth: 90, height: 50, marginRight: 12, justifyContent: 'flex-start' }}>
+                <Image
+                    src={invoice.company?.logo || "/cyphersol-logo.png"}
+                    style={{ maxWidth: '100%', height: '100%', objectFit: 'contain' }}
+                />
             </View>
-
-            <View style={styles.headerRight}>
-                <Text style={[dynamicStyles?.taxInvoiceTitle || styles.taxInvoiceTitle, { fontWeight: 'bold' }]}>
-                    TAX INVOICE
+            {/* Company info stacked to the right of logo */}
+            <View style={{ flex: 1, flexDirection: 'column', justifyContent: 'flex-start' }}>
+                <Text style={[styles.headerCompanyName, { fontSize: 14, marginBottom: 1 }]}>{invoice.company?.companyName || 'Company Name'}</Text>
+                {invoice.company?.addressLine1 && (
+                    <Text style={[styles.addressText, { fontSize: 8, marginBottom: 0 }]}>{invoice.company.addressLine1}</Text>
+                )}
+                <Text style={[styles.addressText, { fontSize: 8, marginBottom: 0 }]}>
+                    {invoice.company?.city && `${invoice.company.city}, `}
+                    {invoice.company?.state && `${invoice.company.state} `}
+                    {invoice.company?.zip}
                 </Text>
-                <Text style={styles.invoiceNumberText}>
-                    {invoice.invoiceNumber || "INV-001"}
-                </Text>
+                {invoice.company?.contactNo && (
+                    <Text style={[styles.addressText, { fontSize: 8, marginBottom: 0 }]}>Ph: {invoice.company.contactNo}</Text>
+                )}
+                {invoice.company?.email && (
+                    <Text style={[styles.addressText, { fontSize: 8, marginBottom: 0 }]}>Email: {invoice.company.email}</Text>
+                )}
+                {/* GSTIN in header */}
+                {invoice.company?.gstin && (
+                    <Text style={[styles.addressText, { fontSize: 8, marginBottom: 0, fontWeight: 'bold', color: colors.primary }]}>
+                        GSTIN: {invoice.company.gstin}
+                    </Text>
+                )}
+            </View>
+            {/* Invoice Title and Number on the far right */}
+            <View style={{ alignItems: 'flex-end', minWidth: 90 }}>
+                <Text style={[styles.taxInvoiceTitle, { fontSize: 16, marginBottom: 2 }]}>TAX INVOICE</Text>
+                <Text style={[styles.invoiceNumberText, { fontSize: 9 }]}>{invoice.invoiceNumber || 'INV-001'}</Text>
             </View>
         </View>
     </View>
 );
 
-const CompanyAndInvoiceInfo = ({ invoice, dynamicStyles }) => (
-    <View style={styles.infoSection}>
-        <View style={styles.companyInfoSection}>
-            <Text style={dynamicStyles?.sectionTitle || styles.sectionTitle}>Bill From</Text>
-            <Text style={dynamicStyles?.companyName || styles.companyName}>
-                {invoice.company?.companyName || "Cyphersol Technologies"}
-            </Text>
-            {invoice.company?.addressLine1 && (
-                <Text style={styles.addressText}>{invoice.company.addressLine1}</Text>
+// --- Step 2: Two-Column Layout for Bill To and Invoice Details ---
+const InfoTwoColumn = ({ invoice, dynamicStyles }) => (
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+        {/* Left: Bill To (Customer) - Hug Content Bottom */}
+        <View style={{ flex: 1.2, backgroundColor: colors.background, padding: 10, paddingBottom: 0, borderRadius: 4, border: `1pt solid ${colors.border}`, marginRight: 12 }}>
+            <Text style={[dynamicStyles?.sectionTitle || styles.sectionTitle, { marginBottom: 3 }]}>Bill To</Text>
+            <Text style={[styles.customerName, { fontSize: 11, color: colors.primary, marginBottom: 2 }]}>{invoice.customer?.name || invoice.customerName || "Customer Name"}</Text>
+            {invoice.customer?.addressLine1 && (
+                <Text style={[styles.addressText, { lineHeight: 1.3, marginBottom: 1 }]}>{invoice.customer.addressLine1}</Text>
             )}
-            <Text style={styles.addressText}>
-                {invoice.company?.city && `${invoice.company.city}, `}
-                {invoice.company?.state && `${invoice.company.state} `}
-                {invoice.company?.zip}
-            </Text>
-            {invoice.company?.phone && (
-                <Text style={styles.addressText}>Ph: {invoice.company.phone}</Text>
+            <Text style={[styles.addressText, { lineHeight: 1.3, marginBottom: 1 }]}> {[
+                invoice.customer?.city,
+                invoice.customer?.state,
+                invoice.customer?.zip
+            ].filter(Boolean).join(", ")} </Text>
+            {(invoice.customer?.phone || invoice.customer?.email) && (
+                <View style={{ marginBottom: 1 }}>
+                    {invoice.customer?.phone && (
+                        <Text style={[styles.addressText, { lineHeight: 1.3 }]}>Ph: {invoice.customer.phone}</Text>
+                    )}
+                    {invoice.customer?.email && (
+                        <Text style={[styles.addressText, { lineHeight: 1.3 }]}>Email: {invoice.customer.email}</Text>
+                    )}
+                </View>
             )}
-            {invoice.company?.email && (
-                <Text style={styles.addressText}>Email: {invoice.company.email}</Text>
+            {(invoice.isPreviewMode || invoice.customer?.gstApplicable === 'Yes') && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 1 }}>
+                    <Text style={{ fontSize: 9, color: colors.textSecondary, lineHeight: 1.3 }}>GSTIN:</Text>
+                    <Text style={{ marginLeft: 4, fontSize: 9, color: colors.primary, fontWeight: 'bold', lineHeight: 1.3 }}>{invoice.customer?.gstin || (invoice.isPreviewMode ? '27ABCDE1234F1Z5' : '')}</Text>
+                </View>
             )}
         </View>
-
-        <View style={styles.invoiceInfoSection}>
-            <Text style={dynamicStyles?.sectionTitle || styles.sectionTitle}>Invoice Details</Text>
+        {/* Right: Invoice Details - Hug Content Bottom */}
+        <View style={{ flex: 1, backgroundColor: colors.background, padding: 10, paddingBottom: 0, borderRadius: 4, border: `1pt solid ${colors.border}` }}>
+            <Text style={[dynamicStyles?.sectionTitle || styles.sectionTitle, { marginBottom: 6 }]}>Invoice Details</Text>
             <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Invoice No:</Text>
                 <Text style={styles.infoValue}>{invoice.invoiceNumber || "INV-001"}</Text>
@@ -774,7 +786,7 @@ const CompanyAndInvoiceInfo = ({ invoice, dynamicStyles }) => (
             </View>
             <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Terms:</Text>
-                <Text style={styles.infoValue}>Net 30</Text>
+                <Text style={styles.infoValue}>{invoice.paymentTerms ? `Net ${invoice.paymentTerms}` : "Net 30"}</Text>
             </View>
         </View>
     </View>
@@ -786,7 +798,7 @@ const CustomerInfo = ({ invoice, dynamicStyles }) => (
 
         {/* Customer Name with enhanced styling */}
         <Text style={[styles.customerName, {
-            fontSize: 13,
+            fontSize: 12,
             color: colors.primary,
             letterSpacing: 0.3,
             marginBottom: 6
@@ -855,6 +867,7 @@ const CustomerInfo = ({ invoice, dynamicStyles }) => (
     </View>
 );
 
+// Streamlined Totals Section - More Compact
 const ItemsTable = ({ invoice, totals, dynamicStyles }) => {
     const items = invoice.items || [];
     const tableHeaderCellStyle = dynamicStyles?.tableHeaderCell || styles.tableHeaderCell;
@@ -892,7 +905,7 @@ const ItemsTable = ({ invoice, totals, dynamicStyles }) => {
                 );
             })}
 
-            {/* Summary Section */}
+            {/* Compact Summary Section */}
             <View style={styles.summarySection}>
                 {/* Subtotal */}
                 <View style={styles.summaryRow}>
@@ -919,135 +932,216 @@ const ItemsTable = ({ invoice, totals, dynamicStyles }) => {
                     </View>
                 )}
 
-                {/* Grand Total */}
-                <View style={styles.totalRow}>
-                    <Text style={[styles.totalLabel, { width: '88%', textAlign: 'right', paddingRight: 8 }]}>GRAND TOTAL:</Text>
-                    <Text style={[styles.totalAmount, { width: '12%', textAlign: 'right', paddingRight: 8 }]}>{formatCurrency(totals.grandTotal).replace('₹', '')}</Text>
+                {/* Compact Grand Total with Inline Amount in Words */}
+                <View style={[styles.totalRow, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }]}>
+                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 10, color: colors.white, fontStyle: 'italic', lineHeight: 1.2, marginRight: 6 }}>
+                            Amount in Words:
+                        </Text>
+                        <Text style={{
+                            fontSize: 11, // value stays large
+                            color: colors.white,
+                            fontWeight: 'bold',
+                            fontStyle: 'normal',
+                            marginRight: 8,
+                        }}>
+                            INR {numberToWords(totals.grandTotal)}
+                        </Text>
+                    </View>
+                    {/* Grand Total aligned like summary/tax rows */}
+                    <Text style={{
+                        ...styles.totalLabel,
+                        paddingRight: 8,
+                        fontSize: 9,
+                        fontWeight: 'bold',
+                    }}>
+                        GRAND TOTAL:
+                    </Text>
+                    <Text style={{
+                        ...styles.totalAmount,
+                        width: '12%',
+                        textAlign: 'right',
+                        paddingRight: 8,
+                        fontSize: 9,
+                        fontWeight: 'bold',
+                    }}>
+                        {formatCurrency(totals.grandTotal).replace('₹', '')}
+                    </Text>
                 </View>
             </View>
         </View>
     );
 };
 
-const TaxableValueSection = ({ totals, dynamicStyles }) => {
-    // Determine if we should show split GST (CGST + SGST) or IGST
-    const showSplit = totals.shouldShowSplit;
-    const subtotal = totals.subtotal || 0;
+const TaxableValueSection = ({ invoice, totals, dynamicStyles }) => {
+    // Group items by HSN/SAC
+    const items = invoice.items || [];
+    const isIntraState = totals.shouldShowSplit;
+    const cgstRate = totals.cgstRate || 0;
+    const sgstRate = totals.sgstRate || 0;
+    const igstRate = totals.igstRate || 0;
+
+    // Group by HSN
+    const hsnGroups = {};
+    items.forEach(item => {
+        const hsn = item.hsn || 'N/A';
+        if (!hsnGroups[hsn]) {
+            hsnGroups[hsn] = { taxable: 0, items: [] };
+        }
+        hsnGroups[hsn].taxable += parseFloat(item.amount) || 0;
+        hsnGroups[hsn].items.push(item);
+    });
+
+    // Prepare rows
+    const rows = Object.entries(hsnGroups).map(([hsn, group]) => {
+        const taxable = group.taxable;
+        let cgst = 0, sgst = 0, igst = 0, totalTax = 0;
+        if (isIntraState) {
+            cgst = taxable * (cgstRate / 100);
+            sgst = taxable * (sgstRate / 100);
+            totalTax = cgst + sgst;
+        } else {
+            igst = taxable * (igstRate / 100);
+            totalTax = igst;
+        }
+        return {
+            hsn,
+            taxable,
+            cgst,
+            sgst,
+            igst,
+            totalTax
+        };
+    });
+
+    // Totals
+    const totalTaxable = rows.reduce((sum, r) => sum + r.taxable, 0);
+    const totalCgst = rows.reduce((sum, r) => sum + r.cgst, 0);
+    const totalSgst = rows.reduce((sum, r) => sum + r.sgst, 0);
+    const totalIgst = rows.reduce((sum, r) => sum + r.igst, 0);
+    const totalTaxAmount = rows.reduce((sum, r) => sum + r.totalTax, 0);
 
     return (
         <View style={styles.taxableValueSection}>
-            <View style={styles.taxableValueHeader}>
-                <Text style={[styles.taxableValueHeaderCell, { width: '30%', textAlign: 'left' }]}>TAXABLE VALUE</Text>
-                <Text style={[styles.taxableValueHeaderCell, { width: '20%', textAlign: 'center' }]}>TAX TYPE</Text>
-                <Text style={[styles.taxableValueHeaderCell, { width: '20%', textAlign: 'center' }]}>RATE</Text>
-                <Text style={[styles.taxableValueHeaderCell, { width: '30%', textAlign: 'right' }]}>AMOUNT</Text>
+            {/* Table Header */}
+            <View style={[styles.taxableValueHeader, { alignItems: 'center' }]}>
+                <Text style={[styles.taxableValueHeaderCell, { width: '18%', textAlign: 'left' }]}>HSN/SAC</Text>
+                <Text style={[styles.taxableValueHeaderCell, { width: '18%', textAlign: 'right' }]}>Taxable Value</Text>
+                {isIntraState ? (
+                    <>
+                        <Text style={[styles.taxableValueHeaderCell, { width: '12%', textAlign: 'center' }]}>CGST Rate</Text>
+                        <Text style={[styles.taxableValueHeaderCell, { width: '12%', textAlign: 'right' }]}>CGST Amt</Text>
+                        <Text style={[styles.taxableValueHeaderCell, { width: '12%', textAlign: 'center' }]}>SGST Rate</Text>
+                        <Text style={[styles.taxableValueHeaderCell, { width: '12%', textAlign: 'right' }]}>SGST Amt</Text>
+                    </>
+                ) : (
+                    <>
+                        <Text style={[styles.taxableValueHeaderCell, { width: '12%', textAlign: 'center' }]}>IGST Rate</Text>
+                        <Text style={[styles.taxableValueHeaderCell, { width: '12%', textAlign: 'right' }]}>IGST Amt</Text>
+                    </>
+                )}
+                <Text style={[styles.taxableValueHeaderCell, { width: '16%', textAlign: 'right' }]}>Total Tax Amount</Text>
             </View>
-
-            {showSplit ? (
-                // Show CGST + SGST rows
-                <>
-                    <View style={styles.taxableValueRow}>
-                        <Text style={[styles.taxableValueCell, { width: '30%', textAlign: 'left' }]}>{formatCurrency(subtotal)}</Text>
-                        <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'center' }]}>CGST</Text>
-                        <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'center' }]}>{totals.cgstRate}%</Text>
-                        <Text style={[styles.taxableValueCell, { width: '30%', textAlign: 'right' }]}>{formatCurrency(totals.cgstAmount)}</Text>
-                    </View>
-                    <View style={styles.taxableValueRow}>
-                        <Text style={[styles.taxableValueCell, { width: '30%', textAlign: 'left' }]}>{formatCurrency(subtotal)}</Text>
-                        <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'center' }]}>SGST</Text>
-                        <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'center' }]}>{totals.sgstRate}%</Text>
-                        <Text style={[styles.taxableValueCell, { width: '30%', textAlign: 'right' }]}>{formatCurrency(totals.sgstAmount)}</Text>
-                    </View>
-                </>
-            ) : (
-                // Show IGST row
-                <View style={styles.taxableValueRow}>
-                    <Text style={[styles.taxableValueCell, { width: '30%', textAlign: 'left' }]}>{formatCurrency(subtotal)}</Text>
-                    <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'center' }]}>IGST</Text>
-                    <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'center' }]}>{totals.igstRate}%</Text>
-                    <Text style={[styles.taxableValueCell, { width: '30%', textAlign: 'right' }]}>{formatCurrency(totals.igstAmount)}</Text>
+            {/* Table Rows */}
+            {rows.map((row, idx) => (
+                <View key={row.hsn + idx} style={styles.taxableValueRow}>
+                    <Text style={[styles.taxableValueCell, { width: '18%', textAlign: 'left' }]}>{row.hsn}</Text>
+                    <Text style={[styles.taxableValueCell, { width: '18%', textAlign: 'right' }]}>{row.taxable.toFixed(2)}</Text>
+                    {isIntraState ? (
+                        <>
+                            <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'center' }]}>{cgstRate}%</Text>
+                            <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'right' }]}>{row.cgst.toFixed(2)}</Text>
+                            <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'center' }]}>{sgstRate}%</Text>
+                            <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'right' }]}>{row.sgst.toFixed(2)}</Text>
+                        </>
+                    ) : (
+                        <>
+                            <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'center' }]}>{igstRate}%</Text>
+                            <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'right' }]}>{row.igst.toFixed(2)}</Text>
+                        </>
+                    )}
+                    <Text style={[styles.taxableValueCell, { width: '16%', textAlign: 'right', fontWeight: 'bold' }]}>{row.totalTax.toFixed(2)}</Text>
                 </View>
-            )}
-
-            {/* Total Tax Amount row */}
+            ))}
+            {/* Total Row */}
             <View style={[styles.taxableValueRow, { backgroundColor: colors.background }]}>
-                <Text style={[styles.taxableValueCell, { width: '50%', textAlign: 'left', fontWeight: 'bold' }]}>Total Tax Amount</Text>
-                <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'left', fontWeight: 'bold' }]}>INR {numberToWords(totals.totalGST)}</Text>
-                <Text style={[styles.taxableValueCell, { width: '30%', textAlign: 'right', fontWeight: 'bold' }]}>{formatCurrency(totals.totalGST)}</Text>
+                <Text style={[styles.taxableValueCell, { width: '18%', textAlign: 'left', fontWeight: 'bold' }]}>Total</Text>
+                <Text style={[styles.taxableValueCell, { width: '18%', textAlign: 'right', fontWeight: 'bold' }]}>{totalTaxable.toFixed(2)}</Text>
+                {isIntraState ? (
+                    <>
+                        <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'center', fontWeight: 'bold' }]}>{cgstRate}%</Text>
+                        <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'right', fontWeight: 'bold' }]}>{totalCgst.toFixed(2)}</Text>
+                        <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'center', fontWeight: 'bold' }]}>{sgstRate}%</Text>
+                        <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'right', fontWeight: 'bold' }]}>{totalSgst.toFixed(2)}</Text>
+                    </>
+                ) : (
+                    <>
+                        <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'center', fontWeight: 'bold' }]}>{igstRate}%</Text>
+                        <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'right', fontWeight: 'bold' }]}>{totalIgst.toFixed(2)}</Text>
+                    </>
+                )}
+                <Text style={[styles.taxableValueCell, { width: '16%', textAlign: 'right', fontWeight: 'bold' }]}>{totalTaxAmount.toFixed(2)}</Text>
             </View>
         </View>
     );
 };
 
-const CompanyTaxInfo = ({ invoice, dynamicStyles }) => (
-    <View style={styles.companyTaxInfoSection}>
-        <View style={styles.companyTaxInfoItem}>
-            <Text style={styles.companyTaxInfoLabel}>PAN:</Text>
-            <Text style={styles.companyTaxInfoValue}>{invoice.company?.pan || "AAKCC9857C"}</Text>
-        </View>
-        <View style={[styles.companyTaxInfoItem, { marginRight: 0 }]}>
-            <Text style={styles.companyTaxInfoLabel}>GSTIN:</Text>
-            <Text style={styles.companyTaxInfoValue}>{invoice.company?.gstin || "27AAKCC9857C1ZB"}</Text>
-        </View>
-    </View>
-);
-
+// Compact Bank Details Section
 const BankDetails = ({ invoice, dynamicStyles }) => (
-    <View style={styles.bankDetailsSection}>
-        <Text style={styles.bankDetailsTitle}>Company's Bank Details</Text>
-        <View style={styles.bankDetailsRow}>
-            <Text style={styles.bankDetailsLabel}>BANK NAME:</Text>
-            <Text style={styles.bankDetailsValue}>{invoice.company?.bankName || "Karnataka Bank"}</Text>
+    <View style={[styles.bankDetailsSection, { padding: 6, marginBottom: 6 }]}>
+        <Text style={[styles.bankDetailsTitle, { fontSize: 8, marginBottom: 3 }]}>Company's Bank Details</Text>
+        <View style={[styles.bankDetailsRow, { marginBottom: 2 }]}>
+            <Text style={[styles.bankDetailsLabel, { fontSize: 7, width: '25%' }]}>BANK:</Text>
+            <Text style={[styles.bankDetailsValue, { fontSize: 7, width: '75%' }]}>{invoice.company?.bankName || "Karnataka Bank"}</Text>
         </View>
-        <View style={styles.bankDetailsRow}>
-            <Text style={styles.bankDetailsLabel}>A/C NO.:</Text>
-            <Text style={styles.bankDetailsValue}>{invoice.company?.accountNumber || "6272000100026401"}</Text>
+        <View style={[styles.bankDetailsRow, { marginBottom: 2 }]}>
+            <Text style={[styles.bankDetailsLabel, { fontSize: 7, width: '25%' }]}>A/C NO.:</Text>
+            <Text style={[styles.bankDetailsValue, { fontSize: 7, width: '75%' }]}>{invoice.company?.accountNumber || "6272000100026401"}</Text>
         </View>
-        <View style={styles.bankDetailsRow}>
-            <Text style={styles.bankDetailsLabel}>IFSC CODE:</Text>
-            <Text style={styles.bankDetailsValue}>{invoice.company?.ifscCode || "KARB0000627"}</Text>
+        <View style={[styles.bankDetailsRow, { marginBottom: 2 }]}>
+            <Text style={[styles.bankDetailsLabel, { fontSize: 7, width: '25%' }]}>IFSC:</Text>
+            <Text style={[styles.bankDetailsValue, { fontSize: 7, width: '75%' }]}>{invoice.company?.ifscCode || "KARB0000627"}</Text>
         </View>
-        <View style={styles.bankDetailsRow}>
-            <Text style={styles.bankDetailsLabel}>BRANCH:</Text>
-            <Text style={styles.bankDetailsValue}>{invoice.company?.bankBranch || "CBS"}</Text>
+        <View style={[styles.bankDetailsRow, { marginBottom: 0 }]}>
+            <Text style={[styles.bankDetailsLabel, { fontSize: 7, width: '25%' }]}>BRANCH:</Text>
+            <Text style={[styles.bankDetailsValue, { fontSize: 7, width: '75%' }]}>{invoice.company?.bankBranch || "CBS"}</Text>
         </View>
     </View>
 );
 
-const AmountInWords = ({ amount, dynamicStyles }) => (
-    <View style={[styles.amountWordsSection, { flexDirection: 'row', alignItems: 'center' }]}>
-        <Text style={[styles.amountWordsTitle, { marginBottom: 0, marginRight: 4 }]}>Amount in Words:</Text>
-        <Text style={[styles.amountWordsText, { flex: 1 }]}>
-            INR {numberToWords(amount)}
-        </Text>
-    </View>
-);
-
+// Compact Footer Section
 const Footer = ({ invoice, dynamicStyles }) => (
-    <View style={styles.footerSection}>
-        <View style={styles.declarationBox}>
-            <Text style={styles.declarationTitle}>Declaration</Text>
-            <Text style={styles.declarationText}>
-                We declare that this invoice shows the actual price of the goods described
-                and that all particulars are true and correct.
+    <View style={[styles.footerSection, { marginBottom: 4, gap: 6 }]}>
+        <View style={[styles.declarationBox, { padding: 8 }]}>
+            <Text style={[styles.declarationTitle, { fontSize: 8, marginBottom: 4 }]}>Declaration</Text>
+            <Text style={[styles.declarationText, { fontSize: 7, lineHeight: 1.2 }]}>
+                We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.
             </Text>
         </View>
 
-        <View style={styles.signatureBox}>
-            <View style={styles.signatureArea}>
-                {invoice.signature && (
-                    <Image
-                        src={invoice.signature}
-                        style={{ width: 80, height: 40 }}
-                    />
-                )}
+        <View style={[styles.signatureBox, { padding: 8 }]}>
+            <View style={[styles.signatureArea, { minHeight: 20, marginBottom: 6 }]}>
+                <Image
+                    src={invoice.signature || "/signature.jpg"}
+                    style={{ width: 60, height: 30 }}
+                />
             </View>
-            <Text style={styles.signatureText}>
+            <Text style={[styles.signatureText, { fontSize: 7, marginBottom: 2 }]}>
                 for {invoice.company?.companyName || "Company Name"}
             </Text>
-            <Text style={styles.authorizedSignatory}>Authorized Signatory</Text>
+            <Text style={[styles.authorizedSignatory, { fontSize: 7 }]}>Authorized Signatory</Text>
         </View>
     </View>
+);
+
+// Compact Notes Section
+const NotesSection = ({ invoice, dynamicStyles, fontScale }) => (
+    invoice.customerNotes && (
+        <View style={[styles.notesSection, { padding: 6, marginBottom: 6 }]}>
+            <Text style={[styles.notesTitle, { fontSize: 8 * fontScale, marginBottom: 3 }]}>Notes:</Text>
+            <Text style={[styles.notesText, { fontSize: 7 * fontScale, lineHeight: 1.2 }]}>{invoice.customerNotes}</Text>
+        </View>
+    )
 );
 
 // Main Classic Blue Template Component
@@ -1154,32 +1248,16 @@ export const ClassicBlueTemplate = (invoice) => {
             <Document>
                 <Page size={pageSize} style={dynamicStyles.page}>
                     <InvoiceHeader invoice={invoice} dynamicStyles={dynamicStyles} />
-                    <CompanyAndInvoiceInfo invoice={invoice} dynamicStyles={dynamicStyles} />
-                    <CustomerInfo invoice={invoice} dynamicStyles={dynamicStyles} />
+                    <InfoTwoColumn invoice={invoice} dynamicStyles={dynamicStyles} />
                     <ItemsTable invoice={invoice} totals={totals} dynamicStyles={dynamicStyles} />
-                    <AmountInWords amount={totals.grandTotal} dynamicStyles={dynamicStyles} />
-
                     {/* Always show Taxable Value Section when there's a subtotal */}
-                    <TaxableValueSection totals={totals} dynamicStyles={dynamicStyles} />
-
-                    {/* Company Tax Info Section */}
-                    <CompanyTaxInfo invoice={invoice} dynamicStyles={dynamicStyles} />
-
+                    <TaxableValueSection invoice={invoice} totals={totals} dynamicStyles={dynamicStyles} />
+                    {/* Removed CompanyTaxInfo - GSTIN is now in header */}
                     {/* Bank Details Section */}
                     <BankDetails invoice={invoice} dynamicStyles={dynamicStyles} />
-
                     <Footer invoice={invoice} dynamicStyles={dynamicStyles} />
-
-                    {invoice.customerNotes && (
-                        <View style={styles.notesSection}>
-                            <Text style={[styles.notesTitle, { fontSize: (styles.notesTitle?.fontSize || 9) * fontScale }]}>Notes:</Text>
-                            <Text style={[styles.notesText, { fontSize: (styles.notesText?.fontSize || 8) * fontScale }]}>{invoice.customerNotes}</Text>
-                        </View>
-                    )}
-
-                    <Text style={[styles.footer, { fontSize: (styles.footer?.fontSize || 7) * fontScale }]}>
-                        This is a Computer Generated Invoice
-                    </Text>
+                    <NotesSection invoice={invoice} dynamicStyles={dynamicStyles} fontScale={fontScale} />
+                    <Text style={[styles.footer, { fontSize: (styles.footer?.fontSize || 7) * fontScale }]}>This is a Computer Generated Invoice</Text>
                 </Page>
             </Document>
         );

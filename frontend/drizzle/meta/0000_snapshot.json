@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "cb8cdbf8-9efc-4794-997c-e4391a4c9549",
+  "id": "624d5794-26fe-4537-b45b-63868df0705d",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "cases": {
@@ -314,6 +314,13 @@
         },
         "compliance_standards": {
           "name": "compliance_standards",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "invoice_prefix": {
+          "name": "invoice_prefix",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -861,6 +868,21 @@
           "notNull": false,
           "autoincrement": false
         },
+        "invoice_type": {
+          "name": "invoice_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'tax'"
+        },
+        "converted_from_id": {
+          "name": "converted_from_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "status": {
           "name": "status",
           "type": "text",
@@ -1124,6 +1146,19 @@
           "tableTo": "customers",
           "columnsFrom": [
             "customer_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "invoices_converted_from_id_invoices_id_fk": {
+          "name": "invoices_converted_from_id_invoices_id_fk",
+          "tableFrom": "invoices",
+          "tableTo": "invoices",
+          "columnsFrom": [
+            "converted_from_id"
           ],
           "columnsTo": [
             "id"
@@ -1449,7 +1484,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 1752039937187
+          "default": 1752309700669
         }
       },
       "indexes": {
@@ -1569,7 +1604,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 1752039937196
+          "default": 1752309700671
         }
       },
       "indexes": {},

@@ -23,6 +23,10 @@ const invoices = sqliteTable("invoices", {
   terms: text("terms").notNull(),
   ledger: text("ledger"),
 
+  // Invoice type - For different invoice types (Tax, Proforma, etc.)
+  invoiceType: text("invoice_type").notNull().default("tax"), // 'tax', 'proforma'
+  convertedFromId: integer("converted_from_id").references(() => invoices.id), // Reference to original proforma invoice if this is a converted tax invoice
+
   // Status tracking - Enhanced for analytics
   status: text("status").notNull().default("pending"), // 'pending', 'paid', 'overdue', 'cancelled', 'draft'
   paidDate: integer("paid_date", { mode: "timestamp" }), // When invoice was paid

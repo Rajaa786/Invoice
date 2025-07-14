@@ -121,6 +121,14 @@ const CompanyForm = ({ open, onOpenChange, onSave }) => {
     // Files
     logo: null,
     signature: null,
+    // Bank details
+    bank: {
+      bankName: "",
+      accountNumber: "",
+      ifscCode: "",
+      branchName: "",
+      accountHolderName: "",
+    },
   });
 
   const [imagePreviews, setImagePreviews] = useState({
@@ -224,6 +232,29 @@ const CompanyForm = ({ open, onOpenChange, onSave }) => {
       return false;
     }
 
+    // Bank validation: if any bank field is filled, all must be filled
+    const { bank } = formData;
+    const anyBankFieldFilled = Object.values(bank).some(v => v && v.trim() !== "");
+    if (anyBankFieldFilled) {
+      const requiredBankFields = {
+        bankName: "Bank name",
+        accountNumber: "Account number",
+        ifscCode: "IFSC code",
+        branchName: "Branch name",
+        accountHolderName: "Account holder name",
+      };
+      for (const [field, label] of Object.entries(requiredBankFields)) {
+        if (!bank[field] || bank[field].trim() === "") {
+          toast({
+            title: "Validation Error",
+            description: `Please enter ${label} in Bank Details`,
+            variant: "destructive",
+          });
+          return false;
+        }
+      }
+    }
+
     return true;
   };
 
@@ -258,6 +289,9 @@ const CompanyForm = ({ open, onOpenChange, onSave }) => {
         dataToSend.signature = signatureBase64;
       }
 
+      // Remove bank from company payload
+      delete dataToSend.bank;
+
       console.log("Sending form data:", {
         ...dataToSend,
         logo: dataToSend.logo ? "[LOGO DATA BASE64]" : null,
@@ -267,6 +301,22 @@ const CompanyForm = ({ open, onOpenChange, onSave }) => {
       const result = await window.electron.addCompany(dataToSend);
 
       if (result.success) {
+        // Add bank account if all fields are filled
+        const { bank } = formData;
+        const allBankFieldsFilled = Object.values(bank).every(v => v && v.trim() !== "");
+        if (allBankFieldsFilled) {
+          await window.electron.addBank({
+            companyId: result.result.id,
+            bankName: bank.bankName,
+            accountNumber: bank.accountNumber,
+            ifscCode: bank.ifscCode,
+            branchName: bank.branchName,
+            accountHolderName: bank.accountHolderName,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        }
+
         toast({
           title: "Success",
           description: "Company created successfully",
@@ -304,6 +354,13 @@ const CompanyForm = ({ open, onOpenChange, onSave }) => {
           taxId: "",
           logo: null,
           signature: null,
+          bank: {
+            bankName: "",
+            accountNumber: "",
+            ifscCode: "",
+            branchName: "",
+            accountHolderName: "",
+          },
         });
 
         setImagePreviews({ logo: null, signature: null });
@@ -370,7 +427,14 @@ const CompanyForm = ({ open, onOpenChange, onSave }) => {
       fiscalYearStart: "04-01",
       taxId: "TECH" + randomNum,
       logo: null,
-      signature: null
+      signature: null,
+      bank: {
+        bankName: "Test Bank",
+        accountNumber: "1234567890123456",
+        ifscCode: "TEST0001234",
+        branchName: "Test Branch",
+        accountHolderName: "Test Account Holder",
+      },
     });
 
     toast({
@@ -920,6 +984,79 @@ const CompanyForm = ({ open, onOpenChange, onSave }) => {
                           <SelectItem value="focus">Focus</SelectItem>
                         </SelectContent>
                       </Select>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              {/* Bank Account Details Section */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <FileText className="h-3 w-3" />
+                    Bank Account Details
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs">Bank Name*</Label>
+                      <Input
+                        placeholder="Enter bank name"
+                        value={formData.bank.bankName}
+                        onChange={e => setFormData(prev => ({
+                          ...prev,
+                          bank: { ...prev.bank, bankName: e.target.value }
+                        }))}
+                        className="text-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Account Number*</Label>
+                      <Input
+                        placeholder="Enter account number"
+                        value={formData.bank.accountNumber}
+                        onChange={e => setFormData(prev => ({
+                          ...prev,
+                          bank: { ...prev.bank, accountNumber: e.target.value }
+                        }))}
+                        className="text-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">IFSC Code*</Label>
+                      <Input
+                        placeholder="Enter IFSC code"
+                        value={formData.bank.ifscCode}
+                        onChange={e => setFormData(prev => ({
+                          ...prev,
+                          bank: { ...prev.bank, ifscCode: e.target.value }
+                        }))}
+                        className="text-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Branch Name*</Label>
+                      <Input
+                        placeholder="Enter branch name"
+                        value={formData.bank.branchName}
+                        onChange={e => setFormData(prev => ({
+                          ...prev,
+                          bank: { ...prev.bank, branchName: e.target.value }
+                        }))}
+                        className="text-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Account Holder Name*</Label>
+                      <Input
+                        placeholder="Enter account holder name"
+                        value={formData.bank.accountHolderName}
+                        onChange={e => setFormData(prev => ({
+                          ...prev,
+                          bank: { ...prev.bank, accountHolderName: e.target.value }
+                        }))}
+                        className="text-sm"
+                      />
                     </div>
                   </div>
                 </CardContent>

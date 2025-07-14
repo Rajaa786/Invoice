@@ -43,7 +43,8 @@ CREATE TABLE `companies` (
 	`fiscal_year_start` text,
 	`tax_id` text,
 	`certifications` text,
-	`compliance_standards` text
+	`compliance_standards` text,
+	`invoice_prefix` text
 );
 --> statement-breakpoint
 CREATE TABLE `company_customers` (
@@ -124,6 +125,8 @@ CREATE TABLE `invoices` (
 	`due_date` integer NOT NULL,
 	`terms` text NOT NULL,
 	`ledger` text,
+	`invoice_type` text DEFAULT 'tax' NOT NULL,
+	`converted_from_id` integer,
 	`status` text DEFAULT 'pending' NOT NULL,
 	`paid_date` integer,
 	`payment_method` text,
@@ -157,7 +160,8 @@ CREATE TABLE `invoices` (
 	`exchange_rate` real DEFAULT 1,
 	`base_currency_amount` real,
 	FOREIGN KEY (`company_id`) REFERENCES `companies`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`customer_id`) REFERENCES `customers`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`customer_id`) REFERENCES `customers`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`converted_from_id`) REFERENCES `invoices`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `invoices_invoice_no_unique` ON `invoices` (`invoice_no`);--> statement-breakpoint
@@ -207,7 +211,7 @@ CREATE TABLE `tally_sales_voucher` (
 	`failed_reason` text,
 	`bank_ledger` text NOT NULL,
 	`result` integer,
-	`created_at` integer DEFAULT 1752039937187 NOT NULL,
+	`created_at` integer DEFAULT 1752309700669 NOT NULL,
 	FOREIGN KEY (`invoice_id`) REFERENCES `invoices`(`id`) ON UPDATE no action ON DELETE CASCADE
 );
 --> statement-breakpoint
@@ -224,7 +228,7 @@ CREATE TABLE `transactions` (
 	`bank` text DEFAULT 'unknown' NOT NULL,
 	`entity` text DEFAULT 'unknown' NOT NULL,
 	`voucher_type` text DEFAULT 'unknown',
-	`created_at` integer DEFAULT 1752039937196 NOT NULL,
+	`created_at` integer DEFAULT 1752309700671 NOT NULL,
 	FOREIGN KEY (`statement_id`) REFERENCES `statements`(`id`) ON UPDATE no action ON DELETE CASCADE
 );
 --> statement-breakpoint

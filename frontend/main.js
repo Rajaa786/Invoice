@@ -7,6 +7,7 @@ const { spawn } = require("child_process");
 const { registerItemDashboardIpc } = require("./ipc/itemDashboard");
 const { registerCompanyDashboardIpc } = require("./ipc/companyDashboard");
 const { registerCustomerDashboardIpc } = require("./ipc/customerDashboard");
+const { registerBankDashboardIpc } = require("./ipc/bankDashboard");
 const { registerTallyIpc } = require("./ipc/tallyHandlers.js");
 const { registerInvoiceGeneratorIpc, registerInvoiceItemsIpc } = require("./ipc/invoiceGenerator");
 const log = require("electron-log/main");
@@ -177,6 +178,7 @@ function createWindow() {
   registerItemDashboardIpc();
   registerCompanyDashboardIpc();
   registerCustomerDashboardIpc();
+  registerBankDashboardIpc();
   registerTallyIpc();
   registerInvoiceGeneratorIpc();
   registerInvoiceItemsIpc();

@@ -137,7 +137,7 @@ const Dashboard = () => {
           setActiveTab={setActiveTab}
         />
         <ScrollArea className="w-full">
-          <BreadcrumbDynamic items={breadcrumbs} />
+          <BreadcrumbDynamic items={breadcrumbs} className="py-2 px-4" />
           <div className="flex-1 flex flex-col overflow-hidden">
             <main className="flex-1">
               {activeTab === "Dashboard" && <MainDashboard />}

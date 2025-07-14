@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useParams } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -54,11 +55,15 @@ import { Badge } from "../ui/badge";
 import CustomerForm from "./CustomerForm";
 import CompanyForm from "./CompanyForm";
 import ItemForm from "./ItemForm";
+import BankForm from "./BankForm";
 import { generateInvoicePDF } from "./generateInvoicePDF";
 import { templateLogger } from "../../utils/templateLogger";
 import { useCompanyConfiguration } from "../../hooks/useConfiguration";
+import { toast } from "react-hot-toast";
+import { Switch } from "../ui/switch";
 
 const InvoiceForm = () => {
+  const params = useParams(); // Get URL parameters including invoice ID
   // State for form fields
   const [customerName, setCustomerName] = useState("");
   // const [invoiceNumber, setInvoiceNumber] = useState("INV-000002");
@@ -96,6 +101,15 @@ const InvoiceForm = () => {
   // const [paymentTerms, setPaymentTerms] = useState("");
   const [termSelectOpen, setTermSelectOpen] = useState(false);
   const [customTerm, setCustomTerm] = useState(""); // track typed input
+  const [isPaid, setIsPaid] = useState(false);
+  const [paymentDetails, setPaymentDetails] = useState({
+    amount: 0,
+    date: new Date(),
+    method: "",
+    notes: "",
+  });
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showPaymentDatePopover, setShowPaymentDatePopover] = useState(false);
 
   const defaultTerms = ["0", "15", "30", "45", "60", "90"];
 
@@ -149,6 +163,7 @@ const InvoiceForm = () => {
   };
 
   // Additional schema fields
+  const [invoiceType, setInvoiceType] = useState("proforma"); // 'tax' or 'proforma'
   const [status, setStatus] = useState("draft");
   const [priority, setPriority] = useState("normal");
   const [tags, setTags] = useState("");
@@ -166,6 +181,20 @@ const InvoiceForm = () => {
   const [currentTab, setCurrentTab] = useState("basic");
   const [completedTabs, setCompletedTabs] = useState(new Set());
   const [incomeLedger, setIncomeLedger] = useState("Sales");
+  const [convertedFromId, setConvertedFromId] = useState(null); // For tracking if this invoice was converted from a Proforma
+
+  // Bank details state
+  const [bankDetails, setBankDetails] = useState({
+    bankName: "",
+    accountNumber: "",
+    ifscCode: "",
+    branchName: "",
+  });
+  const [savedBanks, setSavedBanks] = useState([]);
+  const [isLoadingBanks, setIsLoadingBanks] = useState(false);
+  const [bankSelectOpen, setBankSelectOpen] = useState(false);
+  const [selectedBankId, setSelectedBankId] = useState(null);
+  const [bankFormOpen, setBankFormOpen] = useState(false);
 
   useEffect(() => {
     const fetchCompanies = async () => {
@@ -200,6 +229,35 @@ const InvoiceForm = () => {
 
     fetchCompanies();
   }, []);
+
+  // Load saved banks for the selected company
+  useEffect(() => {
+    const fetchSavedBanks = async () => {
+      if (!selectedCompany || !selectedCompany.id) {
+        setSavedBanks([]);
+        return;
+      }
+      setIsLoadingBanks(true);
+      try {
+        // Use the correct API to fetch banks for the selected company
+        const response = await window.electron.getCompanyBanks(selectedCompany.id);
+        if (response.success) {
+          setSavedBanks(response.banks || response.data || []);
+          console.log("Saved banks:", response.banks || response.data || []);
+        } else {
+          setSavedBanks([]);
+          console.error("Failed to fetch banks:", response.error);
+        }
+      } catch (error) {
+        setSavedBanks([]);
+        console.error("Error fetching banks:", error);
+      } finally {
+        setIsLoadingBanks(false);
+      }
+    };
+    fetchSavedBanks();
+  }, [selectedCompany]);
+
   useEffect(() => {
     const fetchItems = async () => {
       setIsLoadingItems(true);
@@ -287,15 +345,16 @@ const InvoiceForm = () => {
         }
 
         const prefix = companyInitials;
-        console.log("Fetching invoice number with prefix:", prefix);
+        console.log("Fetching invoice number with prefix:", prefix, "and type:", invoiceType);
 
-        const response = await window.electron.getNextInvoiceNumber(prefix);
+        const response = await window.electron.getNextInvoiceNumber(prefix, invoiceType);
         console.log("Got invoice number response:", response);
 
         if (!response || !response.success) {
           console.error("Error getting next invoice number:", response?.error || "Unknown error");
           // Set a default invoice number as fallback
-          const fallbackNumber = `${prefix}0001`;
+          const typePrefix = invoiceType === 'proforma' ? 'PRO-' : '';
+          const fallbackNumber = `${typePrefix}${prefix}0001`;
           console.log("Using fallback invoice number:", fallbackNumber);
           setInvoiceNumber(fallbackNumber);
           setInvoiceSequence("0001");
@@ -306,7 +365,9 @@ const InvoiceForm = () => {
         console.log("Received invoice number:", invoiceNumber);
 
         // Extract sequence number from the end of the invoice number
-        const prefixLength = prefix.length;
+        // For Proforma invoices, we need to account for the 'PRO-' prefix
+        const typePrefix = invoiceType === 'proforma' ? 'PRO-' : '';
+        const prefixLength = typePrefix.length + prefix.length;
         const sequence = invoiceNumber.substring(prefixLength);
 
         if (sequence && !isNaN(parseInt(sequence, 10))) {
@@ -315,13 +376,14 @@ const InvoiceForm = () => {
           setInvoiceSequence(sequence);
         } else {
           console.warn("Invalid sequence number:", sequence);
-          setInvoiceNumber(`${prefix}0001`);
+          setInvoiceNumber(`${typePrefix}${prefix}0001`);
           setInvoiceSequence("0001");
         }
       } catch (error) {
         console.error("Error in fetchLatestInvoiceNumber:", error);
         // Set a default invoice number as fallback
-        const fallbackNumber = `${companyInitials}0001`;
+        const typePrefix = invoiceType === 'proforma' ? 'PRO-' : '';
+        const fallbackNumber = `${typePrefix}${companyInitials}0001`;
         console.log("Using fallback invoice number after error:", fallbackNumber);
         setInvoiceNumber(fallbackNumber);
         setInvoiceSequence("0001");
@@ -329,7 +391,7 @@ const InvoiceForm = () => {
     };
 
     fetchLatestInvoiceNumber();
-  }, [companyInitials]);
+  }, [companyInitials, invoiceType]);
 
   useEffect(() => {
     // Only run this when a company is selected
@@ -804,6 +866,83 @@ const InvoiceForm = () => {
     console.log("New item saved:", newItem);
     // You might want to implement additional logic to add the item to the list
   };
+
+  // Handle bank field changes
+  const handleBankChange = (field, value) => {
+    setBankDetails(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // Handle bank selection from saved banks
+  const handleBankSelect = (bankId) => {
+    const selectedBank = savedBanks.find(bank => String(bank.id) === String(bankId));
+    if (selectedBank) {
+      setBankDetails({
+        bankName: selectedBank.bankName || "",
+        accountNumber: selectedBank.accountNumber || "",
+        ifscCode: selectedBank.ifscCode || "",
+        branchName: selectedBank.branchName || "",
+      });
+      setSelectedBankId(bankId);
+    }
+  };
+
+  // Handle saving new bank
+  const handleSaveBank = (newBank) => {
+    console.log("New bank saved:", newBank);
+    // Add the new bank to the saved banks list
+    const newBankWithId = {
+      ...newBank,
+      id: Date.now(), // Simple ID generation for demo
+    };
+    setSavedBanks(prev => [...prev, newBankWithId]);
+
+    // Auto-select the newly added bank
+    setBankDetails({
+      bankName: newBank.bankName || "",
+      accountNumber: newBank.accountNumber || "",
+      ifscCode: newBank.ifscCode || "",
+      branchName: newBank.branchName || "",
+    });
+    setSelectedBankId(newBankWithId.id);
+  };
+  // Handle converting a Proforma invoice to a Tax invoice
+  const handleConvertProformaToTax = async (proformaInvoiceId) => {
+    try {
+      // Show loading toast
+      toast.loading("Converting Proforma to Tax Invoice...");
+
+      // Call the electron API to convert the Proforma invoice
+      const response = await window.electron.convertProformaToTax(proformaInvoiceId);
+
+      // Dismiss loading toast
+      toast.dismiss();
+
+      if (response.success) {
+        // Show success message
+        toast.success("Successfully converted to Tax Invoice");
+
+        // Reset the form to prepare for a new invoice
+        resetForm();
+
+        // Redirect to the new tax invoice or refresh the current page
+        // This depends on your application's routing structure
+        window.location.href = `/invoices/${response.newInvoiceId}`;
+        return true;
+      } else {
+        // Show error message
+        toast.error(response.error || "Failed to convert invoice");
+        return false;
+      }
+    } catch (error) {
+      console.error("Error converting Proforma to Tax invoice:", error);
+      toast.error("An unexpected error occurred");
+      return false;
+    }
+  };
+
   // Handle form submission
   const handleSubmit = async (isDraft = false) => {
     // Step 1: Validate essential input data
@@ -834,6 +973,9 @@ const InvoiceForm = () => {
         dueDate: dueDate,
         paymentTerms: paymentTerms,
         incomeLedger: incomeLedger,
+        // Include invoice type and converted from ID if applicable
+        invoiceType: invoiceType,
+        convertedFromId: convertedFromId,
         items: items.map((item) => ({
           id: item.dbItemId, // Use the actual database item ID (backend expects 'id' field)
           details: item.details || "",
@@ -864,6 +1006,7 @@ const InvoiceForm = () => {
         createdBy: createdBy,
         // Pass the signature data string if available
         signature: signature || null,
+        isPaid,
       };
 
       console.log("Saving invoice:", invoiceForDB);
@@ -1016,6 +1159,9 @@ const InvoiceForm = () => {
     setTermsAndConditions("");
     setSignature(null);
     setIncomeLedger("Sales");
+    // Reset invoice type to tax invoice
+    setInvoiceType("tax");
+    setConvertedFromId(null);
     // Don't reset company initials as they should persist
   };
 
@@ -1078,100 +1224,36 @@ const InvoiceForm = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-3 space-y-4">
-      <div className="flex items-center justify-between mb-6">
+    <div className="max-w-7xl mx-auto p-4 space-y-3">
+      {/* Compact Header */}
+      <div className="flex items-center justify-between mb-1">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">New Invoice</h1>
-          <p className="text-xs text-gray-600 mt-1">Create and manage your invoice details</p>
+          <h1 className="text-lg font-semibold text-gray-900 leading-tight">New Invoice</h1>
+          <p className="text-xs text-gray-600 mt-0">Create and manage your invoice details</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Badge variant="outline" className="text-xs px-3 py-1">
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-xs px-2 py-0.5">
             {invoiceNumber || "Draft"}
           </Badge>
-          {getNextTab() !== "additional" && (
-            <Badge variant="secondary" className="text-xs px-2 py-1">
-              Next: {getNextTab() === "basic" ? "Complete Basic Details" :
-                getNextTab() === "items" ? "Add Items" :
-                  "Add Notes"}
-            </Badge>
-          )}
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleCancel} size="sm">
-              Cancel
-            </Button>
-            {!isFormReadyToSubmit() ? (
-              <Button
-                variant="outline"
-                onClick={() => setCurrentTab(getNextTab())}
-                size="sm"
-                className="flex items-center gap-1 text-xs px-3 py-1 h-7"
-              >
-                {getNextTab() === "basic" ? "Complete Basic Details" :
-                  getNextTab() === "items" ? "Add Items" : "Continue"}
-                <ArrowRight className="w-3 h-3" />
-              </Button>
-            ) : (
-              <Button
-                onClick={() => handleSubmit(false)}
-                size="sm"
-                className="flex items-center gap-1 text-xs px-3 py-1 h-7 bg-green-600 hover:bg-green-700"
-              >
-                Save Invoice
-              </Button>
-            )}
-          </div>
         </div>
       </div>
 
-      {/* Welcome Guide - Show when form is empty */}
-      {!selectedCompany && !selectedCustomer && currentTab === "basic" && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-6">
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <Info className="w-5 h-5 text-blue-600" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-base font-semibold text-blue-900 mb-2">Welcome to Invoice Creation!</h3>
-              <p className="text-sm text-blue-700 mb-3">
-                Let's create your invoice step by step. We'll guide you through each section to ensure nothing is missed.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
-                <div className="flex items-center gap-2 text-blue-600">
-                  <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-semibold">1</span>
-                  <span>Select Company & Customer</span>
-                </div>
-                <div className="flex items-center gap-2 text-gray-500">
-                  <span className="w-6 h-6 bg-gray-300 text-white rounded-full flex items-center justify-center text-xs font-semibold">2</span>
-                  <span>Add Invoice Items</span>
-                </div>
-                <div className="flex items-center gap-2 text-gray-500">
-                  <span className="w-6 h-6 bg-gray-300 text-white rounded-full flex items-center justify-center text-xs font-semibold">3</span>
-                  <span>Add Notes (Optional)</span>
-                </div>
-                <div className="flex items-center gap-2 text-gray-500">
-                  <span className="w-6 h-6 bg-gray-300 text-white rounded-full flex items-center justify-center text-xs font-semibold">4</span>
-                  <span>Save & Download</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
-        <div className="space-y-4 mb-6">
-          {/* Progress Indicator */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-medium text-blue-900">Invoice Creation Progress</h3>
+        <div className="space-y-2 mb-3">
+          {/* Compact Progress Indicator */}
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-1.5">
+            <div className="flex items-center justify-between mb-0.5">
+              <h3 className="text-xs font-medium text-blue-900">Progress</h3>
               <span className="text-xs text-blue-600">
-                {completedTabs.size}/4 sections completed
+                {completedTabs.size}/4
               </span>
             </div>
-            <div className="flex space-x-2">
+            <div className="flex space-x-1">
               {["basic", "items", "terms", "additional"].map((tab, index) => (
                 <div key={tab} className="flex-1">
-                  <div className={`h-2 rounded-full ${completedTabs.has(tab)
+                  <div className={`h-1 rounded-full ${completedTabs.has(tab)
                     ? 'bg-green-500'
                     : currentTab === tab
                       ? 'bg-blue-500'
@@ -1182,84 +1264,106 @@ const InvoiceForm = () => {
             </div>
           </div>
 
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="basic" className="text-sm relative">
+          <TabsList className="grid w-full grid-cols-4 h-8">
+            <TabsTrigger value="basic" className="text-xs relative py-1">
               <div className="flex items-center">
                 {completedTabs.has("basic") ? (
-                  <div className="w-4 h-4 mr-2 bg-green-500 rounded-full flex items-center justify-center">
+                  <div className="w-3 h-3 mr-1 bg-green-500 rounded-full flex items-center justify-center">
                     <span className="text-white text-xs">✓</span>
                   </div>
                 ) : (
-                  <Building className="w-4 h-4 mr-2" />
+                  <Building className="w-3 h-3 mr-1" />
                 )}
-                <span>Basic Details</span>
+                <span>Basic</span>
                 {!completedTabs.has("basic") && currentTab !== "basic" && (
-                  <span className="ml-2 w-2 h-2 bg-red-500 rounded-full" />
+                  <span className="ml-1 w-1.5 h-1.5 bg-red-500 rounded-full" />
                 )}
               </div>
             </TabsTrigger>
 
-            <TabsTrigger value="items" className="text-sm relative">
+            <TabsTrigger value="items" className="text-xs relative py-1">
               <div className="flex items-center">
                 {completedTabs.has("items") ? (
-                  <div className="w-4 h-4 mr-2 bg-green-500 rounded-full flex items-center justify-center">
+                  <div className="w-3 h-3 mr-1 bg-green-500 rounded-full flex items-center justify-center">
                     <span className="text-white text-xs">✓</span>
                   </div>
                 ) : (
-                  <DollarSign className="w-4 h-4 mr-2" />
+                  <DollarSign className="w-3 h-3 mr-1" />
                 )}
-                <span>Items & Pricing</span>
+                <span>Items</span>
                 {!completedTabs.has("items") && currentTab !== "items" && (
-                  <span className="ml-2 w-2 h-2 bg-red-500 rounded-full" />
+                  <span className="ml-1 w-1.5 h-1.5 bg-red-500 rounded-full" />
                 )}
               </div>
             </TabsTrigger>
 
-            <TabsTrigger value="terms" className="text-sm relative">
+            <TabsTrigger value="terms" className="text-xs relative py-1">
               <div className="flex items-center">
                 {completedTabs.has("terms") ? (
-                  <div className="w-4 h-4 mr-2 bg-green-500 rounded-full flex items-center justify-center">
+                  <div className="w-3 h-3 mr-1 bg-green-500 rounded-full flex items-center justify-center">
                     <span className="text-white text-xs">✓</span>
                   </div>
                 ) : (
-                  <FileText className="w-4 h-4 mr-2" />
+                  <FileText className="w-3 h-3 mr-1" />
                 )}
-                <span>Terms & Notes</span>
+                <span>Terms</span>
               </div>
             </TabsTrigger>
 
-            <TabsTrigger value="additional" className="text-sm relative">
+            <TabsTrigger value="additional" className="text-xs relative py-1">
               <div className="flex items-center">
                 {completedTabs.has("additional") ? (
-                  <div className="w-4 h-4 mr-2 bg-green-500 rounded-full flex items-center justify-center">
+                  <div className="w-3 h-3 mr-1 bg-green-500 rounded-full flex items-center justify-center">
                     <span className="text-white text-xs">✓</span>
                   </div>
                 ) : (
-                  <Settings className="w-4 h-4 mr-2" />
+                  <Settings className="w-3 h-3 mr-1" />
                 )}
-                <span>Additional Info</span>
-                <span className="ml-2 text-xs text-gray-500">(Optional)</span>
+                <span>More</span>
               </div>
             </TabsTrigger>
           </TabsList>
         </div>
 
-        {/* Basic Details Tab */}
-        <TabsContent value="basic" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Company Selection Card */}
-            <Card className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Building className="w-4 h-4 text-blue-600" />
-                  <h3 className="text-base font-semibold">Company Information</h3>
+        {/* Basic Details Tab - Invoice Type at Top */}
+        <TabsContent value="basic" className="space-y-3">
+          {/* Invoice Type - Full Width, No Header */}
+          <div className="border border-gray-200 rounded-md p-3">
+            <div className="space-y-3">
+              <div className="flex items-center justify-center gap-3">
+                <span className={`text-xs font-medium transition-colors duration-200 ${invoiceType === 'proforma' ? 'text-purple-600' : 'text-gray-500'}`}>Proforma</span>
+                <button
+                  onClick={() => setInvoiceType(invoiceType === 'tax' ? 'proforma' : 'tax')}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${invoiceType === 'tax' ? 'bg-green-500 focus:ring-green-500' : 'bg-purple-500 focus:ring-purple-500'}`}
+                >
+                  <span
+                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform duration-200 ${invoiceType === 'tax' ? 'translate-x-5' : 'translate-x-1'}`}
+                  />
+                </button>
+                <span className={`text-xs font-medium transition-colors duration-200 ${invoiceType === 'tax' ? 'text-green-600' : 'text-gray-500'}`}>Tax Invoice</span>
+              </div>
+              {/* Visual Card Display */}
+              <div className="relative h-16 overflow-hidden">
+                {/* Proforma Invoice Card */}
+                <div className={`absolute inset-0 transition-all duration-300 ease-in-out ${invoiceType === 'proforma' ? 'opacity-100 scale-100 translate-x-0' : 'opacity-0 scale-95 -translate-x-2 pointer-events-none'}`}> <div className="relative bg-white border border-purple-200 rounded-md p-3 h-full"> <div className="flex items-center gap-2"> <div className="w-6 h-6 rounded bg-purple-100 flex items-center justify-center"> <svg className="w-3 h-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3a1 1 0 011-1h6a1 1 0 011 1v4m-6 0h6m-6 0H8m0 0V5a1 1 0 011-1h6a1 1 0 011 1v2m-6 0h6m-6 0H8m0 0v10a1 1 0 001 1h6a1 1 0 001-1V7H8z" /> </svg> </div> <div className="flex-1"> <div className="flex items-center gap-2"> <h4 className="text-sm font-medium text-gray-900">Proforma Invoice</h4> <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800"> <span className="w-1 h-1 bg-purple-500 rounded-full mr-1"></span> DRAFT </span> </div> <p className="text-xs text-gray-600">Draft document for quotations</p> </div> </div> </div> </div> {/* Tax Invoice Card */} <div className={`absolute inset-0 transition-all duration-300 ease-in-out ${invoiceType === 'tax' ? 'opacity-100 scale-100 translate-x-0' : 'opacity-0 scale-95 translate-x-2 pointer-events-none'}`}> <div className="relative bg-white border border-green-200 rounded-md p-3 h-full"> <div className="flex items-center gap-2"> <div className="w-6 h-6 rounded bg-green-100 flex items-center justify-center"> <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /> </svg> </div> <div className="flex-1"> <div className="flex items-center gap-2"> <h4 className="text-sm font-medium text-gray-900">Tax Invoice</h4> <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"> <span className="w-1 h-1 bg-green-500 rounded-full mr-1"></span> GST </span> </div> <p className="text-xs text-gray-600">Official legal document</p> </div> </div> </div> </div> </div>
+            </div>
+          </div>
+          {/* Two Column Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Left Column: Core Invoice Details */}
+            <div className="space-y-3">
+              {/* Company Information */}
+              <div className="border border-gray-200 rounded-md p-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <Building className="w-3 h-3 text-blue-600" />
+                  <h3 className="text-sm font-medium">Company Information</h3>
                 </div>
 
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium">Select Company *</Label>
-                  <div className="flex items-center gap-3">
+                <div className="space-y-1">
+                  {/* <Label className="text-xs font-medium">Select Company *</Label> */}
+                  <div className="flex items-center gap-2">
                     {selectedCompany && selectedCompany.logo && (
-                      <div className="h-10 w-10 rounded-lg border overflow-hidden flex-shrink-0">
+                      <div className="h-8 w-8 rounded border overflow-hidden flex-shrink-0">
                         <img
                           src={selectedCompany.logo}
                           alt={`${selectedCompany.companyName} logo`}
@@ -1275,7 +1379,7 @@ const InvoiceForm = () => {
                         setCompanySelectOpen(false);
                       }}
                     >
-                      <SelectTrigger className="h-10">
+                      <SelectTrigger className="h-9 text-xs">
                         <SelectValue
                           placeholder={
                             selectedCompany
@@ -1288,22 +1392,22 @@ const InvoiceForm = () => {
                       </SelectTrigger>
                       <SelectContent className="p-0">
                         <Command>
-                          <div className="p-3 border-b flex gap-2">
+                          <div className="p-2 border-b flex gap-2">
                             <CommandInput placeholder="Search companies..." className="flex-1" />
                             <Button
                               size="sm"
                               onClick={() => setCompanyFormOpen(true)}
                             >
-                              <Plus className="h-4 w-4 mr-1" /> Add New
+                              <Plus className="h-3 w-3 mr-1" /> Add New
                             </Button>
                           </div>
                           <CommandEmpty>
-                            <div className="p-4 text-center text-muted-foreground">
-                              <p>No companies found</p>
+                            <div className="p-3 text-center text-muted-foreground">
+                              <p className="text-sm">No companies found</p>
                               <p className="text-xs mt-1">Click "Add New" to create one</p>
                             </div>
                           </CommandEmpty>
-                          <CommandGroup className="max-h-48 overflow-y-auto">
+                          <CommandGroup className="max-h-40 overflow-y-auto">
                             {companies.map((company) => (
                               <CommandItem
                                 key={company.id}
@@ -1312,10 +1416,10 @@ const InvoiceForm = () => {
                                   handleCompanySelect(value);
                                   setCompanySelectOpen(false);
                                 }}
-                                className="flex items-center gap-3 p-3"
+                                className="flex items-center gap-3 p-2"
                               >
                                 {company.logo && (
-                                  <div className="h-8 w-8 rounded overflow-hidden flex-shrink-0">
+                                  <div className="h-6 w-6 rounded overflow-hidden flex-shrink-0">
                                     <img
                                       src={company.logo}
                                       alt={`${company.companyName} logo`}
@@ -1323,7 +1427,7 @@ const InvoiceForm = () => {
                                     />
                                   </div>
                                 )}
-                                <span>{company.companyName}</span>
+                                <span className="text-sm">{company.companyName}</span>
                               </CommandItem>
                             ))}
                           </CommandGroup>
@@ -1333,18 +1437,165 @@ const InvoiceForm = () => {
                   </div>
                 </div>
               </div>
-            </Card>
 
-            {/* Customer Selection Card */}
-            <Card className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-green-600" />
-                  <h3 className="text-base font-semibold">Customer Information</h3>
+              {/* Invoice Fields */}
+              <div className="border border-gray-200 rounded-md p-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <FileText className="w-3 h-3 text-purple-600" />
+                  <h3 className="text-sm font-medium">Invoice Details</h3>
                 </div>
 
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium">Select Customer *</Label>
+                <hr className="mb-2 border-gray-200" />
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium">Invoice Number</Label>
+                    <div className="flex gap-1">
+                      <Input
+                        value={companyInitials}
+                        onChange={(e) =>
+                          updateCompanyInitials(e.target.value.toUpperCase().slice(0, 6))
+                        }
+                        className="w-16 text-center h-9 !text-xs"
+                        maxLength={6}
+                        placeholder="ABC"
+                      />
+                      <Input
+                        value={invoiceSequence}
+                        onChange={(e) => handleSequenceChange(e.target.value)}
+                        className="flex-1 h-9 !text-xs"
+                        placeholder="0001"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium">Income Ledger</Label>
+                    <Input
+                      id="incomeLedger"
+                      placeholder="Sales"
+                      value={incomeLedger}
+                      onChange={(e) => setIncomeLedger(e.target.value)}
+                      className="h-9 !text-xs"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium">Invoice Date</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left h-9 text-xs">
+                          {invoiceDate instanceof Date && !isNaN(invoiceDate)
+                            ? format(invoiceDate, "dd/MM/yyyy")
+                            : "Select date"}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={invoiceDate}
+                          onSelect={setInvoiceDate}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium">Due Date</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left h-9 text-xs" disabled={isPaid}>
+                          {dueDate instanceof Date && !isNaN(dueDate)
+                            ? format(dueDate, "dd/MM/yyyy")
+                            : "Select date"}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={dueDate}
+                          onSelect={setDueDate}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium">Payment Terms</Label>
+                    <Select
+                      value={paymentTerms}
+                      onValueChange={(value) => {
+                        setPaymentTerms(value);
+                        if (invoiceDate) {
+                          const newDueDate = addDays(new Date(invoiceDate), parseInt(value));
+                          setDueDate(newDueDate);
+                        }
+                      }}
+                      disabled={isPaid}
+                    >
+                      <SelectTrigger className="h-9 text-xs" disabled={isPaid}>
+                        <SelectValue placeholder="Select payment terms" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <div className="p-2 border-b">
+                          <input
+                            type="number"
+                            placeholder="Enter custom days..."
+                            className="w-full px-2 py-1 border rounded text-xs"
+                            value={customTerm}
+                            onChange={(e) => setCustomTerm(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                const days = parseInt(e.currentTarget.value);
+                                if (!isNaN(days)) {
+                                  setPaymentTerms(days.toString());
+                                  if (invoiceDate) {
+                                    const newDueDate = addDays(new Date(invoiceDate), days);
+                                    setDueDate(newDueDate);
+                                  }
+                                  setCustomTerm("");
+                                }
+                              }
+                            }}
+                          />
+                        </div>
+                        {defaultTerms.map((term) => (
+                          <SelectItem key={term} value={term}>
+                            Net {term} days
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium">Reference</Label>
+                    <Input
+                      placeholder="Optional reference"
+                      className="h-9 !text-xs"
+                    />
+                  </div>
+
+
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Configuration & Customer */}
+            <div className="space-y-3">
+              {/* Customer Information */}
+              <div className="border border-gray-200 rounded-md p-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <User className="w-3 h-3 text-green-600" />
+                  <h3 className="text-sm font-medium">Customer Information</h3>
+                </div>
+
+                <div className="space-y-1">
+                  {/* <Label className="text-xs font-medium">Select Customer *</Label> */}
                   <Select
                     open={customerSelectOpen}
                     onOpenChange={setCustomerSelectOpen}
@@ -1353,7 +1604,7 @@ const InvoiceForm = () => {
                       setCustomerSelectOpen(false);
                     }}
                   >
-                    <SelectTrigger className="h-10">
+                    <SelectTrigger className="h-9 text-xs">
                       <SelectValue
                         placeholder={
                           selectedCustomer
@@ -1364,22 +1615,22 @@ const InvoiceForm = () => {
                     </SelectTrigger>
                     <SelectContent className="p-0">
                       <Command>
-                        <div className="p-3 border-b flex gap-2">
+                        <div className="p-2 border-b flex gap-2">
                           <CommandInput placeholder="Search customers..." className="flex-1" />
                           <Button
                             size="sm"
                             onClick={() => setCustomerFormOpen(true)}
                           >
-                            <Plus className="h-4 w-4 mr-1" /> Add New
+                            <Plus className="h-3 w-3 mr-1" /> Add New
                           </Button>
                         </div>
                         <CommandEmpty>
-                          <div className="p-4 text-center text-muted-foreground">
-                            <p>No customers found</p>
+                          <div className="p-3 text-center text-muted-foreground">
+                            <p className="text-sm">No customers found</p>
                             <p className="text-xs mt-1">Click "Add New" to create one</p>
                           </div>
                         </CommandEmpty>
-                        <CommandGroup className="max-h-48 overflow-y-auto">
+                        <CommandGroup className="max-h-40 overflow-y-auto">
                           {isLoadingCustomers ? (
                             <CommandItem disabled>Loading customers...</CommandItem>
                           ) : customers.length === 0 ? (
@@ -1393,7 +1644,7 @@ const InvoiceForm = () => {
                                   handleCustomerSelect(value);
                                   setCustomerSelectOpen(false);
                                 }}
-                                className="p-3"
+                                className="p-2"
                               >
                                 {`${customer.firstName || ""} ${customer.lastName || ""}`.trim() ||
                                   customer.name ||
@@ -1407,159 +1658,153 @@ const InvoiceForm = () => {
                   </Select>
                 </div>
               </div>
-            </Card>
-          </div>
 
-          {/* Invoice Details Card */}
-          <Card className="p-6">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-purple-600" />
-                <h3 className="text-base font-semibold">Invoice Details</h3>
-              </div>
+              {/* Simplified Bank Details Component */}
+              <div className="border border-gray-200 rounded-md p-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <DollarSign className="w-3 h-3 text-blue-600" />
+                  <h3 className="text-sm font-medium">Bank Details</h3>
+                </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Invoice Number</Label>
-                  <div className="flex gap-1">
-                    <Input
-                      value={companyInitials}
-                      onChange={(e) =>
-                        updateCompanyInitials(e.target.value.toUpperCase().slice(0, 6))
-                      }
-                      className="w-20 text-center"
-                      maxLength={6}
-                      placeholder="ABC"
-                    />
-                    <Input
-                      value={invoiceSequence}
-                      onChange={(e) => handleSequenceChange(e.target.value)}
-                      className="flex-1"
-                      placeholder="0001"
-                    />
+                {/* State 1: Selection View */}
+                {!selectedBankId && (
+                  <div className="space-y-1">
+                    <Select
+                      open={bankSelectOpen}
+                      onOpenChange={setBankSelectOpen}
+                      onValueChange={(value) => {
+                        handleBankSelect(value);
+                        setBankSelectOpen(false);
+                      }}
+                    >
+                      <SelectTrigger className="h-9 text-xs">
+                        <SelectValue placeholder="Select a bank account" />
+                      </SelectTrigger>
+                      <SelectContent className="p-0">
+                        <Command>
+                          <div className="p-2 border-b flex gap-2">
+                            <CommandInput placeholder="Search bank accounts..." className="flex-1" />
+                            <Button
+                              size="sm"
+                              onClick={() => setBankFormOpen(true)}
+                            >
+                              <Plus className="h-3 w-3 mr-1" /> Add New
+                            </Button>
+                          </div>
+                          <CommandEmpty>
+                            <div className="p-3 text-center text-muted-foreground">
+                              <p className="text-sm">No bank accounts found</p>
+                              <p className="text-xs mt-1">Click "Add New" to create one</p>
+                            </div>
+                          </CommandEmpty>
+                          <CommandGroup className="max-h-40 overflow-y-auto">
+                            {isLoadingBanks ? (
+                              <CommandItem disabled>Loading bank accounts...</CommandItem>
+                            ) : savedBanks.length === 0 ? (
+                              <CommandItem disabled>No bank accounts found</CommandItem>
+                            ) : (
+                              savedBanks.map((bank) => (
+                                <CommandItem
+                                  key={bank.id}
+                                  value={String(bank.id)}
+                                  onSelect={(value) => {
+                                    handleBankSelect(value);
+                                    setBankSelectOpen(false);
+                                  }}
+                                  className="flex items-center gap-2 p-2"
+                                >
+                                  <span className="text-xs font-medium">{bank.bankName}</span>
+                                  <span className="text-xs text-gray-500">{bank.accountNumber}</span>
+                                </CommandItem>
+                              ))
+                            )}
+                          </CommandGroup>
+                        </Command>
+                      </SelectContent>
+                    </Select>
                   </div>
-                </div>
+                )}
 
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Income Ledger</Label>
-                  <Input
-                    id="incomeLedger"
-                    placeholder="Sales"
-                    value={incomeLedger}
-                    onChange={(e) => setIncomeLedger(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Invoice Date</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-start text-left">
-                        {invoiceDate instanceof Date && !isNaN(invoiceDate)
-                          ? format(invoiceDate, "dd/MM/yyyy")
-                          : "Select date"}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={invoiceDate}
-                        onSelect={setInvoiceDate}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Due Date</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-start text-left">
-                        {dueDate instanceof Date && !isNaN(dueDate)
-                          ? format(dueDate, "dd/MM/yyyy")
-                          : "Select date"}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={dueDate}
-                        onSelect={setDueDate}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Payment Terms</Label>
-                  <Select
-                    value={paymentTerms}
-                    onValueChange={(value) => {
-                      setPaymentTerms(value);
-                      if (invoiceDate) {
-                        const newDueDate = addDays(new Date(invoiceDate), parseInt(value));
-                        setDueDate(newDueDate);
-                      }
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select payment terms" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <div className="p-2 border-b">
-                        <input
-                          type="number"
-                          placeholder="Enter custom days..."
-                          className="w-full px-2 py-1 border rounded text-sm"
-                          value={customTerm}
-                          onChange={(e) => setCustomTerm(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              const days = parseInt(e.currentTarget.value);
-                              if (!isNaN(days)) {
-                                setPaymentTerms(days.toString());
-                                if (invoiceDate) {
-                                  const newDueDate = addDays(new Date(invoiceDate), days);
-                                  setDueDate(newDueDate);
-                                }
-                                setCustomTerm("");
-                              }
-                            }
+                {/* State 2: Display & Remove View */}
+                {selectedBankId && (
+                  <div className="p-2 bg-gray-50 rounded-md">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-gray-700">Selected Account</span>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedBankId(null);
+                            setBankDetails({
+                              bankName: "",
+                              accountNumber: "",
+                              ifscCode: "",
+                              branchName: "",
+                            });
                           }}
-                        />
+                          className="h-6 px-2 text-xs text-gray-600 hover:text-gray-700"
+                        >
+                          Change
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedBankId(null);
+                            setBankDetails({
+                              bankName: "",
+                              accountNumber: "",
+                              ifscCode: "",
+                              branchName: "",
+                            });
+                          }}
+                          className="h-6 px-2 text-xs text-red-600 hover:text-red-700"
+                        >
+                          🗑️ Remove
+                        </Button>
                       </div>
-                      {defaultTerms.map((term) => (
-                        <SelectItem key={term} value={term}>
-                          Net {term} days
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                    </div>
+                    <div className="space-y-1 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Bank:</span>
+                        <span className="font-medium">{bankDetails.bankName}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Account Number:</span>
+                        <span className="font-medium">XXXXXX{bankDetails.accountNumber.slice(-4)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">IFSC Code:</span>
+                        <span className="font-medium">{bankDetails.ifscCode}</span>
+                      </div>
+                      {bankDetails.branchName && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Branch:</span>
+                          <span className="font-medium">{bankDetails.branchName}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          </Card>
+          </div>
 
-          {/* Navigation and Guidance for Basic Tab */}
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+          {/* Compact Navigation for Basic Tab */}
+          <div className="bg-gray-50 border border-gray-200 rounded-md p-1.5">
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 {!isTabCompleted("basic") ? (
                   <div className="flex items-center text-amber-600">
-                    <span className="w-2 h-2 bg-amber-500 rounded-full mr-2"></span>
-                    <span className="text-xs font-medium">
-                      Please select a company and customer to continue
+                    <span className="w-1.5 h-1.5 bg-amber-500 rounded-full mr-2"></span>
+                    <span className="text-xs">
+                      Select company and customer to continue
                     </span>
                   </div>
                 ) : (
                   <div className="flex items-center text-green-600">
-                    <span className="text-xs">✓ Basic details completed! Ready to add invoice items.</span>
+                    <span className="text-xs">✓ Basic details completed</span>
                   </div>
                 )}
               </div>
@@ -1568,9 +1813,9 @@ const InvoiceForm = () => {
                   <Button
                     onClick={() => setCurrentTab("items")}
                     size="sm"
-                    className="flex items-center gap-1 text-xs px-3 py-1 h-7"
+                    className="flex items-center gap-1 text-xs px-2 py-1 h-6"
                   >
-                    Next: Add Items
+                    Next: Items
                     <ArrowRight className="w-3 h-3" />
                   </Button>
                 )}
@@ -1580,61 +1825,33 @@ const InvoiceForm = () => {
         </TabsContent>
 
         {/* Items & Pricing Tab */}
-        <TabsContent value="items" className="space-y-6">
-          <Card className="p-6">
-            <div className="space-y-4">
+        <TabsContent value="items" className="space-y-4">
+          <Card className="p-4">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <DollarSign className="w-4 h-4 text-blue-600" />
-                  <h3 className="text-base font-semibold">Invoice Items</h3>
+                  <h3 className="text-sm font-semibold">Invoice Items</h3>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={addNewRow}
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Item
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const newRows = Array.from({ length: 5 }, (_, index) => ({
-                        id: items.length + index + 1,
-                        details: "",
-                        quantity: "1.00",
-                        rate: "0.00",
-                        amount: "0.00",
-                        hsn: "",
-                        dbItemId: null, // Initialize dbItemId as null for new rows
-                      }));
-                      setItems([...items, ...newRows]);
-                    }}
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Bulk Add
-                  </Button>
-                </div>
+                {/* Removed buttons from header - they'll be placed more intuitively */}
               </div>
 
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-gray-50">
-                      <TableHead className="w-[40%]">Item Details</TableHead>
-                      <TableHead className="text-center w-[12%]">HSN/SAC</TableHead>
-                      <TableHead className="text-center w-[12%]">Quantity</TableHead>
-                      <TableHead className="text-center w-[12%]">Rate (₹)</TableHead>
-                      <TableHead className="text-center w-[12%]">Amount (₹)</TableHead>
-                      <TableHead className="w-[8%]"></TableHead>
+                    <TableRow className="bg-gray-50 h-8">
+                      <TableHead className="w-[40%] text-xs px-2 py-1">Item Details</TableHead>
+                      <TableHead className="text-center w-[12%] text-xs px-2 py-1">HSN/SAC</TableHead>
+                      <TableHead className="text-center w-[12%] text-xs px-2 py-1">Quantity</TableHead>
+                      <TableHead className="text-center w-[12%] text-xs px-2 py-1">Rate (₹)</TableHead>
+                      <TableHead className="text-center w-[12%] text-xs px-2 py-1">Amount (₹)</TableHead>
+                      <TableHead className="w-[8%] text-xs px-2 py-1"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {items.map((item) => (
-                      <TableRow key={item.id} className="hover:bg-gray-50">
-                        <TableCell>
+                      <TableRow key={item.id} className="hover:bg-gray-50 h-9">
+                        <TableCell className="px-2 py-1">
                           <Select
                             open={itemSelectsOpen[item.id] || false}
                             onOpenChange={(open) => {
@@ -1651,7 +1868,7 @@ const InvoiceForm = () => {
                               }));
                             }}
                           >
-                            <SelectTrigger className="w-full h-9">
+                            <SelectTrigger className="w-full h-9 text-xs">
                               <SelectValue
                                 placeholder={
                                   isLoadingItems
@@ -1699,10 +1916,10 @@ const InvoiceForm = () => {
                           </Select>
                         </TableCell>
 
-                        <TableCell>
+                        <TableCell className="px-2 py-1">
                           <Input
                             value={item.hsn || ""}
-                            className="text-center h-9"
+                            className="text-center h-9 text-xs"
                             onChange={(e) => {
                               const updatedItems = items.map((i) => {
                                 if (i.id === item.id) {
@@ -1716,35 +1933,40 @@ const InvoiceForm = () => {
                           />
                         </TableCell>
 
-                        <TableCell>
+                        <TableCell className="px-2 py-1">
                           <Input
+                            type="number"
+                            step="1"
+                            pattern="[0-9]*"
                             value={item.quantity}
-                            className="text-center h-9"
+                            className="text-center h-9 text-xs"
                             onChange={(e) => {
-                              updateItemAmount(item.id, e.target.value, item.rate);
+                              // Only allow whole numbers
+                              const value = e.target.value.replace(/[^0-9]/g, '');
+                              updateItemAmount(item.id, value, item.rate);
                             }}
                           />
                         </TableCell>
 
-                        <TableCell>
+                        <TableCell className="px-2 py-1">
                           <Input
                             value={item.rate}
-                            className="text-center h-9"
+                            className="text-center h-9 text-xs"
                             onChange={(e) => {
                               updateItemAmount(item.id, item.quantity, e.target.value);
                             }}
                           />
                         </TableCell>
 
-                        <TableCell>
+                        <TableCell className="px-2 py-1">
                           <Input
                             value={item.amount}
-                            className="text-center h-9 bg-gray-50"
+                            className="text-center h-9 bg-gray-50 text-xs"
                             readOnly
                           />
                         </TableCell>
 
-                        <TableCell>
+                        <TableCell className="px-2 py-1">
                           <Button
                             type="button"
                             size="icon"
@@ -1761,13 +1983,47 @@ const InvoiceForm = () => {
                 </Table>
               </div>
 
-              {/* Totals Section */}
-              <div className="border-t pt-6">
-                <div className="flex justify-between items-start">
-                  <div className="space-y-4">
+              {/* Action Buttons - Now placed where users naturally look after completing a row */}
+              <div className="flex items-center justify-between pt-1 border-t border-gray-100 mt-1">
+                <div className="flex items-center gap-2 ml-4">
+                  <Button
+                    onClick={addNewRow}
+                    size="sm"
+                    className="flex items-center gap-1 text-xs px-3 py-1 h-7 bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Plus className="h-3 w-3" />
+                    Add Item
+                  </Button>
+                  <button
+                    onClick={() => {
+                      const newRows = Array.from({ length: 5 }, (_, index) => ({
+                        id: items.length + index + 1,
+                        details: "",
+                        quantity: "1.00",
+                        rate: "0.00",
+                        amount: "0.00",
+                        hsn: "",
+                        dbItemId: null,
+                      }));
+                      setItems([...items, ...newRows]);
+                    }}
+                    className="text-xs text-gray-600 hover:text-gray-800 underline hover:no-underline"
+                  >
+                    + Bulk Add (5 rows)
+                  </button>
+                </div>
+                <div className="text-xs text-gray-500">
+                  {items.length} item{items.length !== 1 ? 's' : ''}
+                </div>
+              </div>
+
+              {/* Totals Section - compact */}
+              <div className="border-t pt-3 mt-2">
+                <div className="flex justify-between items-start gap-4">
+                  <div className="space-y-2">
                     <div>
-                      <Label className="text-sm font-medium mb-2 block">Discount</Label>
-                      <div className="flex items-center gap-2">
+                      <Label className="text-xs font-medium mb-1 block">Discount</Label>
+                      <div className="flex items-center gap-1">
                         <Input
                           type="number"
                           value={discountPercentage}
@@ -1776,11 +2032,11 @@ const InvoiceForm = () => {
                             setDiscountPercentage(percentage);
                             setDiscountAmount((subtotal * percentage) / 100);
                           }}
-                          className="w-20 h-9"
+                          className="w-20 min-w-[4.5rem] h-7 text-xs text-right"
                           placeholder="0"
                         />
-                        <span className="text-sm">%</span>
-                        <span className="text-sm text-gray-500">or</span>
+                        <span className="text-xs">%</span>
+                        <span className="text-xs text-gray-500">or</span>
                         <Input
                           type="number"
                           value={discountAmount}
@@ -1789,48 +2045,125 @@ const InvoiceForm = () => {
                             setDiscountAmount(amount);
                             setDiscountPercentage(subtotal > 0 ? (amount / subtotal) * 100 : 0);
                           }}
-                          className="w-24 h-9"
+                          className="min-w-[4.5rem] w-auto h-7 text-xs text-right"
                           placeholder="0.00"
                         />
-                        <span className="text-sm">₹</span>
+                        <span className="text-xs">₹</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="w-80 space-y-2">
-                    <div className="flex justify-between text-sm">
+                  <div className="w-72 space-y-1 text-xs">
+                    <div className="flex justify-between">
                       <span className="text-gray-600">Subtotal:</span>
                       <span className="font-medium">₹{subtotal.toFixed(2)}</span>
                     </div>
 
                     {discountAmount > 0 && (
-                      <div className="flex justify-between text-sm">
+                      <div className="flex justify-between">
                         <span className="text-gray-600">Discount ({discountPercentage.toFixed(1)}%):</span>
                         <span className="font-medium text-red-600">-₹{discountAmount.toFixed(2)}</span>
                       </div>
                     )}
 
-                    <div className="flex justify-between text-sm">
+                    <div className="flex justify-between">
                       <span className="text-gray-600">Taxable Amount:</span>
                       <span className="font-medium">₹{(subtotal - discountAmount).toFixed(2)}</span>
                     </div>
 
-                    <div className="flex justify-between text-sm">
+                    <div className="flex justify-between">
                       <span className="text-gray-600">CGST (9%):</span>
                       <span className="font-medium">₹{((subtotal - discountAmount) * 0.09).toFixed(2)}</span>
                     </div>
 
-                    <div className="flex justify-between text-sm">
+                    <div className="flex justify-between">
                       <span className="text-gray-600">SGST (9%):</span>
                       <span className="font-medium">₹{((subtotal - discountAmount) * 0.09).toFixed(2)}</span>
                     </div>
 
-                    <div className="border-t pt-2">
-                      <div className="flex justify-between text-lg">
+                    <div className="border-t pt-1 mt-1">
+                      <div className="flex justify-between text-sm">
                         <span className="font-semibold">Total:</span>
                         <span className="font-bold text-blue-600">
                           ₹{((subtotal - discountAmount) + ((subtotal - discountAmount) * 0.18)).toFixed(2)}
                         </span>
+                      </div>
+
+                      {/* Payment Status Component */}
+                      <div className="mt-3 pt-2 border-t border-gray-200">
+                        {!isPaid ? (
+                          // State 1: Default "Unpaid" Status
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-gray-600">Status:</span>
+                              <span className="text-xs text-amber-600 font-medium">
+                                Due on {format(dueDate, "dd MMM yyyy")}
+                              </span>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setPaymentDetails({
+                                  amount: ((subtotal - discountAmount) + ((subtotal - discountAmount) * 0.18)),
+                                  date: new Date(),
+                                  method: "",
+                                  notes: "",
+                                });
+                                setShowPaymentModal(true);
+                              }}
+                              className="w-full h-7 text-xs bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+                            >
+                              + Record Payment
+                            </Button>
+                            <p className="text-xs text-gray-500 text-center">
+                              💡 Perfect for pre-paid invoices
+                            </p>
+                          </div>
+                        ) : (
+                          // State 3: "Paid" Status
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-gray-600">Status:</span>
+                              <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                                <span className="mr-1">✔️</span>
+                                PAID
+                              </div>
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Paid on {format(paymentDetails.date, "dd MMM yyyy")} via {paymentDetails.method || "Payment"}
+                            </div>
+                            <div className="flex gap-2 justify-between">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowPaymentModal(true)}
+                                className="h-6 pr-2 pl-0 text-xs text-blue-600 hover:text-blue-700"
+                              >
+                                Edit Payment
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setIsPaid(false);
+                                  setPaymentDetails({
+                                    amount: 0,
+                                    date: new Date(),
+                                    method: "",
+                                    notes: "",
+                                  });
+                                }}
+                                className="h-6 pl-2 pr-0 text-xs text-red-600 hover:text-red-700"
+                              >
+                                Mark Unpaid
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1840,7 +2173,7 @@ const InvoiceForm = () => {
           </Card>
 
           {/* Navigation and Guidance for Items Tab */}
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-1.5">
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 {!isTabCompleted("items") ? (
@@ -1892,16 +2225,16 @@ const InvoiceForm = () => {
         </TabsContent>
 
         {/* Terms & Notes Tab */}
-        <TabsContent value="terms" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="p-6">
-              <div className="space-y-4">
+        <TabsContent value="terms" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card className="p-4">
+              <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-blue-600" />
-                  <h3 className="text-base font-semibold">Customer Notes</h3>
+                  <h3 className="text-sm font-semibold">Customer Notes</h3>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Narration (Visible on Invoice)</Label>
+                  <Label className="text-xs font-medium">Narration (Visible on Invoice)</Label>
                   <Textarea
                     placeholder="Thanks for your business."
                     className="h-32 resize-none"
@@ -1915,15 +2248,15 @@ const InvoiceForm = () => {
               </div>
             </Card>
 
-            <Card className="p-6">
-              <div className="space-y-4">
+            <Card className="p-4">
+              <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Settings className="w-4 h-4 text-green-600" />
-                  <h3 className="text-base font-semibold">Invoice Settings</h3>
+                  <h3 className="text-sm font-semibold">Invoice Settings</h3>
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Priority</Label>
+                    <Label className="text-xs font-medium">Priority</Label>
                     <Select value={priority} onValueChange={setPriority}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select priority" />
@@ -1938,11 +2271,12 @@ const InvoiceForm = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Tags</Label>
+                    <Label className="text-xs font-medium">Tags</Label>
                     <Input
                       placeholder="project, client, urgent..."
                       value={tags}
                       onChange={(e) => setTags(e.target.value)}
+                      className="text-xs"
                     />
                     <p className="text-xs text-gray-500">
                       Comma-separated tags for organization
@@ -1954,11 +2288,11 @@ const InvoiceForm = () => {
           </div>
 
           {showTerms && (
-            <Card className="p-6">
-              <div className="space-y-4">
+            <Card className="p-4">
+              <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-purple-600" />
-                  <h3 className="text-base font-semibold">Terms & Conditions</h3>
+                  <h3 className="text-sm font-semibold">Terms & Conditions</h3>
                 </div>
                 <div className="space-y-2">
                   <Textarea
@@ -1984,7 +2318,7 @@ const InvoiceForm = () => {
           </div>
 
           {/* Navigation and Guidance for Terms Tab */}
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-1.5">
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <div className="flex items-center text-blue-600">
@@ -2025,18 +2359,18 @@ const InvoiceForm = () => {
         </TabsContent>
 
         {/* Additional Info Tab */}
-        <TabsContent value="additional" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="p-6">
-              <div className="space-y-4">
+        <TabsContent value="additional" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card className="p-4">
+              <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <DollarSign className="w-4 h-4 text-blue-600" />
-                  <h3 className="text-base font-semibold">Payment Information</h3>
+                  <h3 className="text-sm font-semibold">Payment Information</h3>
                 </div>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Currency</Label>
+                      <Label className="text-xs font-medium">Currency</Label>
                       <Select value={currency} onValueChange={setCurrency}>
                         <SelectTrigger>
                           <SelectValue />
@@ -2049,17 +2383,18 @@ const InvoiceForm = () => {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Exchange Rate</Label>
+                      <Label className="text-xs font-medium">Exchange Rate</Label>
                       <Input
                         type="number"
                         step="0.01"
                         value={exchangeRate}
                         onChange={(e) => setExchangeRate(parseFloat(e.target.value) || 1.0)}
+                        className="text-xs"
                       />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Payment Method</Label>
+                    <Label className="text-xs font-medium">Payment Method</Label>
                     <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select payment method" />
@@ -2074,26 +2409,27 @@ const InvoiceForm = () => {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Payment Reference</Label>
+                    <Label className="text-xs font-medium">Payment Reference</Label>
                     <Input
                       placeholder="Reference number or ID"
                       value={paymentReference}
                       onChange={(e) => setPaymentReference(e.target.value)}
+                      className="text-xs"
                     />
                   </div>
                 </div>
               </div>
             </Card>
 
-            <Card className="p-6">
-              <div className="space-y-4">
+            <Card className="p-4">
+              <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Building className="w-4 h-4 text-green-600" />
-                  <h3 className="text-base font-semibold">Business Information</h3>
+                  <h3 className="text-sm font-semibold">Business Information</h3>
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Branch/Location ID</Label>
+                    <Label className="text-xs font-medium">Branch/Location ID</Label>
                     <Input
                       placeholder="e.g., HQ-001, BRANCH-NYC"
                       value={branchId}
@@ -2101,19 +2437,21 @@ const InvoiceForm = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Territory</Label>
+                    <Label className="text-xs font-medium">Territory</Label>
                     <Input
                       placeholder="e.g., North Region, International"
                       value={territory}
                       onChange={(e) => setTerritory(e.target.value)}
+                      className="text-xs"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Created By</Label>
+                    <Label className="text-xs font-medium">Created By</Label>
                     <Input
                       placeholder="User name or ID"
                       value={createdBy}
                       onChange={(e) => setCreatedBy(e.target.value)}
+                      className="text-xs"
                     />
                   </div>
                 </div>
@@ -2121,11 +2459,11 @@ const InvoiceForm = () => {
             </Card>
           </div>
 
-          <Card className="p-6">
-            <div className="space-y-4">
+          <Card className="p-4">
+            <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-purple-600" />
-                <h3 className="text-base font-semibold">Internal Notes</h3>
+                <h3 className="text-sm font-semibold">Internal Notes</h3>
               </div>
               <div className="space-y-2">
                 <Textarea
@@ -2142,7 +2480,7 @@ const InvoiceForm = () => {
           </Card>
 
           {/* Navigation and Guidance for Additional Tab */}
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-1.5">
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <div className="flex items-center text-blue-600">
@@ -2195,6 +2533,12 @@ const InvoiceForm = () => {
         open={itemFormOpen}
         onOpenChange={setItemFormOpen}
         onSave={handleSaveItem}
+      />
+
+      <BankForm
+        open={bankFormOpen}
+        onOpenChange={setBankFormOpen}
+        onSave={handleSaveBank}
       />
 
       {/* Download Invoice Dialog */}
@@ -2281,8 +2625,133 @@ const InvoiceForm = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Payment Modal */}
+      <AlertDialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Record Payment</AlertDialogTitle>
+            <AlertDialogDescription>
+              Record payment details for this invoice. This will mark the invoice as paid.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Amount Paid</Label>
+              <Input
+                type="number"
+                value={paymentDetails.amount}
+                onChange={(e) => setPaymentDetails(prev => ({
+                  ...prev,
+                  amount: parseFloat(e.target.value) || 0
+                }))}
+                className="h-9 text-xs"
+                placeholder="0.00"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Payment Date</Label>
+              <Popover open={showPaymentDatePopover} onOpenChange={setShowPaymentDatePopover}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start text-left h-9 text-xs">
+                    {paymentDetails.date instanceof Date && !isNaN(paymentDetails.date)
+                      ? format(paymentDetails.date, "dd/MM/yyyy")
+                      : "Select date"}
+                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={paymentDetails.date}
+                    onSelect={(date) => {
+                      if (date && date <= new Date()) {
+                        setPaymentDetails(prev => ({
+                          ...prev,
+                          date
+                        }));
+                        setShowPaymentDatePopover(false);
+                      }
+                    }}
+                    initialFocus
+                    disabled={(date) => date > new Date()}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Payment Method</Label>
+              <Select
+                value={paymentDetails.method}
+                onValueChange={(value) => setPaymentDetails(prev => ({
+                  ...prev,
+                  method: value
+                }))}
+              >
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue placeholder="Select payment method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="upi">UPI</SelectItem>
+                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                  <SelectItem value="cheque">Cheque</SelectItem>
+                  <SelectItem value="card">Credit/Debit Card</SelectItem>
+                  <SelectItem value="online">Online Payment</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Notes (Optional)</Label>
+              <Textarea
+                placeholder="Transaction ID, reference number, or any notes..."
+                value={paymentDetails.notes}
+                onChange={(e) => setPaymentDetails(prev => ({
+                  ...prev,
+                  notes: e.target.value
+                }))}
+                className="h-16 text-xs resize-none"
+              />
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setIsPaid(true);
+                setShowPaymentModal(false);
+              }}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              Save Payment
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Floating Action Button for Converting Proforma to Tax Invoice */}
+      {invoiceType === 'proforma' && params && params.id && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <Button
+            onClick={() => handleConvertProformaToTax(params.id)}
+            className="rounded-full w-14 h-14 shadow-lg bg-blue-600 hover:bg-blue-700 flex items-center justify-center"
+            title="Convert to Tax Invoice"
+          >
+            <DollarSign className="h-6 w-6" />
+          </Button>
+          <div className="mt-2 text-center text-xs font-medium text-gray-700 bg-white px-2 py-1 rounded-md shadow">
+            Convert to Tax
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export default InvoiceForm;
+

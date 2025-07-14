@@ -29,6 +29,15 @@ contextBridge.exposeInMainWorld("electron", {
   deleteCustomer: (id) => ipcRenderer.invoke("delete-customer", id),
   getCustomerCompanies: (customerId) => ipcRenderer.invoke("get-customer-companies", customerId),
   updateCustomerCompanies: (customerId, companyIds) => ipcRenderer.invoke("update-customer-companies", customerId, companyIds),
+
+  // Bank operations
+  addBank: (data) => ipcRenderer.invoke("add-bank", data),
+  getBanks: (companyId = null) => ipcRenderer.invoke("get-banks", companyId),
+  getBank: (bankId) => ipcRenderer.invoke("get-bank", bankId),
+  updateBank: (bankId, data) => ipcRenderer.invoke("update-bank", { bankId, data }),
+  deleteBank: (bankId) => ipcRenderer.invoke("delete-bank", bankId),
+  getCompanyBanks: (companyId) => ipcRenderer.invoke("get-company-banks", companyId),
+  setDefaultBank: (companyId, bankId) => ipcRenderer.invoke("set-default-bank", { companyId, bankId }),
   checkTallyRunning: (port) => ipcRenderer.invoke("check-tally-running", port),
   importLedgers: (companyName, port) =>
     ipcRenderer.invoke("import-ledgers", companyName, port),
@@ -42,7 +51,7 @@ contextBridge.exposeInMainWorld("electron", {
 
   getAllInvoices: () => ipcRenderer.invoke("invoice:getAll"),
   getInvoiceById: (id) => ipcRenderer.invoke("invoice:getById", id),
-  getNextInvoiceNumber: (prefix) => ipcRenderer.invoke("get-next-invoice-number", prefix),
+  getNextInvoiceNumber: (prefix, invoiceType) => ipcRenderer.invoke("get-next-invoice-number", prefix, invoiceType),
   uploadLedgerToTally: (data, port, tallyVersion) =>
     ipcRenderer.invoke("ledger-create", data, port, tallyVersion),
   uploadSalesToTally: (data, port) =>
