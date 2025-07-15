@@ -16,7 +16,7 @@ log.debug("Database instance initialized:", !!db);
 // Helper function for invoice number pattern recognition and generation
 /**
  * Analyzes an invoice number given a known prefix.
- * Example: invoiceNo = 'PRO-CYP0001', prefix = 'PRO-CYP' => { prefix: 'PRO-CYP', sequence: 1, format: 'prefix-sequence' }
+ * Example: invoiceNo = 'PRO-CYP0001', prefix = 'PRO-CYP' => { prefix: 'PRO-CYP', sequence: 1, sequenceLength: 4, format: 'prefix-sequence' }
  */
 function analyzeInvoicePattern(invoiceNo, prefix) {
   log.info("🔍 Analyzing invoice number pattern:", invoiceNo, "with prefix:", prefix);
@@ -28,6 +28,7 @@ function analyzeInvoicePattern(invoiceNo, prefix) {
       return {
         prefix,
         sequence: parseInt(sequencePart, 10),
+        sequenceLength: sequencePart.length, // Preserve the original length for padding
         format: 'prefix-sequence'
       };
     }
@@ -37,15 +38,19 @@ function analyzeInvoicePattern(invoiceNo, prefix) {
   return {
     prefix: prefix || '',
     sequence: 0,
+    sequenceLength: 4, // Default to 4 digits
     format: 'prefix-sequence'
   };
 }
 
 /**
  * Generates the next invoice number given a pattern and sequence.
- * Example: pattern = { prefix: 'PRO-CYP', sequence: 1 }, nextSequence = 2 => 'PRO-CYP0002'
+ * Example: pattern = { prefix: 'PRO-CYP', sequence: 1, sequenceLength: 4 }, nextSequence = 2 => 'PRO-CYP0002'
  */
-function generateNextNumber(pattern, sequence, padding = 4) {
+function generateNextNumber(pattern, sequence) {
+  // Use the original sequence length from the pattern, or default to 4
+  const padding = pattern.sequenceLength || 4;
+  log.info("🔍 Padding:", padding);
   return `${pattern.prefix}${sequence.toString().padStart(padding, '0')}`;
 }
 
@@ -584,7 +589,193 @@ function registerInvoiceGeneratorIpc() {
   //       error: error.message,
   //     };
   //   }
-  // });
+  //   });
+
+  // Payment recording handlers
+  ipcMain.handle("record-payment", async (event, { invoiceId, paymentData }) => {
+    try {
+      log.info("💰 Recording payment for invoice:", invoiceId, paymentData);
+
+      // Validate required fields
+      if (!invoiceId || !paymentData) {
+        return {
+          success: false,
+          error: "Invoice ID and payment data are required"
+        };
+      }
+
+      // Check if invoice exists and is a tax invoice
+      const invoice = await db
+        .select()
+        .from(invoices)
+        .where(sql`id = ${invoiceId} AND invoice_type = 'tax'`)
+        .limit(1);
+
+      if (invoice.length === 0) {
+        return {
+          success: false,
+          error: "Tax invoice not found"
+        };
+      }
+
+      // Convert payment date to Date object
+      const paymentDate = paymentData.date instanceof Date 
+        ? paymentData.date 
+        : new Date(paymentData.date);
+
+      if (isNaN(paymentDate.getTime())) {
+        return {
+          success: false,
+          error: "Invalid payment date"
+        };
+      }
+
+      // Update invoice with payment details
+      const updatedInvoice = await db
+        .update(invoices)
+        .set({
+          paidDate: paymentDate,
+          paymentMethod: paymentData.method || "",
+          paymentReference: paymentData.notes || "",
+          status: "paid",
+          updatedAt: new Date()
+        })
+        .where(sql`id = ${invoiceId}`)
+        .returning();
+
+      log.info("✅ Payment recorded successfully:", updatedInvoice[0]);
+
+      return {
+        success: true,
+        invoice: updatedInvoice[0]
+      };
+    } catch (error) {
+      log.error("❌ Error recording payment:", error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  });
+
+  ipcMain.handle("update-payment", async (event, { invoiceId, paymentData }) => {
+    try {
+      log.info("🔄 Updating payment for invoice:", invoiceId, paymentData);
+
+      // Validate required fields
+      if (!invoiceId || !paymentData) {
+        return {
+          success: false,
+          error: "Invoice ID and payment data are required"
+        };
+      }
+
+      // Check if invoice exists and is a tax invoice
+      const invoice = await db
+        .select()
+        .from(invoices)
+        .where(sql`id = ${invoiceId} AND invoice_type = 'tax'`)
+        .limit(1);
+
+      if (invoice.length === 0) {
+        return {
+          success: false,
+          error: "Tax invoice not found"
+        };
+      }
+
+      // Convert payment date to Date object
+      const paymentDate = paymentData.date instanceof Date 
+        ? paymentData.date 
+        : new Date(paymentData.date);
+
+      if (isNaN(paymentDate.getTime())) {
+        return {
+          success: false,
+          error: "Invalid payment date"
+        };
+      }
+
+      // Update invoice with new payment details
+      const updatedInvoice = await db
+        .update(invoices)
+        .set({
+          paymentDate: paymentDate,
+          paymentMethod: paymentData.method || "",
+          paymentReference: paymentData.notes || "",
+          updatedAt: new Date()
+        })
+        .where(sql`id = ${invoiceId}`)
+        .returning();
+
+      log.info("✅ Payment updated successfully:", updatedInvoice[0]);
+
+      return {
+        success: true,
+        invoice: updatedInvoice[0]
+      };
+    } catch (error) {
+      log.error("❌ Error updating payment:", error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  });
+
+  ipcMain.handle("mark-invoice-unpaid", async (event, invoiceId) => {
+    try {
+      log.info("❌ Marking invoice as unpaid:", invoiceId);
+
+      // Validate required fields
+      if (!invoiceId) {
+        return {
+          success: false,
+          error: "Invoice ID is required"
+        };
+      }
+
+      // Check if invoice exists and is a tax invoice
+      const invoice = await db
+        .select()
+        .from(invoices)
+        .where(sql`id = ${invoiceId} AND invoice_type = 'tax'`)
+        .limit(1);
+
+      if (invoice.length === 0) {
+        return {
+          success: false,
+          error: "Tax invoice not found"
+        };
+      }
+
+      // Update invoice to mark as unpaid
+      const updatedInvoice = await db
+        .update(invoices)
+        .set({
+          paidDate: null,
+          paymentMethod: null,
+          paymentReference: null,
+          status: "pending",
+          updatedAt: new Date()
+        })
+        .where(sql`id = ${invoiceId}`)
+        .returning();
+
+      log.info("✅ Invoice marked as unpaid:", updatedInvoice[0]);
+
+      return {
+        success: true,
+        invoice: updatedInvoice[0]
+      };
+    } catch (error) {
+      log.error("❌ Error marking invoice as unpaid:", error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  });
 }
 
 function registerInvoiceItemsIpc() {

@@ -21,6 +21,7 @@ const customers = sqliteTable("customers", {
   billingCountry: text("billing_country").notNull(),
   billingState: text("billing_state").notNull(),
   billingCity: text("billing_city").notNull(),
+  billingZip: text("billing_zip"), // Added zip/postal code for billing address
   billingAddressLine1: text("billing_address_line_1").notNull(),
   billingAddressLine2: text("billing_address_line_2"),
   billingContactNo: text("billing_contact_no").notNull(),
@@ -31,6 +32,7 @@ const customers = sqliteTable("customers", {
   shippingCountry: text("shipping_country").notNull(),
   shippingState: text("shipping_state").notNull(),
   shippingCity: text("shipping_city").notNull(),
+  shippingZip: text("shipping_zip"), // Added zip/postal code for shipping address
   shippingAddressLine1: text("shipping_address_line_1").notNull(),
   shippingAddressLine2: text("shipping_address_line_2"),
   shippingContactNo: text("shipping_contact_no").notNull(),

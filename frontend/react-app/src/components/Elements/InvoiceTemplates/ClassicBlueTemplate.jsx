@@ -747,6 +747,9 @@ const InfoTwoColumn = ({ invoice, dynamicStyles }) => (
             {invoice.customer?.addressLine1 && (
                 <Text style={[styles.addressText, { lineHeight: 1.3, marginBottom: 1 }]}>{invoice.customer.addressLine1}</Text>
             )}
+            {invoice.customer?.addressLine2 && (
+                <Text style={[styles.addressText, { lineHeight: 1.3, marginBottom: 1 }]}>{invoice.customer.addressLine2}</Text>
+            )}
             <Text style={[styles.addressText, { lineHeight: 1.3, marginBottom: 1 }]}> {[
                 invoice.customer?.city,
                 invoice.customer?.state,
@@ -777,17 +780,21 @@ const InfoTwoColumn = ({ invoice, dynamicStyles }) => (
                 <Text style={styles.infoValue}>{invoice.invoiceNumber || "INV-001"}</Text>
             </View>
             <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Date:</Text>
+                <Text style={styles.infoLabel}>Invoice Date:</Text>
                 <Text style={styles.infoValue}>{formatDate(invoice.invoiceDate)}</Text>
             </View>
             <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Payment Date:</Text>
+                <Text style={styles.infoValue}>10/07/2025</Text>
+            </View>
+            {/* <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Due Date:</Text>
                 <Text style={styles.infoValue}>{formatDate(invoice.dueDate)}</Text>
-            </View>
-            <View style={styles.infoRow}>
+            </View> */}
+            {/* <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Terms:</Text>
                 <Text style={styles.infoValue}>{invoice.paymentTerms ? `Net ${invoice.paymentTerms}` : "Net 30"}</Text>
-            </View>
+            </View> */}
         </View>
     </View>
 );
@@ -1115,7 +1122,7 @@ const Footer = ({ invoice, dynamicStyles }) => (
         <View style={[styles.declarationBox, { padding: 8 }]}>
             <Text style={[styles.declarationTitle, { fontSize: 8, marginBottom: 4 }]}>Declaration</Text>
             <Text style={[styles.declarationText, { fontSize: 7, lineHeight: 1.2 }]}>
-                We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.
+                All payments made via cheques to be addressed to: CypherSOL Fintech India Pvt. Ltd.
             </Text>
         </View>
 

@@ -34,6 +34,111 @@ import {
     useCompanyConfiguration
 } from '../../hooks/useConfiguration';
 
+// Isolated company prefix input component that manages its own state
+const CompanyPrefixInput = ({ company, getCompanyInitials, setCompanyInitials }) => {
+    const [prefix, setPrefix] = useState('');
+    const [initialPrefix, setInitialPrefix] = useState('');
+    const [updateStatus, setUpdateStatus] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Load initial prefix
+    useEffect(() => {
+        const loadPrefix = async () => {
+            try {
+                setIsLoading(true);
+                const initial = await getCompanyInitials(company.id);
+                const finalPrefix = initial || generateCompanyInitials(company.companyName);
+                setPrefix(finalPrefix);
+                setInitialPrefix(finalPrefix);
+            } catch (error) {
+                console.error(`Error loading prefix for company ${company.id}:`, error);
+                const fallbackPrefix = generateCompanyInitials(company.companyName);
+                setPrefix(fallbackPrefix);
+                setInitialPrefix(fallbackPrefix);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        loadPrefix();
+    }, [company.id, getCompanyInitials, company.companyName]);
+
+    // Helper function to generate company initials
+    const generateCompanyInitials = (companyName) => {
+        if (!companyName) return '';
+        return companyName
+            .split(/\s+/)
+            .map(word => word[0]?.toUpperCase() || '')
+            .join('')
+            .substring(0, 6);
+    };
+
+    const handleUpdate = async () => {
+        if (!prefix.trim()) return;
+        setUpdateStatus('updating');
+        try {
+            const success = await setCompanyInitials(company.id, prefix.trim().toUpperCase());
+            if (success) {
+                setUpdateStatus('success');
+                setInitialPrefix(prefix.trim().toUpperCase());
+                setTimeout(() => setUpdateStatus(null), 2000);
+            } else {
+                setUpdateStatus('error');
+                setTimeout(() => setUpdateStatus(null), 3000);
+            }
+        } catch (error) {
+            console.error('Error updating company prefix:', error);
+            setUpdateStatus('error');
+            setTimeout(() => setUpdateStatus(null), 3000);
+        }
+    };
+
+    console.log('🔍 CompanyPrefixInput render for company:', company.id, 'prefix:', prefix);
+
+    return (
+        <div className="flex items-center gap-2">
+            <Input
+                value={prefix}
+                onChange={(e) => {
+                    const value = e.target.value.toUpperCase().slice(0, 6);
+                    console.log('📝 Company prefix onChange:', value);
+                    setPrefix(value);
+                }}
+                placeholder="ABC"
+                className="text-center text-sm min-w-[3rem] max-w-[6rem]"
+                style={{
+                    width: `${Math.max(3, prefix.length)}rem`
+                }}
+                maxLength={6}
+                disabled={isLoading}
+                onFocus={() => console.log('🎯 Company prefix input focused for:', company.id)}
+                onBlur={() => console.log('👋 Company prefix input blurred for:', company.id)}
+            />
+            {prefix !== initialPrefix && !!prefix && (
+                <Button
+                    size="sm"
+                    onClick={handleUpdate}
+                    disabled={updateStatus === 'updating'}
+                    className="px-3 py-1 text-xs"
+                >
+                    {updateStatus === 'updating' ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                        'Save'
+                    )}
+                </Button>
+            )}
+            <div className="w-8 text-center">
+                {updateStatus === 'success' && (
+                    <Check className="w-4 h-4 text-green-500 mx-auto" />
+                )}
+                {updateStatus === 'error' && (
+                    <AlertCircle className="w-4 h-4 text-red-500 mx-auto" />
+                )}
+            </div>
+        </div>
+    );
+};
+
 const SettingsPage = () => {
     const [activeSection, setActiveSection] = useState('templates');
     const [isLoading, setIsLoading] = useState(false);
@@ -79,16 +184,13 @@ const SettingsPage = () => {
         isInitialized: companyConfigInitialized
     } = useCompanyConfiguration();
 
-    // State for company prefix management
+    // State for company management
     const [companies, setCompanies] = useState([]);
-    const [companyPrefixes, setCompanyPrefixes] = useState({});
-    const [editBuffers, setEditBuffers] = useState({}); // local edit state for each company
     const [isLoadingCompanies, setIsLoadingCompanies] = useState(false);
-    const [prefixUpdateStatus, setPrefixUpdateStatus] = useState({});
 
-    // Load companies and their prefixes
+    // Load companies
     useEffect(() => {
-        const loadCompaniesAndPrefixes = async () => {
+        const loadCompanies = async () => {
             if (!companyConfigInitialized) return;
 
             setIsLoadingCompanies(true);
@@ -99,72 +201,17 @@ const SettingsPage = () => {
                     if (response.success) {
                         const companiesData = response.companies || [];
                         setCompanies(companiesData);
-
-                        // Load prefixes for each company
-                        const prefixes = {};
-                        const buffers = {};
-                        for (const company of companiesData) {
-                            try {
-                                const prefix = await getCompanyInitials(company.id);
-                                prefixes[company.id] = prefix || generateCompanyInitials(company.companyName);
-                                buffers[company.id] = prefix || generateCompanyInitials(company.companyName);
-                            } catch (error) {
-                                console.error(`Error loading prefix for company ${company.id}:`, error);
-                                prefixes[company.id] = generateCompanyInitials(company.companyName);
-                                buffers[company.id] = generateCompanyInitials(company.companyName);
-                            }
-                        }
-                        setCompanyPrefixes(prefixes);
-                        setEditBuffers(buffers);
                     }
                 }
             } catch (error) {
-                console.error('Error loading companies and prefixes:', error);
+                console.error('Error loading companies:', error);
             } finally {
                 setIsLoadingCompanies(false);
             }
         };
 
-        loadCompaniesAndPrefixes();
-    }, [companyConfigInitialized, getCompanyInitials]);
-
-    // Helper function to generate company initials
-    const generateCompanyInitials = (companyName) => {
-        if (!companyName) return '';
-        return companyName
-            .split(/\s+/)
-            .map(word => word[0]?.toUpperCase() || '')
-            .join('')
-            .substring(0, 6);
-    };
-
-    // Update company prefix
-    const updateCompanyPrefix = async (companyId, newPrefix) => {
-        if (!newPrefix.trim()) return;
-        setPrefixUpdateStatus(prev => ({ ...prev, [companyId]: 'updating' }));
-        try {
-            const success = await setCompanyInitials(companyId, newPrefix.trim().toUpperCase());
-            if (success) {
-                setCompanyPrefixes(prev => ({ ...prev, [companyId]: newPrefix.trim().toUpperCase() }));
-                setEditBuffers(prev => ({ ...prev, [companyId]: newPrefix.trim().toUpperCase() }));
-                setPrefixUpdateStatus(prev => ({ ...prev, [companyId]: 'success' }));
-                setTimeout(() => {
-                    setPrefixUpdateStatus(prev => ({ ...prev, [companyId]: null }));
-                }, 2000);
-            } else {
-                setPrefixUpdateStatus(prev => ({ ...prev, [companyId]: 'error' }));
-                setTimeout(() => {
-                    setPrefixUpdateStatus(prev => ({ ...prev, [companyId]: null }));
-                }, 3000);
-            }
-        } catch (error) {
-            console.error('Error updating company prefix:', error);
-            setPrefixUpdateStatus(prev => ({ ...prev, [companyId]: 'error' }));
-            setTimeout(() => {
-                setPrefixUpdateStatus(prev => ({ ...prev, [companyId]: null }));
-            }, 3000);
-        }
-    };
+        loadCompanies();
+    }, [companyConfigInitialized]);
 
     const handleSaveSettings = async (section) => {
         setIsLoading(true);
@@ -463,40 +510,11 @@ const SettingsPage = () => {
                                         <div className="font-medium text-sm">{company.companyName}</div>
                                         <div className="text-xs text-gray-500">{company.city}, {company.state}</div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <Input
-                                            value={editBuffers[company.id] || ''}
-                                            onChange={(e) => {
-                                                const value = e.target.value.toUpperCase().slice(0, 6);
-                                                setEditBuffers(prev => ({ ...prev, [company.id]: value }));
-                                            }}
-                                            placeholder="ABC"
-                                            className="w-20 text-center text-sm"
-                                            maxLength={6}
-                                        />
-                                        {editBuffers[company.id] !== companyPrefixes[company.id] && !!editBuffers[company.id] && (
-                                            <Button
-                                                size="sm"
-                                                onClick={() => updateCompanyPrefix(company.id, editBuffers[company.id])}
-                                                disabled={prefixUpdateStatus[company.id] === 'updating'}
-                                                className="px-3 py-1 text-xs"
-                                            >
-                                                {prefixUpdateStatus[company.id] === 'updating' ? (
-                                                    <RefreshCw className="w-4 h-4 animate-spin" />
-                                                ) : (
-                                                    'Save'
-                                                )}
-                                            </Button>
-                                        )}
-                                        <div className="w-8 text-center">
-                                            {prefixUpdateStatus[company.id] === 'success' && (
-                                                <Check className="w-4 h-4 text-green-500 mx-auto" />
-                                            )}
-                                            {prefixUpdateStatus[company.id] === 'error' && (
-                                                <AlertCircle className="w-4 h-4 text-red-500 mx-auto" />
-                                            )}
-                                        </div>
-                                    </div>
+                                    <CompanyPrefixInput
+                                        company={company}
+                                        getCompanyInitials={getCompanyInitials}
+                                        setCompanyInitials={setCompanyInitials}
+                                    />
                                 </div>
                             ))}
                             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">

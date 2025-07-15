@@ -693,12 +693,15 @@ const InvoiceForm = () => {
             const invoiceNo = latestInvoice.invoiceNo;
             const prefixLength = initials.length;
             const latestSequence = invoiceNo.substring(prefixLength);
+
+            // Preserve the original sequence length for proper padding
+            const originalSequenceLength = latestSequence.length;
             const sequenceNumber = parseInt(latestSequence, 10);
 
             if (!isNaN(sequenceNumber)) {
               const newSequence = (sequenceNumber + 1)
                 .toString()
-                .padStart(4, "0");
+                .padStart(originalSequenceLength, "0");
               setInvoiceSequence(newSequence);
               setInvoiceNumber(`${initials}${newSequence}`);
               return;
@@ -1021,7 +1024,19 @@ const InvoiceForm = () => {
       const nextSequence = (currentSequence + 1).toString().padStart(4, "0");
       setInvoiceSequence(nextSequence);
       // Step 5: Set the saved invoice with the database ID included
-      setSavedInvoice({ ...invoiceForDB, id: result.data.id });
+      const savedInvoiceData = { ...invoiceForDB, id: result.data.id };
+      setSavedInvoice(savedInvoiceData);
+
+      // Check if this is a paid invoice and update payment status
+      if (savedInvoiceData.status === 'paid' && savedInvoiceData.paidDate) {
+        setIsPaid(true);
+        setPaymentDetails({
+          amount: savedInvoiceData.totalAmount || 0,
+          date: new Date(savedInvoiceData.paidDate),
+          method: savedInvoiceData.paymentMethod || "",
+          notes: savedInvoiceData.paymentReference || "",
+        });
+      }
 
       // Step 6: Prepare properly formatted data for PDF generation
       const invoiceForPDF = {
@@ -1223,6 +1238,18 @@ const InvoiceForm = () => {
     return isTabCompleted("basic") && isTabCompleted("items");
   };
 
+  const handlePaidSwitchToggle = () => {
+    setIsPaid(!isPaid);
+    if (!isPaid) {
+      setPaymentDetails({
+        amount: subtotal,
+        date: new Date(),
+        method: "cash",
+        notes: "Initial payment",
+      });
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-4 space-y-3">
       {/* Compact Header */}
@@ -1345,7 +1372,73 @@ const InvoiceForm = () => {
               {/* Visual Card Display */}
               <div className="relative h-16 overflow-hidden">
                 {/* Proforma Invoice Card */}
-                <div className={`absolute inset-0 transition-all duration-300 ease-in-out ${invoiceType === 'proforma' ? 'opacity-100 scale-100 translate-x-0' : 'opacity-0 scale-95 -translate-x-2 pointer-events-none'}`}> <div className="relative bg-white border border-purple-200 rounded-md p-3 h-full"> <div className="flex items-center gap-2"> <div className="w-6 h-6 rounded bg-purple-100 flex items-center justify-center"> <svg className="w-3 h-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3a1 1 0 011-1h6a1 1 0 011 1v4m-6 0h6m-6 0H8m0 0V5a1 1 0 011-1h6a1 1 0 011 1v2m-6 0h6m-6 0H8m0 0v10a1 1 0 001 1h6a1 1 0 001-1V7H8z" /> </svg> </div> <div className="flex-1"> <div className="flex items-center gap-2"> <h4 className="text-sm font-medium text-gray-900">Proforma Invoice</h4> <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800"> <span className="w-1 h-1 bg-purple-500 rounded-full mr-1"></span> DRAFT </span> </div> <p className="text-xs text-gray-600">Draft document for quotations</p> </div> </div> </div> </div> {/* Tax Invoice Card */} <div className={`absolute inset-0 transition-all duration-300 ease-in-out ${invoiceType === 'tax' ? 'opacity-100 scale-100 translate-x-0' : 'opacity-0 scale-95 translate-x-2 pointer-events-none'}`}> <div className="relative bg-white border border-green-200 rounded-md p-3 h-full"> <div className="flex items-center gap-2"> <div className="w-6 h-6 rounded bg-green-100 flex items-center justify-center"> <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /> </svg> </div> <div className="flex-1"> <div className="flex items-center gap-2"> <h4 className="text-sm font-medium text-gray-900">Tax Invoice</h4> <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"> <span className="w-1 h-1 bg-green-500 rounded-full mr-1"></span> GST </span> </div> <p className="text-xs text-gray-600">Official legal document</p> </div> </div> </div> </div> </div>
+                <div className={`absolute inset-0 transition-all duration-300 ease-in-out ${invoiceType === 'proforma' ? 'opacity-100 scale-100 translate-x-0' : 'opacity-0 scale-95 -translate-x-2 pointer-events-none'}`}>
+                  <div className="relative bg-white border border-purple-200 rounded-md p-3 h-full">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded bg-purple-100 flex items-center justify-center">
+                        <svg className="w-3 h-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3a1 1 0 011-1h6a1 1 0 011 1v4m-6 0h6m-6 0H8m0 0V5a1 1 0 011-1h6a1 1 0 011 1v2m-6 0h6m-6 0H8m0 0v10a1 1 0 001 1h6a1 1 0 001-1V7H8z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-medium text-gray-900">Proforma Invoice</h4>
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                            <span className="w-1 h-1 bg-purple-500 rounded-full mr-1"></span> DRAFT
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600">Draft document for quotations</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {/* Tax Invoice Card */}
+                <div className={`absolute inset-0 transition-all duration-300 ease-in-out ${invoiceType === 'tax' ? 'opacity-100 scale-100 translate-x-0' : 'opacity-0 scale-95 translate-x-2 pointer-events-none'}`}>
+                  <div className="relative bg-white border border-green-200 rounded-md p-3 h-full flex flex-col justify-between">
+                    {/* Top section of the card */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded bg-green-100 flex items-center justify-center">
+                          <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-medium text-gray-900">Tax Invoice</h4>
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              <span className="w-1 h-1 bg-green-500 rounded-full mr-1"></span> GST
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-600">Official legal document</p>
+                        </div>
+                      </div>
+                      {isPaid && invoiceType === 'tax' && (
+                        <Badge className="bg-green-100 text-green-800">✓ PAID</Badge>
+                      )}
+                    </div>
+                    {/* Bottom section with the Switch - ONLY for Tax Invoice */}
+                    <div className="mt-2 pt-2 border-t border-gray-100">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="paid-switch" className="text-xs text-gray-700">
+                          Mark as paid on creation?
+                        </Label>
+                        <Switch id="paid-switch" checked={isPaid} onCheckedChange={handlePaidSwitchToggle} />
+                      </div>
+                      {isPaid && (
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="h-auto p-0 mt-1 text-xs text-blue-600"
+                          onClick={() => setShowPaymentModal(true)}
+                        >
+                          + Record Payment Details
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           {/* Two Column Grid */}
@@ -2100,26 +2193,35 @@ const InvoiceForm = () => {
                                 Due on {format(dueDate, "dd MMM yyyy")}
                               </span>
                             </div>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setPaymentDetails({
-                                  amount: ((subtotal - discountAmount) + ((subtotal - discountAmount) * 0.18)),
-                                  date: new Date(),
-                                  method: "",
-                                  notes: "",
-                                });
-                                setShowPaymentModal(true);
-                              }}
-                              className="w-full h-7 text-xs bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
-                            >
-                              + Record Payment
-                            </Button>
-                            <p className="text-xs text-gray-500 text-center">
-                              💡 Perfect for pre-paid invoices
-                            </p>
+                            {invoiceType === 'tax' && (
+                              <>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setPaymentDetails({
+                                      amount: ((subtotal - discountAmount) + ((subtotal - discountAmount) * 0.18)),
+                                      date: new Date(),
+                                      method: "",
+                                      notes: "",
+                                    });
+                                    setShowPaymentModal(true);
+                                  }}
+                                  className="w-full h-7 text-xs bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+                                >
+                                  + Record Payment
+                                </Button>
+                                <p className="text-xs text-gray-500 text-center">
+                                  💡 Perfect for pre-paid invoices
+                                </p>
+                              </>
+                            )}
+                            {/* {invoiceType === 'proforma' && (
+                              <p className="text-xs text-gray-500 text-center">
+                                💡 Proforma invoices don't require payment tracking
+                              </p>
+                            )} */}
                           </div>
                         ) : (
                           // State 3: "Paid" Status
@@ -2134,34 +2236,79 @@ const InvoiceForm = () => {
                             <div className="text-xs text-gray-500">
                               Paid on {format(paymentDetails.date, "dd MMM yyyy")} via {paymentDetails.method || "Payment"}
                             </div>
-                            <div className="flex gap-2 justify-between">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setShowPaymentModal(true)}
-                                className="h-6 pr-2 pl-0 text-xs text-blue-600 hover:text-blue-700"
-                              >
-                                Edit Payment
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setIsPaid(false);
-                                  setPaymentDetails({
-                                    amount: 0,
-                                    date: new Date(),
-                                    method: "",
-                                    notes: "",
-                                  });
-                                }}
-                                className="h-6 pl-2 pr-0 text-xs text-red-600 hover:text-red-700"
-                              >
-                                Mark Unpaid
-                              </Button>
-                            </div>
+                            {invoiceType === 'tax' && (
+                              <div className="flex gap-2 justify-between">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    // Populate payment details from saved invoice data
+                                    if (savedInvoice) {
+                                      setPaymentDetails({
+                                        amount: savedInvoice.totalAmount || 0,
+                                        date: savedInvoice.paidDate ? new Date(savedInvoice.paidDate) : new Date(),
+                                        method: savedInvoice.paymentMethod || "",
+                                        notes: savedInvoice.paymentReference || "",
+                                      });
+                                    }
+                                    setShowPaymentModal(true);
+                                  }}
+                                  className="h-6 pr-2 pl-0 text-xs text-blue-600 hover:text-blue-700"
+                                >
+                                  Edit Payment
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={async () => {
+                                    try {
+                                      const response = await window.electron.markInvoiceUnpaid(savedInvoice?.id);
+                                      if (response.success) {
+                                        setIsPaid(false);
+                                        setPaymentDetails({
+                                          amount: 0,
+                                          date: new Date(),
+                                          method: "",
+                                          notes: "",
+                                        });
+                                        toast.success("Invoice marked as unpaid");
+                                      } else {
+                                        toast.error(response.error || "Failed to mark invoice as unpaid");
+                                      }
+                                    } catch (error) {
+                                      console.error("Error marking invoice as unpaid:", error);
+                                      toast.error("An error occurred while marking invoice as unpaid");
+                                    }
+                                  }}
+                                  className="h-6 pl-2 pr-0 text-xs text-red-600 hover:text-red-700"
+                                >
+                                  Mark Unpaid
+                                </Button>
+                              </div>
+                            )}
+                            {invoiceType === 'proforma' && (
+                              <div className="flex gap-2 justify-between">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setIsPaid(false);
+                                    setPaymentDetails({
+                                      amount: 0,
+                                      date: new Date(),
+                                      method: "",
+                                      notes: "",
+                                    });
+                                  }}
+                                  className="h-6 pl-2 pr-0 text-xs text-red-600 hover:text-red-700"
+                                >
+                                  Mark Unpaid
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -2630,9 +2777,12 @@ const InvoiceForm = () => {
       <AlertDialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Record Payment</AlertDialogTitle>
+            <AlertDialogTitle>{isPaid ? "Edit Payment" : "Record Payment"}</AlertDialogTitle>
             <AlertDialogDescription>
-              Record payment details for this invoice. This will mark the invoice as paid.
+              {isPaid
+                ? "Update payment details for this invoice."
+                : "Record payment details for this invoice. This will mark the invoice as paid."
+              }
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -2722,13 +2872,37 @@ const InvoiceForm = () => {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
-                setIsPaid(true);
-                setShowPaymentModal(false);
+              onClick={async () => {
+                try {
+                  // Determine if we're recording a new payment or updating an existing one
+                  const isUpdating = isPaid;
+                  const apiMethod = isUpdating ? 'updatePayment' : 'recordPayment';
+
+                  const response = await window.electron[apiMethod]({
+                    invoiceId: savedInvoice?.id, // Use the saved invoice ID
+                    paymentData: {
+                      amount: paymentDetails.amount,
+                      date: paymentDetails.date,
+                      method: paymentDetails.method,
+                      notes: paymentDetails.notes
+                    }
+                  });
+
+                  if (response.success) {
+                    setIsPaid(true);
+                    setShowPaymentModal(false);
+                    toast.success(isUpdating ? "Payment updated successfully!" : "Payment recorded successfully!");
+                  } else {
+                    toast.error(response.error || `Failed to ${isUpdating ? 'update' : 'record'} payment`);
+                  }
+                } catch (error) {
+                  console.error("Error with payment:", error);
+                  toast.error("An error occurred while processing payment");
+                }
               }}
               className="bg-green-600 hover:bg-green-700"
             >
-              Save Payment
+              {isPaid ? "Update Payment" : "Save Payment"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
