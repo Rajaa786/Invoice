@@ -38,7 +38,7 @@ const stateCityMapping = {
   karnataka: ["Bengaluru", "Mysuru", "Hubli"],
   kerala: ["Thiruvananthapuram", "Kochi", "Kozhikode"],
   "madhya pradesh": ["Bhopal", "Indore", "Gwalior"],
-  maharashtra: ["Mumbai", "Pune", "Nagpur"],
+  maharashtra: ["Mumbai", "Pune", "Nagpur", "Aurangabad"],
   manipur: ["Imphal", "Thoubal", "Churachandpur"],
   meghalaya: ["Shillong", "Tura", "Jowai"],
   mizoram: ["Aizawl", "Lunglei", "Champhai"],

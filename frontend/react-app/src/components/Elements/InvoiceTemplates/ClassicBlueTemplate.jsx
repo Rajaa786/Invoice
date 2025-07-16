@@ -656,7 +656,7 @@ const calculateTotals = (items, invoice) => {
         });
     } else {
         // In normal mode, use business logic
-        shouldShowSplit = customerStateCode === "27" || invoice.isIntraState;
+        shouldShowSplit = invoice.isIntraState;
         console.log('🔍 [ClassicBlueTemplate] Normal Mode GST Display:', {
             customerStateCode,
             isIntraState: invoice.isIntraState,
@@ -743,7 +743,16 @@ const InfoTwoColumn = ({ invoice, dynamicStyles }) => (
         {/* Left: Bill To (Customer) - Hug Content Bottom */}
         <View style={{ flex: 1.2, backgroundColor: colors.background, padding: 10, paddingBottom: 0, borderRadius: 4, border: `1pt solid ${colors.border}`, marginRight: 12 }}>
             <Text style={[dynamicStyles?.sectionTitle || styles.sectionTitle, { marginBottom: 3 }]}>Bill To</Text>
-            <Text style={[styles.customerName, { fontSize: 11, color: colors.primary, marginBottom: 2 }]}>{invoice.customer?.name || invoice.customerName || "Customer Name"}</Text>
+            {/* Company Name (if available) */}
+            {invoice.customer?.companyName && (
+                <Text style={[styles.customerName, { fontSize: 11, color: colors.primary, marginBottom: 1, fontWeight: 'bold' }]}>
+                    {invoice.customer.companyName}
+                </Text>
+            )}
+            {/* Individual Customer Name */}
+            <Text style={[styles.customerName, { fontSize: 10, color: colors.textSecondary, marginBottom: 2 }]}>
+                {invoice.customer?.name || invoice.customerName || "Customer Name"}
+            </Text>
             {invoice.customer?.addressLine1 && (
                 <Text style={[styles.addressText, { lineHeight: 1.3, marginBottom: 1 }]}>{invoice.customer.addressLine1}</Text>
             )}
@@ -783,18 +792,27 @@ const InfoTwoColumn = ({ invoice, dynamicStyles }) => (
                 <Text style={styles.infoLabel}>Invoice Date:</Text>
                 <Text style={styles.infoValue}>{formatDate(invoice.invoiceDate)}</Text>
             </View>
-            <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Payment Date:</Text>
-                <Text style={styles.infoValue}>10/07/2025</Text>
-            </View>
-            {/* <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Due Date:</Text>
-                <Text style={styles.infoValue}>{formatDate(invoice.dueDate)}</Text>
-            </View> */}
-            {/* <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Terms:</Text>
-                <Text style={styles.infoValue}>{invoice.paymentTerms ? `Net ${invoice.paymentTerms}` : "Net 30"}</Text>
-            </View> */}
+            {/* Conditionally show Payment Date if available */}
+            {invoice.paidDate && (
+                <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Payment Date:</Text>
+                    <Text style={styles.infoValue}>{formatDate(invoice.paidDate)}</Text>
+                </View>
+            )}
+            {/* Conditionally show Due Date if available and not paid */}
+            {invoice.dueDate && !invoice.paidDate && (
+                <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Due Date:</Text>
+                    <Text style={styles.infoValue}>{formatDate(invoice.dueDate)}</Text>
+                </View>
+            )}
+            {/* Conditionally show Payment Terms if available and not paid */}
+            {invoice.paymentTerms && !invoice.paidDate && (
+                <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Terms:</Text>
+                    <Text style={styles.infoValue}>{invoice.paymentTerms ? `Net ${invoice.paymentTerms}` : "Net 30"}</Text>
+                </View>
+            )}
         </View>
     </View>
 );

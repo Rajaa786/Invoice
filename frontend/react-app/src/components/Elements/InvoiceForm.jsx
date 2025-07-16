@@ -1071,6 +1071,10 @@ const InvoiceForm = () => {
         invoiceNumber: invoiceNumber || "SI-0001599",
         invoiceDate: invoiceDate,
         dueDate: dueDate,
+        // Add payment date if invoice is marked as paid
+        paidDate: isPaid && invoiceType === 'tax' ? paymentDetails.date : null,
+        // Add payment terms
+        paymentTerms: paymentTerms,
         customerNotes: customerNotes,
         termsAndConditions: termsAndConditions,
         cgstRate: 9,
@@ -1104,6 +1108,7 @@ const InvoiceForm = () => {
               ? `${selectedCustomer.salutation || ""} ${selectedCustomer.firstName
                 } ${selectedCustomer.lastName}`.trim()
               : selectedCustomer.companyName || "Customer Name",
+          companyName: selectedCustomer.companyName || "",
           addressLine1: selectedCustomer.billingAddressLine1 || "",
           addressLine2: selectedCustomer.billingAddressLine2 || "",
           city: selectedCustomer.billingCity || "",
@@ -1111,6 +1116,7 @@ const InvoiceForm = () => {
           country: selectedCustomer.billingCountry || "",
           email: selectedCustomer.billingEmail || "",
           contactNo: selectedCustomer.billingContactNo || "",
+          phone: selectedCustomer.billingContactNo || "",
           gstin: selectedCustomer.gstin || "",
           stateCode: selectedCustomer.stateCode || "",
           gstApplicable: selectedCustomer.gstApplicable || "No",

@@ -391,49 +391,7 @@ function registerInvoiceGeneratorIpc() {
     }
   });
 
-  // Mark invoice as unpaid
-  ipcMain.handle("mark-invoice-unpaid", async (event, invoiceId) => {
-    try {
-      log.info("🔄 Marking invoice as unpaid:", invoiceId);
 
-      // Update the invoice to remove payment details
-      const updatedInvoice = await db
-        .update(invoices)
-        .set({
-          status: "pending",
-          paidDate: null,
-          paymentMethod: null,
-          paymentReference: null,
-          updatedAt: new Date()
-        })
-        .where(eq(invoices.id, invoiceId))
-        .returning();
-
-      if (updatedInvoice.length === 0) {
-        return {
-          success: false,
-          error: "Invoice not found"
-        };
-      }
-
-      log.info("✅ Invoice marked as unpaid successfully:", updatedInvoice[0]);
-
-      return {
-        success: true,
-        data: updatedInvoice[0]
-      };
-    } catch (error) {
-      log.error("❌ Error marking invoice as unpaid:", {
-        error: error.message,
-        stack: error.stack,
-        invoiceId
-      });
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  });
 
   // Convert Proforma invoice to Tax invoice
   ipcMain.handle("convert-proforma-to-tax", async (event, proformaInvoiceId) => {
