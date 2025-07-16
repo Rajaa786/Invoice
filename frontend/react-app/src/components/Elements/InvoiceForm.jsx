@@ -108,8 +108,8 @@ const InvoiceForm = () => {
     method: "",
     notes: "",
   });
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showPaymentDatePopover, setShowPaymentDatePopover] = useState(false);
+  const [paymentDateOpen, setPaymentDateOpen] = useState(false);
+
 
   const defaultTerms = ["0", "15", "30", "45", "60", "90"];
 
@@ -973,7 +973,7 @@ const InvoiceForm = () => {
         customerId: selectedCustomer.id,
         invoiceNumber: invoiceNumber,
         invoiceDate: invoiceDate,
-        dueDate: dueDate,
+        dueDate: isPaid && invoiceType === 'tax' ? null : dueDate,
         paymentTerms: paymentTerms,
         incomeLedger: incomeLedger,
         // Include invoice type and converted from ID if applicable
@@ -996,7 +996,7 @@ const InvoiceForm = () => {
         discountPercentage: discountPercentage,
         customerNotes: customerNotes,
         termsAndConditions: termsAndConditions,
-        status: isDraft ? "draft" : "pending",
+        status: isDraft ? "draft" : (isPaid && invoiceType === 'tax' ? "paid" : "pending"),
         priority: priority,
         tags: tags,
         internalNotes: internalNotes,
@@ -1010,6 +1010,12 @@ const InvoiceForm = () => {
         // Pass the signature data string if available
         signature: signature || null,
         isPaid,
+        // Add payment details if invoice is marked as paid
+        ...(isPaid && invoiceType === 'tax' && {
+          paidDate: paymentDetails.date,
+          paymentMethod: paymentDetails.method,
+          paymentReference: paymentDetails.notes || "",
+        }),
       };
 
       console.log("Saving invoice:", invoiceForDB);
@@ -1036,6 +1042,28 @@ const InvoiceForm = () => {
           method: savedInvoiceData.paymentMethod || "",
           notes: savedInvoiceData.paymentReference || "",
         });
+      }
+
+      // If invoice was marked as paid during creation, update payment details in database
+      if (isPaid && invoiceType === 'tax' && savedInvoiceData.id) {
+        try {
+          const response = await window.electron.updateInvoicePayment({
+            invoiceId: savedInvoiceData.id,
+            paymentData: {
+              date: paymentDetails.date,
+              method: paymentDetails.method,
+              notes: paymentDetails.notes
+            }
+          });
+
+          if (response.success) {
+            console.log("Payment details updated successfully for new invoice");
+          } else {
+            console.error("Failed to update payment details:", response.error);
+          }
+        } catch (error) {
+          console.error("Error updating payment details for new invoice:", error);
+        }
       }
 
       // Step 6: Prepare properly formatted data for PDF generation
@@ -1238,15 +1266,93 @@ const InvoiceForm = () => {
     return isTabCompleted("basic") && isTabCompleted("items");
   };
 
-  const handlePaidSwitchToggle = () => {
-    setIsPaid(!isPaid);
-    if (!isPaid) {
-      setPaymentDetails({
-        amount: subtotal,
+  const handlePaidSwitchToggle = async () => {
+    const newPaidStatus = !isPaid;
+    setIsPaid(newPaidStatus);
+
+    if (newPaidStatus) {
+      // When marking as paid, calculate the final total amount including taxes and discounts
+      const shouldApplyGST = selectedCustomer?.gstApplicable === 'Yes';
+      const calculatedCgst = shouldApplyGST ? subtotal * 0.09 : 0;
+      const calculatedSgst = shouldApplyGST ? subtotal * 0.09 : 0;
+      const finalTotal = subtotal + calculatedCgst + calculatedSgst - discountAmount;
+
+      const newPaymentDetails = {
+        amount: finalTotal,
         date: new Date(),
         method: "cash",
         notes: "Initial payment",
-      });
+      };
+
+      setPaymentDetails(newPaymentDetails);
+
+      // If we have a saved invoice, update its payment status in the database
+      if (savedInvoice?.id) {
+        try {
+          const response = await window.electron.updateInvoicePayment({
+            invoiceId: savedInvoice.id,
+            paymentData: {
+              date: newPaymentDetails.date,
+              method: newPaymentDetails.method,
+              notes: newPaymentDetails.notes
+            }
+          });
+
+          if (response.success) {
+            toast.success("Invoice marked as paid successfully!");
+            // Update the saved invoice with new status
+            setSavedInvoice(prev => ({
+              ...prev,
+              status: "paid",
+              paidDate: newPaymentDetails.date,
+              paymentMethod: newPaymentDetails.method,
+              paymentReference: newPaymentDetails.notes
+            }));
+          } else {
+            toast.error(response.error || "Failed to mark invoice as paid");
+            // Revert the switch if the update failed
+            setIsPaid(false);
+          }
+        } catch (error) {
+          console.error("Error updating invoice payment status:", error);
+          toast.error("An error occurred while marking invoice as paid");
+          // Revert the switch if the update failed
+          setIsPaid(false);
+        }
+      }
+    } else {
+      // When marking as unpaid, recalculate a default due date
+      const days = parseInt(paymentTerms || "30", 10);
+      const newDueDate = addDays(new Date(invoiceDate), days);
+      setDueDate(newDueDate);
+
+      // If we have a saved invoice, update its payment status in the database
+      if (savedInvoice?.id) {
+        try {
+          const response = await window.electron.markInvoiceUnpaid(savedInvoice.id);
+
+          if (response.success) {
+            toast.success("Invoice marked as unpaid successfully!");
+            // Update the saved invoice with new status
+            setSavedInvoice(prev => ({
+              ...prev,
+              status: "pending",
+              paidDate: null,
+              paymentMethod: null,
+              paymentReference: null
+            }));
+          } else {
+            toast.error(response.error || "Failed to mark invoice as unpaid");
+            // Revert the switch if the update failed
+            setIsPaid(true);
+          }
+        } catch (error) {
+          console.error("Error marking invoice as unpaid:", error);
+          toast.error("An error occurred while marking invoice as unpaid");
+          // Revert the switch if the update failed
+          setIsPaid(true);
+        }
+      }
     }
   };
 
@@ -1394,9 +1500,8 @@ const InvoiceForm = () => {
                 </div>
                 {/* Tax Invoice Card */}
                 <div className={`absolute inset-0 transition-all duration-300 ease-in-out ${invoiceType === 'tax' ? 'opacity-100 scale-100 translate-x-0' : 'opacity-0 scale-95 translate-x-2 pointer-events-none'}`}>
-                  <div className="relative bg-white border border-green-200 rounded-md p-3 h-full flex flex-col justify-between">
-                    {/* Top section of the card */}
-                    <div className="flex items-center justify-between">
+                  <div className="relative bg-white border border-green-200 rounded-md p-3 h-full">
+                    <div className="flex items-center justify-between h-full">
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded bg-green-100 flex items-center justify-center">
                           <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1413,28 +1518,29 @@ const InvoiceForm = () => {
                           <p className="text-xs text-gray-600">Official legal document</p>
                         </div>
                       </div>
-                      {isPaid && invoiceType === 'tax' && (
-                        <Badge className="bg-green-100 text-green-800">✓ PAID</Badge>
-                      )}
-                    </div>
-                    {/* Bottom section with the Switch - ONLY for Tax Invoice */}
-                    <div className="mt-2 pt-2 border-t border-gray-100">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="paid-switch" className="text-xs text-gray-700">
-                          Mark as paid on creation?
-                        </Label>
-                        <Switch id="paid-switch" checked={isPaid} onCheckedChange={handlePaidSwitchToggle} />
+                      <div className="flex items-center gap-3">
+                        {isPaid && invoiceType === 'tax' && (
+                          <Badge className="bg-green-100 text-green-800 border border-green-300 px-2 py-1">
+                            <span className="mr-1">✓</span> PAID
+                          </Badge>
+                        )}
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                              <Label htmlFor="paid-switch" className="text-xs font-medium text-blue-900 whitespace-nowrap">
+                                Mark as paid
+                              </Label>
+                            </div>
+                            <Switch
+                              id="paid-switch"
+                              checked={isPaid}
+                              onCheckedChange={handlePaidSwitchToggle}
+                              className="data-[state=checked]:bg-blue-600"
+                            />
+                          </div>
+                        </div>
                       </div>
-                      {isPaid && (
-                        <Button
-                          variant="link"
-                          size="sm"
-                          className="h-auto p-0 mt-1 text-xs text-blue-600"
-                          onClick={() => setShowPaymentModal(true)}
-                        >
-                          + Record Payment Details
-                        </Button>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -1595,75 +1701,78 @@ const InvoiceForm = () => {
                     </Popover>
                   </div>
 
-                  <div className="space-y-1">
-                    <Label className="text-xs font-medium">Due Date</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start text-left h-9 text-xs" disabled={isPaid}>
-                          {dueDate instanceof Date && !isNaN(dueDate)
-                            ? format(dueDate, "dd/MM/yyyy")
-                            : "Select date"}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={dueDate}
-                          onSelect={setDueDate}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+                  {!(invoiceType === 'tax' && isPaid) && (
+                    <>
+                      <div className="space-y-1">
+                        <Label className="text-xs font-medium">Due Date</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full justify-start text-left h-9 text-xs">
+                              {dueDate instanceof Date && !isNaN(dueDate)
+                                ? format(dueDate, "dd/MM/yyyy")
+                                : "Select date"}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={dueDate}
+                              onSelect={setDueDate}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
 
-                  <div className="space-y-1">
-                    <Label className="text-xs font-medium">Payment Terms</Label>
-                    <Select
-                      value={paymentTerms}
-                      onValueChange={(value) => {
-                        setPaymentTerms(value);
-                        if (invoiceDate) {
-                          const newDueDate = addDays(new Date(invoiceDate), parseInt(value));
-                          setDueDate(newDueDate);
-                        }
-                      }}
-                      disabled={isPaid}
-                    >
-                      <SelectTrigger className="h-9 text-xs" disabled={isPaid}>
-                        <SelectValue placeholder="Select payment terms" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <div className="p-2 border-b">
-                          <input
-                            type="number"
-                            placeholder="Enter custom days..."
-                            className="w-full px-2 py-1 border rounded text-xs"
-                            value={customTerm}
-                            onChange={(e) => setCustomTerm(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                const days = parseInt(e.currentTarget.value);
-                                if (!isNaN(days)) {
-                                  setPaymentTerms(days.toString());
-                                  if (invoiceDate) {
-                                    const newDueDate = addDays(new Date(invoiceDate), days);
-                                    setDueDate(newDueDate);
+                      <div className="space-y-1">
+                        <Label className="text-xs font-medium">Payment Terms</Label>
+                        <Select
+                          value={paymentTerms}
+                          onValueChange={(value) => {
+                            setPaymentTerms(value);
+                            if (invoiceDate) {
+                              const newDueDate = addDays(new Date(invoiceDate), parseInt(value));
+                              setDueDate(newDueDate);
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="h-9 text-xs">
+                            <SelectValue placeholder="Select payment terms" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <div className="p-2 border-b">
+                              <input
+                                type="number"
+                                placeholder="Enter custom days..."
+                                className="w-full px-2 py-1 border rounded text-xs"
+                                value={customTerm}
+                                onChange={(e) => setCustomTerm(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    const days = parseInt(e.currentTarget.value);
+                                    if (!isNaN(days)) {
+                                      setPaymentTerms(days.toString());
+                                      if (invoiceDate) {
+                                        const newDueDate = addDays(new Date(invoiceDate), days);
+                                        setDueDate(newDueDate);
+                                      }
+                                      setCustomTerm("");
+                                    }
                                   }
-                                  setCustomTerm("");
-                                }
-                              }
-                            }}
-                          />
-                        </div>
-                        {defaultTerms.map((term) => (
-                          <SelectItem key={term} value={term}>
-                            Net {term} days
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                                }}
+                              />
+                            </div>
+                            {defaultTerms.map((term) => (
+                              <SelectItem key={term} value={term}>
+                                Net {term} days
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  )}
 
                   <div className="space-y-1">
                     <Label className="text-xs font-medium">Reference</Label>
@@ -1673,9 +1782,82 @@ const InvoiceForm = () => {
                     />
                   </div>
 
-
                 </div>
               </div>
+
+              {/* Payment Details Section - Only show for Tax Invoices when marked as paid */}
+              {invoiceType === 'tax' && isPaid && (
+                <div className="border border-green-200 rounded-md p-2 bg-green-50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                    <h3 className="text-sm font-medium text-green-900">Payment Details</h3>
+                  </div>
+                  <hr className="mb-2 border-green-200" />
+
+
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-medium">Payment Date</Label>
+                      <Popover open={paymentDateOpen} onOpenChange={setPaymentDateOpen}>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="w-full justify-start text-left h-9 text-xs">
+                            {paymentDetails.date instanceof Date && !isNaN(paymentDetails.date)
+                              ? format(paymentDetails.date, "dd/MM/yyyy")
+                              : "Select date"}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={paymentDetails.date}
+                            onSelect={(date) => {
+                              if (date && date <= new Date()) {
+                                setPaymentDetails(prev => ({
+                                  ...prev,
+                                  date
+                                }));
+                                // Auto-close the popover after date selection
+                                setPaymentDateOpen(false);
+                              }
+                            }}
+                            initialFocus
+                            disabled={(date) => date > new Date()}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs font-medium">Payment Method</Label>
+                      <Select
+                        value={paymentDetails.method}
+                        onValueChange={(value) => setPaymentDetails(prev => ({
+                          ...prev,
+                          method: value
+                        }))}
+                      >
+                        <SelectTrigger className="h-9 text-xs">
+                          <SelectValue placeholder="Select method" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cash">Cash</SelectItem>
+                          <SelectItem value="upi">UPI</SelectItem>
+                          <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                          <SelectItem value="cheque">Cheque</SelectItem>
+                          <SelectItem value="card">Credit/Debit Card</SelectItem>
+                          <SelectItem value="online">Online Payment</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+
+
+
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Right Column: Configuration & Customer */}
@@ -2182,136 +2364,21 @@ const InvoiceForm = () => {
                         </span>
                       </div>
 
-                      {/* Payment Status Component */}
-                      <div className="mt-3 pt-2 border-t border-gray-200">
-                        {!isPaid ? (
-                          // State 1: Default "Unpaid" Status
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-gray-600">Status:</span>
-                              <span className="text-xs text-amber-600 font-medium">
-                                Due on {format(dueDate, "dd MMM yyyy")}
-                              </span>
+                      {/* Payment Status Summary - Only show for paid invoices */}
+                      {isPaid && (
+                        <div className="mt-3 pt-2 border-t border-gray-200">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-gray-600">Payment Status:</span>
+                            <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                              <span className="mr-1">✔️</span>
+                              PAID
                             </div>
-                            {invoiceType === 'tax' && (
-                              <>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setPaymentDetails({
-                                      amount: ((subtotal - discountAmount) + ((subtotal - discountAmount) * 0.18)),
-                                      date: new Date(),
-                                      method: "",
-                                      notes: "",
-                                    });
-                                    setShowPaymentModal(true);
-                                  }}
-                                  className="w-full h-7 text-xs bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
-                                >
-                                  + Record Payment
-                                </Button>
-                                <p className="text-xs text-gray-500 text-center">
-                                  💡 Perfect for pre-paid invoices
-                                </p>
-                              </>
-                            )}
-                            {/* {invoiceType === 'proforma' && (
-                              <p className="text-xs text-gray-500 text-center">
-                                💡 Proforma invoices don't require payment tracking
-                              </p>
-                            )} */}
                           </div>
-                        ) : (
-                          // State 3: "Paid" Status
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-gray-600">Status:</span>
-                              <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-                                <span className="mr-1">✔️</span>
-                                PAID
-                              </div>
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              Paid on {format(paymentDetails.date, "dd MMM yyyy")} via {paymentDetails.method || "Payment"}
-                            </div>
-                            {invoiceType === 'tax' && (
-                              <div className="flex gap-2 justify-between">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    // Populate payment details from saved invoice data
-                                    if (savedInvoice) {
-                                      setPaymentDetails({
-                                        amount: savedInvoice.totalAmount || 0,
-                                        date: savedInvoice.paidDate ? new Date(savedInvoice.paidDate) : new Date(),
-                                        method: savedInvoice.paymentMethod || "",
-                                        notes: savedInvoice.paymentReference || "",
-                                      });
-                                    }
-                                    setShowPaymentModal(true);
-                                  }}
-                                  className="h-6 pr-2 pl-0 text-xs text-blue-600 hover:text-blue-700"
-                                >
-                                  Edit Payment
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={async () => {
-                                    try {
-                                      const response = await window.electron.markInvoiceUnpaid(savedInvoice?.id);
-                                      if (response.success) {
-                                        setIsPaid(false);
-                                        setPaymentDetails({
-                                          amount: 0,
-                                          date: new Date(),
-                                          method: "",
-                                          notes: "",
-                                        });
-                                        toast.success("Invoice marked as unpaid");
-                                      } else {
-                                        toast.error(response.error || "Failed to mark invoice as unpaid");
-                                      }
-                                    } catch (error) {
-                                      console.error("Error marking invoice as unpaid:", error);
-                                      toast.error("An error occurred while marking invoice as unpaid");
-                                    }
-                                  }}
-                                  className="h-6 pl-2 pr-0 text-xs text-red-600 hover:text-red-700"
-                                >
-                                  Mark Unpaid
-                                </Button>
-                              </div>
-                            )}
-                            {invoiceType === 'proforma' && (
-                              <div className="flex gap-2 justify-between">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    setIsPaid(false);
-                                    setPaymentDetails({
-                                      amount: 0,
-                                      date: new Date(),
-                                      method: "",
-                                      notes: "",
-                                    });
-                                  }}
-                                  className="h-6 pl-2 pr-0 text-xs text-red-600 hover:text-red-700"
-                                >
-                                  Mark Unpaid
-                                </Button>
-                              </div>
-                            )}
+                          <div className="text-xs text-gray-500 mt-1">
+                            Paid on {format(paymentDetails.date, "dd MMM yyyy")} via {paymentDetails.method || "Payment"}
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2773,140 +2840,7 @@ const InvoiceForm = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Payment Modal */}
-      <AlertDialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
-        <AlertDialogContent className="max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle>{isPaid ? "Edit Payment" : "Record Payment"}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {isPaid
-                ? "Update payment details for this invoice."
-                : "Record payment details for this invoice. This will mark the invoice as paid."
-              }
-            </AlertDialogDescription>
-          </AlertDialogHeader>
 
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label className="text-xs font-medium">Amount Paid</Label>
-              <Input
-                type="number"
-                value={paymentDetails.amount}
-                onChange={(e) => setPaymentDetails(prev => ({
-                  ...prev,
-                  amount: parseFloat(e.target.value) || 0
-                }))}
-                className="h-9 text-xs"
-                placeholder="0.00"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-xs font-medium">Payment Date</Label>
-              <Popover open={showPaymentDatePopover} onOpenChange={setShowPaymentDatePopover}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start text-left h-9 text-xs">
-                    {paymentDetails.date instanceof Date && !isNaN(paymentDetails.date)
-                      ? format(paymentDetails.date, "dd/MM/yyyy")
-                      : "Select date"}
-                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={paymentDetails.date}
-                    onSelect={(date) => {
-                      if (date && date <= new Date()) {
-                        setPaymentDetails(prev => ({
-                          ...prev,
-                          date
-                        }));
-                        setShowPaymentDatePopover(false);
-                      }
-                    }}
-                    initialFocus
-                    disabled={(date) => date > new Date()}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-xs font-medium">Payment Method</Label>
-              <Select
-                value={paymentDetails.method}
-                onValueChange={(value) => setPaymentDetails(prev => ({
-                  ...prev,
-                  method: value
-                }))}
-              >
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue placeholder="Select payment method" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="upi">UPI</SelectItem>
-                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                  <SelectItem value="cheque">Cheque</SelectItem>
-                  <SelectItem value="card">Credit/Debit Card</SelectItem>
-                  <SelectItem value="online">Online Payment</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-xs font-medium">Notes (Optional)</Label>
-              <Textarea
-                placeholder="Transaction ID, reference number, or any notes..."
-                value={paymentDetails.notes}
-                onChange={(e) => setPaymentDetails(prev => ({
-                  ...prev,
-                  notes: e.target.value
-                }))}
-                className="h-16 text-xs resize-none"
-              />
-            </div>
-          </div>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={async () => {
-                try {
-                  // Determine if we're recording a new payment or updating an existing one
-                  const isUpdating = isPaid;
-                  const apiMethod = isUpdating ? 'updatePayment' : 'recordPayment';
-
-                  const response = await window.electron[apiMethod]({
-                    invoiceId: savedInvoice?.id, // Use the saved invoice ID
-                    paymentData: {
-                      amount: paymentDetails.amount,
-                      date: paymentDetails.date,
-                      method: paymentDetails.method,
-                      notes: paymentDetails.notes
-                    }
-                  });
-
-                  if (response.success) {
-                    setIsPaid(true);
-                    setShowPaymentModal(false);
-                    toast.success(isUpdating ? "Payment updated successfully!" : "Payment recorded successfully!");
-                  } else {
-                    toast.error(response.error || `Failed to ${isUpdating ? 'update' : 'record'} payment`);
-                  }
-                } catch (error) {
-                  console.error("Error with payment:", error);
-                  toast.error("An error occurred while processing payment");
-                }
-              }}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              {isPaid ? "Update Payment" : "Save Payment"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Floating Action Button for Converting Proforma to Tax Invoice */}
       {invoiceType === 'proforma' && params && params.id && (

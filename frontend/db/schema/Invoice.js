@@ -19,7 +19,7 @@ const invoices = sqliteTable("invoices", {
   // Invoice details
   invoiceNo: text("invoice_no").notNull().unique(),
   invoiceDate: integer("invoice_date", { mode: "timestamp" }).notNull(),
-  dueDate: integer("due_date", { mode: "timestamp" }).notNull(),
+  dueDate: integer("due_date", { mode: "timestamp" }),
   terms: text("terms").notNull(),
   ledger: text("ledger"),
 

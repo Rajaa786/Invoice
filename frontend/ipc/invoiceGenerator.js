@@ -172,16 +172,18 @@ function registerInvoiceGeneratorIpc() {
           ? invoiceData.invoiceDate
           : new Date(invoiceData.invoiceDate);
 
-      const dueDateObj =
-        invoiceData.dueDate instanceof Date
+      // Handle nullable due date for paid invoices
+      const dueDateObj = invoiceData.dueDate
+        ? (invoiceData.dueDate instanceof Date
           ? invoiceData.dueDate
-          : new Date(invoiceData.dueDate);
+          : new Date(invoiceData.dueDate))
+        : null;
 
       // Validate that dates are valid
       if (isNaN(invoiceDateObj.getTime())) {
         throw new Error('Invalid invoice date provided');
       }
-      if (isNaN(dueDateObj.getTime())) {
+      if (dueDateObj && isNaN(dueDateObj.getTime())) {
         throw new Error('Invalid due date provided');
       }
 
@@ -223,6 +225,8 @@ function registerInvoiceGeneratorIpc() {
           internalNotes: invoiceData.internalNotes || "",
           currency: invoiceData.currency || "INR",
           exchangeRate: parseFloat(invoiceData.exchangeRate) || 1.0,
+          // Handle payment details for paid invoices
+          paidDate: invoiceData.paidDate ? new Date(invoiceData.paidDate) : null,
           paymentMethod: invoiceData.paymentMethod || "",
           paymentReference: invoiceData.paymentReference || "",
           branchId: invoiceData.branchId || "",
@@ -313,6 +317,113 @@ function registerInvoiceGeneratorIpc() {
       };
     } catch (error) {
       log.error("❌ Error getting invoice by ID:", {
+        error: error.message,
+        stack: error.stack,
+        invoiceId
+      });
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  });
+
+  // Update invoice payment status
+  ipcMain.handle("update-invoice-payment", async (event, { invoiceId, paymentData }) => {
+    try {
+      log.info("💰 Updating invoice payment status:", { invoiceId, paymentData });
+
+      // Validate required fields
+      if (!invoiceId || !paymentData) {
+        return {
+          success: false,
+          error: "Missing required fields: invoiceId or paymentData"
+        };
+      }
+
+      // Convert payment date to Date object
+      const paidDateObj = paymentData.date instanceof Date
+        ? paymentData.date
+        : new Date(paymentData.date);
+
+      // Validate payment date
+      if (isNaN(paidDateObj.getTime())) {
+        throw new Error('Invalid payment date provided');
+      }
+
+      // Update the invoice with payment details
+      const updatedInvoice = await db
+        .update(invoices)
+        .set({
+          status: "paid",
+          paidDate: paidDateObj,
+          paymentMethod: paymentData.method || "",
+          paymentReference: paymentData.notes || "",
+          updatedAt: new Date()
+        })
+        .where(eq(invoices.id, invoiceId))
+        .returning();
+
+      if (updatedInvoice.length === 0) {
+        return {
+          success: false,
+          error: "Invoice not found"
+        };
+      }
+
+      log.info("✅ Invoice payment status updated successfully:", updatedInvoice[0]);
+
+      return {
+        success: true,
+        data: updatedInvoice[0]
+      };
+    } catch (error) {
+      log.error("❌ Error updating invoice payment status:", {
+        error: error.message,
+        stack: error.stack,
+        invoiceId,
+        paymentData
+      });
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  });
+
+  // Mark invoice as unpaid
+  ipcMain.handle("mark-invoice-unpaid", async (event, invoiceId) => {
+    try {
+      log.info("🔄 Marking invoice as unpaid:", invoiceId);
+
+      // Update the invoice to remove payment details
+      const updatedInvoice = await db
+        .update(invoices)
+        .set({
+          status: "pending",
+          paidDate: null,
+          paymentMethod: null,
+          paymentReference: null,
+          updatedAt: new Date()
+        })
+        .where(eq(invoices.id, invoiceId))
+        .returning();
+
+      if (updatedInvoice.length === 0) {
+        return {
+          success: false,
+          error: "Invoice not found"
+        };
+      }
+
+      log.info("✅ Invoice marked as unpaid successfully:", updatedInvoice[0]);
+
+      return {
+        success: true,
+        data: updatedInvoice[0]
+      };
+    } catch (error) {
+      log.error("❌ Error marking invoice as unpaid:", {
         error: error.message,
         stack: error.stack,
         invoiceId
@@ -619,8 +730,8 @@ function registerInvoiceGeneratorIpc() {
       }
 
       // Convert payment date to Date object
-      const paymentDate = paymentData.date instanceof Date 
-        ? paymentData.date 
+      const paymentDate = paymentData.date instanceof Date
+        ? paymentData.date
         : new Date(paymentData.date);
 
       if (isNaN(paymentDate.getTime())) {
@@ -685,8 +796,8 @@ function registerInvoiceGeneratorIpc() {
       }
 
       // Convert payment date to Date object
-      const paymentDate = paymentData.date instanceof Date 
-        ? paymentData.date 
+      const paymentDate = paymentData.date instanceof Date
+        ? paymentData.date
         : new Date(paymentData.date);
 
       if (isNaN(paymentDate.getTime())) {

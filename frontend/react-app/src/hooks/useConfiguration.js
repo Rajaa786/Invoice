@@ -25,12 +25,12 @@ const debounce = (func, wait) => {
 const getCachedValue = async (key, fetchFn) => {
     const now = Date.now();
     const cached = SETTINGS_CACHE.get(key);
-    
+
     if (cached && (now - cached.timestamp) < CACHE_EXPIRY) {
         console.log(`Using cached value for ${key}:`, cached.value);
         return cached.value;
     }
-    
+
     console.log(`Fetching fresh value for ${key}`);
     const value = await fetchFn();
     SETTINGS_CACHE.set(key, { value, timestamp: now });
@@ -67,10 +67,10 @@ export const useConfiguration = () => {
             try {
                 console.log('Initializing configuration service...');
                 const service = await getConfigurationService();
-                
+
                 // Ensure the service is properly initialized
                 await service.ensureInitialized();
-                
+
                 console.log('Configuration service initialized successfully');
                 configServiceInstance = service;
                 setConfigService(service);
@@ -80,7 +80,7 @@ export const useConfiguration = () => {
                 console.error('Failed to initialize configuration service:', err);
                 setError(err);
                 setIsInitialized(false);
-                
+
                 // Retry after a delay
                 setTimeout(() => {
                     console.log('Retrying configuration service initialization...');
@@ -98,7 +98,7 @@ export const useConfiguration = () => {
             console.warn(`Config service not ready, returning default for ${keyPath}`);
             return defaultValue;
         }
-        
+
         try {
             return await getCachedValue(keyPath, async () => {
                 const value = await configService.settingsService.get(keyPath);
@@ -160,7 +160,7 @@ export const useTemplateConfiguration = () => {
             try {
                 setLoading(true);
                 console.log('Loading template configuration...');
-                
+
                 const [template, settings] = await Promise.all([
                     get('invoice.templates.selectedTemplate', 'classic_blue'),
                     get('invoice.templates.settings', {
@@ -173,7 +173,7 @@ export const useTemplateConfiguration = () => {
                 ]);
 
                 console.log('Loaded template configuration:', { template, settings });
-                
+
                 setSelectedTemplateState(template);
                 setTemplateSettingsState(settings);
             } catch (error) {
@@ -212,7 +212,7 @@ export const useTemplateConfiguration = () => {
             // 🔧 FIXED: Use functional setState to avoid templateSettings dependency
             setTemplateSettingsState(prevSettings => {
                 const mergedSettings = { ...prevSettings, ...newSettings };
-                
+
                 // Async save operation (don't wait for it in setState)
                 set('invoice.templates.settings', mergedSettings).then(success => {
                     if (!success) {
@@ -226,10 +226,10 @@ export const useTemplateConfiguration = () => {
                     // Revert to previous state on error
                     setTemplateSettingsState(prevSettings);
                 });
-                
+
                 return mergedSettings;
             });
-            
+
             return true; // Return immediately for optimistic UI
         } catch (error) {
             console.error('Error updating template settings:', error);
@@ -288,7 +288,7 @@ export const useAppConfiguration = () => {
             try {
                 setLoading(true);
                 console.log('Loading app configuration...');
-                
+
                 const [currentTheme, currentLanguage] = await Promise.all([
                     configService.getTheme(),
                     configService.getLanguage()
@@ -296,13 +296,13 @@ export const useAppConfiguration = () => {
 
                 console.log('Loaded theme:', currentTheme, 'language:', currentLanguage);
                 console.log('Theme type:', typeof currentTheme, 'Language type:', typeof currentLanguage);
-                
+
                 // Use fallback values if undefined
                 const finalTheme = currentTheme || 'light';
                 const finalLanguage = currentLanguage || 'en';
-                
+
                 console.log('Setting final values - theme:', finalTheme, 'language:', finalLanguage);
-                
+
                 setThemeState(finalTheme);
                 setLanguageState(finalLanguage);
             } catch (error) {
@@ -553,11 +553,11 @@ export const useUIConfiguration = () => {
             try {
                 setLoading(true);
                 console.log('Loading UI configuration...');
-                
+
                 const preferences = await configService.getUIPreferences();
                 console.log('Loaded UI preferences:', preferences);
                 console.log('UI preferences type:', typeof preferences);
-                
+
                 // Merge with defaults to ensure all properties exist
                 const defaultPreferences = {
                     autoSave: false,
@@ -570,12 +570,12 @@ export const useUIConfiguration = () => {
                     numberFormat: 'en-IN',
                     showTooltips: true
                 };
-                
+
                 const mergedPreferences = { ...defaultPreferences, ...preferences };
                 console.log('Merged UI preferences:', mergedPreferences);
                 console.log('AutoSave value:', mergedPreferences.autoSave, 'type:', typeof mergedPreferences.autoSave);
                 console.log('ShowPreview value:', mergedPreferences.showPreview, 'type:', typeof mergedPreferences.showPreview);
-                
+
                 setUIPreferencesState(mergedPreferences);
                 console.log('UI preferences set to:', mergedPreferences);
             } catch (error) {
