@@ -61,6 +61,7 @@ import { templateLogger } from "../../utils/templateLogger";
 import { useCompanyConfiguration } from "../../hooks/useConfiguration";
 import { toast } from "react-hot-toast";
 import { Switch } from "../ui/switch";
+import { getCustomerStateCode, getCompanyStateCode, calculateGSTAmounts } from "../../shared/constants/GSTConfig";
 
 const InvoiceForm = () => {
   const params = useParams(); // Get URL parameters including invoice ID
@@ -960,11 +961,15 @@ const InvoiceForm = () => {
     }
 
     try {
-      // Step 2: Calculate tax amounts and total
-      const shouldApplyGST = selectedCustomer.gstApplicable === 'Yes';
-      const calculatedCgst = shouldApplyGST ? subtotal * 0.09 : 0;
-      const calculatedSgst = shouldApplyGST ? subtotal * 0.09 : 0;
-      const calculatedTotal = subtotal + calculatedCgst + calculatedSgst;
+      // Step 2: Calculate tax amounts and total using GSTConfig
+      const customerStateCode = getCustomerStateCode(selectedCustomer);
+      const companyStateCode = getCompanyStateCode(selectedCompany);
+
+      // Calculate GST based on state comparison
+      const gstDetails = calculateGSTAmounts(subtotal, customerStateCode, companyStateCode)
+
+
+      const calculatedTotal = subtotal + gstDetails.totalGST;
 
       console.log("items max", items);
       // Step 3: Prepare invoice data for database
@@ -987,10 +992,12 @@ const InvoiceForm = () => {
           amount: parseFloat(item.amount) || 0,
         })),
         subtotal: subtotal,
-        cgstRate: 9,
-        sgstRate: 9,
-        cgstAmount: calculatedCgst,
-        sgstAmount: calculatedSgst,
+        cgstRate: gstDetails.cgstRate,
+        sgstRate: gstDetails.sgstRate,
+        igstRate: gstDetails.igstRate,
+        cgstAmount: gstDetails.cgstAmount,
+        sgstAmount: gstDetails.sgstAmount,
+        igstAmount: gstDetails.igstAmount,
         totalAmount: calculatedTotal,
         discountAmount: discountAmount,
         discountPercentage: discountPercentage,
@@ -1077,11 +1084,27 @@ const InvoiceForm = () => {
         paymentTerms: paymentTerms,
         customerNotes: customerNotes,
         termsAndConditions: termsAndConditions,
-        cgstRate: 9,
-        sgstRate: 9,
-        cgstAmount: calculatedCgst,
-        sgstAmount: calculatedSgst,
+        // GST details including isIntraState flag
+        subtotal: subtotal,
+        cgstRate: gstDetails.cgstRate,
+        sgstRate: gstDetails.sgstRate,
+        igstRate: gstDetails.igstRate,
+        cgstAmount: gstDetails.cgstAmount,
+        sgstAmount: gstDetails.sgstAmount,
+        igstAmount: gstDetails.igstAmount,
+        totalGST: gstDetails.totalGST,
+        isIntraState: gstDetails.isIntraState,
         totalAmount: calculatedTotal,
+
+        // Debug logging for GST flow
+        _debug: {
+          gstCalculation: {
+            customerStateCode: getCustomerStateCode(selectedCustomer),
+            companyStateCode: getCompanyStateCode(selectedCompany),
+            isIntraState: gstDetails.isIntraState,
+            gstType: gstDetails.isIntraState ? 'CGST+SGST' : 'IGST'
+          }
+        },
 
         // Step 7: Format company data with correct property names
         company: {
@@ -1278,10 +1301,13 @@ const InvoiceForm = () => {
 
     if (newPaidStatus) {
       // When marking as paid, calculate the final total amount including taxes and discounts
-      const shouldApplyGST = selectedCustomer?.gstApplicable === 'Yes';
-      const calculatedCgst = shouldApplyGST ? subtotal * 0.09 : 0;
-      const calculatedSgst = shouldApplyGST ? subtotal * 0.09 : 0;
-      const finalTotal = subtotal + calculatedCgst + calculatedSgst - discountAmount;
+      const customerStateCode = getCustomerStateCode(selectedCustomer);
+      const companyStateCode = getCompanyStateCode(selectedCompany);
+
+      // Calculate GST based on state comparison - always calculate GST
+      const gstDetails = calculateGSTAmounts(subtotal, customerStateCode, companyStateCode);
+
+      const finalTotal = subtotal + gstDetails.totalGST - discountAmount;
 
       const newPaymentDetails = {
         amount: finalTotal,
@@ -2352,40 +2378,59 @@ const InvoiceForm = () => {
                       <span className="font-medium">₹{(subtotal - discountAmount).toFixed(2)}</span>
                     </div>
 
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">CGST (9%):</span>
-                      <span className="font-medium">₹{((subtotal - discountAmount) * 0.09).toFixed(2)}</span>
-                    </div>
+                    {(() => {
+                      const taxableAmount = subtotal - discountAmount;
 
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">SGST (9%):</span>
-                      <span className="font-medium">₹{((subtotal - discountAmount) * 0.09).toFixed(2)}</span>
-                    </div>
+                      const gstDetails = calculateGSTAmounts(taxableAmount, getCustomerStateCode(selectedCustomer), getCompanyStateCode(selectedCompany));
 
-                    <div className="border-t pt-1 mt-1">
-                      <div className="flex justify-between text-sm">
-                        <span className="font-semibold">Total:</span>
-                        <span className="font-bold text-blue-600">
-                          ₹{((subtotal - discountAmount) + ((subtotal - discountAmount) * 0.18)).toFixed(2)}
-                        </span>
-                      </div>
+                      const isIntraState = gstDetails.isIntraState;
 
-                      {/* Payment Status Summary - Only show for paid invoices */}
-                      {isPaid && (
-                        <div className="mt-3 pt-2 border-t border-gray-200">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-600">Payment Status:</span>
-                            <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-                              <span className="mr-1">✔️</span>
-                              PAID
+                      return (
+                        <>
+                          {isIntraState ? (
+                            <>
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">CGST ({gstDetails.cgstRate}%):</span>
+                                <span className="font-medium">₹{gstDetails.cgstAmount.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">SGST ({gstDetails.sgstRate}%):</span>
+                                <span className="font-medium">₹{gstDetails.sgstAmount.toFixed(2)}</span>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">IGST ({gstDetails.igstRate}%):</span>
+                              <span className="font-medium">₹{gstDetails.igstAmount.toFixed(2)}</span>
+                            </div>
+                          )}
+                          <div className="border-t pt-1 mt-1">
+                            <div className="flex justify-between text-sm">
+                              <span className="font-semibold">Total:</span>
+                              <span className="font-bold text-blue-600">
+                                ₹{(taxableAmount + gstDetails.totalGST).toFixed(2)}
+                              </span>
                             </div>
                           </div>
-                          <div className="text-xs text-gray-500 mt-1">
-                            Paid on {format(paymentDetails.date, "dd MMM yyyy")} via {paymentDetails.method || "Payment"}
+                        </>
+                      );
+                    })()}
+
+                    {/* Payment Status Summary - Only show for paid invoices */}
+                    {isPaid && (
+                      <div className="mt-3 pt-2 border-t border-gray-200">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-600">Payment Status:</span>
+                          <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                            <span className="mr-1">✔️</span>
+                            PAID
                           </div>
                         </div>
-                      )}
-                    </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          Paid on {format(paymentDetails.date, "dd MMM yyyy")} via {paymentDetails.method || "Payment"}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2846,24 +2891,24 @@ const InvoiceForm = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-
-
       {/* Floating Action Button for Converting Proforma to Tax Invoice */}
-      {invoiceType === 'proforma' && params && params.id && (
-        <div className="fixed bottom-6 right-6 z-50">
-          <Button
-            onClick={() => handleConvertProformaToTax(params.id)}
-            className="rounded-full w-14 h-14 shadow-lg bg-blue-600 hover:bg-blue-700 flex items-center justify-center"
-            title="Convert to Tax Invoice"
-          >
-            <DollarSign className="h-6 w-6" />
-          </Button>
-          <div className="mt-2 text-center text-xs font-medium text-gray-700 bg-white px-2 py-1 rounded-md shadow">
-            Convert to Tax
+      {
+        invoiceType === 'proforma' && params && params.id && (
+          <div className="fixed bottom-6 right-6 z-50">
+            <Button
+              onClick={() => handleConvertProformaToTax(params.id)}
+              className="rounded-full w-14 h-14 shadow-lg bg-blue-600 hover:bg-blue-700 flex items-center justify-center"
+              title="Convert to Tax Invoice"
+            >
+              <DollarSign className="h-6 w-6" />
+            </Button>
+            <div className="mt-2 text-center text-xs font-medium text-gray-700 bg-white px-2 py-1 rounded-md shadow">
+              Convert to Tax
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 };
 

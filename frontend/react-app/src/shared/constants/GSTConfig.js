@@ -80,19 +80,32 @@ const shouldApplyCGSTAndSGST = (customerStateCode, companyStateCode = "27") => {
 };
 
 // Helper function to calculate GST amounts
-const calculateGSTAmounts = (baseAmount, customerStateCode) => {
+const calculateGSTAmounts = (baseAmount, customerStateCode, companyStateCode = "27") => {
   console.group('💰 [calculateGSTAmounts] Starting GST calculation');
   console.log('📊 Input parameters:', {
     baseAmount: baseAmount?.toFixed(2),
     customerStateCode,
-    customerState: STATE_CODES[customerStateCode] || 'Unknown State'
+    customerState: STATE_CODES[customerStateCode] || 'Unknown State',
+    companyStateCode,
+    companyState: STATE_CODES[companyStateCode] || 'Unknown State'
   });
 
   const { CGST, SGST, IGST } = GST_RATES.STANDARD;
 
-  // If customer is from Maharashtra, apply CGST + SGST
-  if (customerStateCode === "27") {
-    console.log('✅ [calculateGSTAmounts] Customer is from Maharashtra - Applying CGST + SGST');
+  // Check if customer and company are in the same state (intra-state)
+  const isIntraState = customerStateCode && parseInt(customerStateCode) === 27;
+
+  console.log('🔍 [calculateGSTAmounts] State comparison:', {
+    customerStateCode,
+    customerState: STATE_CODES[customerStateCode] || 'Unknown',
+    companyStateCode,
+    companyState: STATE_CODES[companyStateCode] || 'Unknown',
+    isIntraState,
+    transactionType: isIntraState ? 'Intra-state' : 'Inter-state'
+  });
+
+  if (isIntraState) {
+    console.log('✅ [calculateGSTAmounts] Intra-state transaction - Applying CGST + SGST');
     const cgstAmount = (baseAmount * CGST) / 100;
     const sgstAmount = (baseAmount * SGST) / 100;
     const totalGST = cgstAmount + sgstAmount;
@@ -117,7 +130,7 @@ const calculateGSTAmounts = (baseAmount, customerStateCode) => {
     console.groupEnd();
     return result;
   } else {
-    console.log('ℹ️ [calculateGSTAmounts] Customer is from other state - Applying IGST');
+    console.log('ℹ️ [calculateGSTAmounts] Inter-state transaction - Applying IGST');
     const igstAmount = (baseAmount * IGST) / 100;
 
     const result = {
@@ -163,7 +176,7 @@ const getCustomerStateCode = (customer) => {
   console.log('📄 Customer details:', {
     hasGST: !!customer?.gstin,
     gstin: customer?.gstin,
-    state: customer?.state
+    state: customer?.billingState
   });
 
   // First try to get from GST number
@@ -183,8 +196,8 @@ const getCustomerStateCode = (customer) => {
   }
 
   // If no valid GST number, try to get from state name
-  if (customer?.state) {
-    const stateCode = getStateCodeFromName(customer.state);
+  if (customer?.billingState) {
+    const stateCode = getStateCodeFromName(customer.billingState);
     if (stateCode) {
       console.log('✅ [getCustomerStateCode] Found state code from state name:', stateCode, '(', STATE_CODES[stateCode], ')');
       console.groupEnd();
@@ -201,6 +214,58 @@ const getCustomerStateCode = (customer) => {
   return null;
 };
 
+// Helper function to extract company state code
+const getCompanyStateCode = (company) => {
+  console.group('🔍 [getCompanyStateCode] Getting company state code');
+  console.log('🏢 Company details:', {
+    hasGST: !!company?.gstin,
+    gstin: company?.gstin,
+    stateCode: company?.stateCode,
+    state: company?.state
+  });
+
+  // First try to get from company's stateCode field
+  if (company?.stateCode && isValidStateCode(company.stateCode)) {
+    console.log('✅ [getCompanyStateCode] Valid state code from company:', company.stateCode, '(', STATE_CODES[company.stateCode], ')');
+    console.groupEnd();
+    return company.stateCode;
+  }
+
+  // Then try to get from GST number
+  if (company?.gstin && company.gstin.length >= 2) {
+    const stateCode = company.gstin.substring(0, 2);
+    console.log('🔄 [getCompanyStateCode] Extracted state code from GST:', stateCode);
+
+    if (isValidStateCode(stateCode)) {
+      console.log('✅ [getCompanyStateCode] Valid state code from GST:', stateCode, '(', STATE_CODES[stateCode], ')');
+      console.groupEnd();
+      return stateCode;
+    } else {
+      console.log('⚠️ [getCompanyStateCode] Invalid state code from GST, trying state name');
+    }
+  } else {
+    console.log('ℹ️ [getCompanyStateCode] No valid GST number found, trying state name');
+  }
+
+  // If no valid GST number, try to get from state name
+  if (company?.state) {
+    const stateCode = getStateCodeFromName(company.state);
+    if (stateCode) {
+      console.log('✅ [getCompanyStateCode] Found state code from state name:', stateCode, '(', STATE_CODES[stateCode], ')');
+      console.groupEnd();
+      return stateCode;
+    } else {
+      console.log('⚠️ [getCompanyStateCode] Could not find state code from state name');
+    }
+  } else {
+    console.log('⚠️ [getCompanyStateCode] No state name provided');
+  }
+
+  console.log('❌ [getCompanyStateCode] Could not determine state code, defaulting to Maharashtra (27)');
+  console.groupEnd();
+  return "27"; // Default to Maharashtra if no state code found
+};
+
 module.exports = {
   STATE_CODES,
   GST_RATES,
@@ -209,5 +274,6 @@ module.exports = {
   getStateName,
   isValidStateCode,
   getCustomerStateCode,
+  getCompanyStateCode,
   getStateCodeFromName
 }; 

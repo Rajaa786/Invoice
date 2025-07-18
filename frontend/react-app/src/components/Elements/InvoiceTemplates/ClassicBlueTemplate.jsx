@@ -619,61 +619,28 @@ const numberToWords = (num) => {
 };
 
 const calculateTotals = (items, invoice) => {
-    const subtotal = items.reduce((sum, item) => {
-        const amount = parseFloat(item.amount) || (parseFloat(item.quantity) * parseFloat(item.rate)) || 0;
-        return sum + amount;
-    }, 0);
-
-    // Get GST details from invoice object
-    const customerStateCode = invoice.customerStateCode;
+    // Use pre-calculated values from InvoiceForm.jsx - no calculations needed here
+    const subtotal = invoice.subtotal || 0;
     const cgstAmount = invoice.cgstAmount || 0;
     const sgstAmount = invoice.sgstAmount || 0;
     const igstAmount = invoice.igstAmount || 0;
     const cgstRate = invoice.cgstRate || 0;
     const sgstRate = invoice.sgstRate || 0;
     const igstRate = invoice.igstRate || 0;
-    const totalGST = invoice.totalGST || 0;
+    const totalGST = invoice.totalGST || (cgstAmount + sgstAmount + igstAmount);
+    const isIntraState = invoice.isIntraState || false;
 
-    // Determine if we're in preview mode
-    const isPreviewMode = invoice.isPreviewMode || false;
-
-    // Get GST display settings with defaults
-    const gstDisplaySettings = invoice.gstDisplaySettings || {
-        defaultMode: 'split',
-        showSplitByDefault: true
-    };
-
-    // Smart GST display logic with preview mode handling:
-    let shouldShowSplit = false;
-
-    if (isPreviewMode) {
-        // In preview mode, respect the settings
-        shouldShowSplit = gstDisplaySettings.showSplitByDefault && gstDisplaySettings.defaultMode === 'split';
-        console.log('🔍 [ClassicBlueTemplate] Preview Mode GST Display:', {
-            showSplitByDefault: gstDisplaySettings.showSplitByDefault,
-            defaultMode: gstDisplaySettings.defaultMode,
-            shouldShowSplit
-        });
-    } else {
-        // In normal mode, use business logic
-        shouldShowSplit = invoice.isIntraState;
-        console.log('🔍 [ClassicBlueTemplate] Normal Mode GST Display:', {
-            customerStateCode,
-            isIntraState: invoice.isIntraState,
-            shouldShowSplit
-        });
-    }
-
-    console.log('💰 [ClassicBlueTemplate] GST Display Logic:', {
-        isPreviewMode,
-        customerStateCode,
-        defaultMode: gstDisplaySettings.defaultMode,
-        isIntraState: invoice.isIntraState,
-        shouldShowSplit,
-        cgstAmount,
-        sgstAmount,
-        igstAmount,
-        gstDisplaySettings
+    console.log("🔍 [ClassicBlueTemplate] Invoice data received:", {
+        invoiceNumber: invoice.invoiceNumber,
+        subtotal: subtotal,
+        isIntraState: isIntraState,
+        shouldShowSplit: isIntraState,
+        gstType: isIntraState ? 'CGST+SGST' : 'IGST',
+        cgstAmount: cgstAmount,
+        sgstAmount: sgstAmount,
+        igstAmount: igstAmount,
+        totalGST: totalGST,
+        debug: invoice._debug
     });
 
     return {
@@ -685,9 +652,7 @@ const calculateTotals = (items, invoice) => {
         sgstAmount,
         igstAmount,
         totalGST,
-        customerStateCode,
-        shouldShowSplit,
-        isPreviewMode,
+        shouldShowSplit: isIntraState,
         grandTotal: subtotal + totalGST
     };
 };
@@ -774,10 +739,13 @@ const InfoTwoColumn = ({ invoice, dynamicStyles }) => (
                     )}
                 </View>
             )}
-            {(invoice.isPreviewMode || invoice.customer?.gstApplicable === 'Yes') && (
+            {/* Show GSTIN only if GST is applicable and GSTIN is present */}
+            {invoice.customer?.gstApplicable === 'Yes' && invoice.customer?.gstin && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 1 }}>
                     <Text style={{ fontSize: 9, color: colors.textSecondary, lineHeight: 1.3 }}>GSTIN:</Text>
-                    <Text style={{ marginLeft: 4, fontSize: 9, color: colors.primary, fontWeight: 'bold', lineHeight: 1.3 }}>{invoice.customer?.gstin || (invoice.isPreviewMode ? '27ABCDE1234F1Z5' : '')}</Text>
+                    <Text style={{ marginLeft: 4, fontSize: 9, color: colors.primary, fontWeight: 'bold', lineHeight: 1.3 }}>
+                        {invoice.customer.gstin}
+                    </Text>
                 </View>
             )}
         </View>
@@ -807,90 +775,16 @@ const InfoTwoColumn = ({ invoice, dynamicStyles }) => (
                 </View>
             )}
             {/* Conditionally show Payment Terms if available and not paid */}
-            {invoice.paymentTerms && !invoice.paidDate && (
+            {/* {invoice.paymentTerms && !invoice.paidDate && (
                 <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>Terms:</Text>
                     <Text style={styles.infoValue}>{invoice.paymentTerms ? `Net ${invoice.paymentTerms}` : "Net 30"}</Text>
                 </View>
-            )}
+            )} */}
         </View>
     </View>
 );
 
-const CustomerInfo = ({ invoice, dynamicStyles }) => (
-    <View style={[styles.customerSection, { marginBottom: 12 }]}>
-        <Text style={[dynamicStyles?.sectionTitle || styles.sectionTitle, { marginBottom: 6 }]}>Bill To</Text>
-
-        {/* Customer Name with enhanced styling */}
-        <Text style={[styles.customerName, {
-            fontSize: 12,
-            color: colors.primary,
-            letterSpacing: 0.3,
-            marginBottom: 6
-        }]}>
-            {invoice.customer?.name || invoice.customerName || "Customer Name"}
-        </Text>
-
-        {/* Address Block */}
-        <View style={{ marginBottom: 6 }}>
-            {invoice.customer?.addressLine1 && (
-                <Text style={[styles.addressText, { lineHeight: 1.4 }]}>
-                    {invoice.customer.addressLine1}
-                </Text>
-            )}
-            {/* City, State, ZIP in one line */}
-            <Text style={[styles.addressText, { lineHeight: 1.4 }]}>
-                {[
-                    invoice.customer?.city,
-                    invoice.customer?.state,
-                    invoice.customer?.zip
-                ].filter(Boolean).join(", ")}
-            </Text>
-        </View>
-
-        {/* Contact Information */}
-        {(invoice.customer?.phone || invoice.customer?.email) && (
-            <View style={{ marginBottom: 6 }}>
-                {invoice.customer?.phone && (
-                    <Text style={[styles.addressText, { lineHeight: 1.4 }]}>
-                        Ph: {invoice.customer.phone}
-                    </Text>
-                )}
-                {invoice.customer?.email && (
-                    <Text style={[styles.addressText, { lineHeight: 1.4 }]}>
-                        Email: {invoice.customer.email}
-                    </Text>
-                )}
-            </View>
-        )}
-
-        {/* GSTIN with better color differentiation */}
-        {(invoice.isPreviewMode || invoice.customer?.gstApplicable === 'Yes') && (
-            <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginTop: 2
-            }}>
-                <Text style={{
-                    fontSize: 9,
-                    color: colors.textSecondary,
-                    lineHeight: 1.4
-                }}>
-                    GSTIN:
-                </Text>
-                <Text style={{
-                    marginLeft: 4,
-                    fontSize: 9,
-                    color: colors.primary,
-                    fontWeight: 'bold',
-                    lineHeight: 1.4
-                }}>
-                    {invoice.customer?.gstin || (invoice.isPreviewMode ? '27ABCDE1234F1Z5' : '')}
-                </Text>
-            </View>
-        )}
-    </View>
-);
 
 // Streamlined Totals Section - More Compact
 const ItemsTable = ({ invoice, totals, dynamicStyles }) => {
@@ -999,14 +893,21 @@ const ItemsTable = ({ invoice, totals, dynamicStyles }) => {
 };
 
 const TaxableValueSection = ({ invoice, totals, dynamicStyles }) => {
-    // Group items by HSN/SAC
+    // Use pre-calculated values from InvoiceForm.jsx
     const items = invoice.items || [];
     const isIntraState = totals.shouldShowSplit;
     const cgstRate = totals.cgstRate || 0;
     const sgstRate = totals.sgstRate || 0;
     const igstRate = totals.igstRate || 0;
 
-    // Group by HSN
+    // Use GST amounts already calculated in InvoiceForm.jsx
+    const totalCgst = totals.cgstAmount || 0;
+    const totalSgst = totals.sgstAmount || 0;
+    const totalIgst = totals.igstAmount || 0;
+    const totalTaxAmount = totals.totalGST || 0;
+    const totalTaxable = totals.subtotal || 0;
+
+    // Group by HSN for display purposes only - no calculations needed
     const hsnGroups = {};
     items.forEach(item => {
         const hsn = item.hsn || 'N/A';
@@ -1017,16 +918,19 @@ const TaxableValueSection = ({ invoice, totals, dynamicStyles }) => {
         hsnGroups[hsn].items.push(item);
     });
 
-    // Prepare rows
+    // Prepare rows using proportional distribution of pre-calculated GST amounts
     const rows = Object.entries(hsnGroups).map(([hsn, group]) => {
         const taxable = group.taxable;
+        const proportion = totalTaxable > 0 ? taxable / totalTaxable : 0;
+
+        // Distribute pre-calculated GST amounts proportionally
         let cgst = 0, sgst = 0, igst = 0, totalTax = 0;
         if (isIntraState) {
-            cgst = taxable * (cgstRate / 100);
-            sgst = taxable * (sgstRate / 100);
+            cgst = totalCgst * proportion;
+            sgst = totalSgst * proportion;
             totalTax = cgst + sgst;
         } else {
-            igst = taxable * (igstRate / 100);
+            igst = totalIgst * proportion;
             totalTax = igst;
         }
         return {
@@ -1039,73 +943,75 @@ const TaxableValueSection = ({ invoice, totals, dynamicStyles }) => {
         };
     });
 
-    // Totals
-    const totalTaxable = rows.reduce((sum, r) => sum + r.taxable, 0);
-    const totalCgst = rows.reduce((sum, r) => sum + r.cgst, 0);
-    const totalSgst = rows.reduce((sum, r) => sum + r.sgst, 0);
-    const totalIgst = rows.reduce((sum, r) => sum + r.igst, 0);
-    const totalTaxAmount = rows.reduce((sum, r) => sum + r.totalTax, 0);
-
     return (
         <View style={styles.taxableValueSection}>
             {/* Table Header */}
             <View style={[styles.taxableValueHeader, { alignItems: 'center' }]}>
-                <Text style={[styles.taxableValueHeaderCell, { width: '18%', textAlign: 'left' }]}>HSN/SAC</Text>
-                <Text style={[styles.taxableValueHeaderCell, { width: '18%', textAlign: 'right' }]}>Taxable Value</Text>
                 {isIntraState ? (
                     <>
+                        <Text style={[styles.taxableValueHeaderCell, { width: '18%', textAlign: 'left' }]}>HSN/SAC</Text>
+                        <Text style={[styles.taxableValueHeaderCell, { width: '18%', textAlign: 'right' }]}>Taxable Value</Text>
                         <Text style={[styles.taxableValueHeaderCell, { width: '12%', textAlign: 'center' }]}>CGST Rate</Text>
                         <Text style={[styles.taxableValueHeaderCell, { width: '12%', textAlign: 'right' }]}>CGST Amt</Text>
                         <Text style={[styles.taxableValueHeaderCell, { width: '12%', textAlign: 'center' }]}>SGST Rate</Text>
                         <Text style={[styles.taxableValueHeaderCell, { width: '12%', textAlign: 'right' }]}>SGST Amt</Text>
+                        <Text style={[styles.taxableValueHeaderCell, { width: '16%', textAlign: 'right' }]}>Total Tax Amount</Text>
                     </>
                 ) : (
                     <>
-                        <Text style={[styles.taxableValueHeaderCell, { width: '12%', textAlign: 'center' }]}>IGST Rate</Text>
-                        <Text style={[styles.taxableValueHeaderCell, { width: '12%', textAlign: 'right' }]}>IGST Amt</Text>
+                        <Text style={[styles.taxableValueHeaderCell, { width: '20%', textAlign: 'left' }]}>HSN/SAC</Text>
+                        <Text style={[styles.taxableValueHeaderCell, { width: '20%', textAlign: 'right' }]}>Taxable Value</Text>
+                        <Text style={[styles.taxableValueHeaderCell, { width: '20%', textAlign: 'center' }]}>IGST Rate</Text>
+                        <Text style={[styles.taxableValueHeaderCell, { width: '20%', textAlign: 'right' }]}>IGST Amt</Text>
+                        <Text style={[styles.taxableValueHeaderCell, { width: '20%', textAlign: 'right' }]}>Total Tax Amount</Text>
                     </>
                 )}
-                <Text style={[styles.taxableValueHeaderCell, { width: '16%', textAlign: 'right' }]}>Total Tax Amount</Text>
             </View>
             {/* Table Rows */}
             {rows.map((row, idx) => (
                 <View key={row.hsn + idx} style={styles.taxableValueRow}>
-                    <Text style={[styles.taxableValueCell, { width: '18%', textAlign: 'left' }]}>{row.hsn}</Text>
-                    <Text style={[styles.taxableValueCell, { width: '18%', textAlign: 'right' }]}>{row.taxable.toFixed(2)}</Text>
                     {isIntraState ? (
                         <>
+                            <Text style={[styles.taxableValueCell, { width: '18%', textAlign: 'left' }]}>{row.hsn}</Text>
+                            <Text style={[styles.taxableValueCell, { width: '18%', textAlign: 'right' }]}>{row.taxable.toFixed(2)}</Text>
                             <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'center' }]}>{cgstRate}%</Text>
                             <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'right' }]}>{row.cgst.toFixed(2)}</Text>
                             <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'center' }]}>{sgstRate}%</Text>
                             <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'right' }]}>{row.sgst.toFixed(2)}</Text>
+                            <Text style={[styles.taxableValueCell, { width: '16%', textAlign: 'right', fontWeight: 'bold' }]}>{row.totalTax.toFixed(2)}</Text>
                         </>
                     ) : (
                         <>
-                            <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'center' }]}>{igstRate}%</Text>
-                            <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'right' }]}>{row.igst.toFixed(2)}</Text>
+                            <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'left' }]}>{row.hsn}</Text>
+                            <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'right' }]}>{row.taxable.toFixed(2)}</Text>
+                            <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'center' }]}>{igstRate}%</Text>
+                            <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'right' }]}>{row.igst.toFixed(2)}</Text>
+                            <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'right', fontWeight: 'bold' }]}>{row.totalTax.toFixed(2)}</Text>
                         </>
                     )}
-                    <Text style={[styles.taxableValueCell, { width: '16%', textAlign: 'right', fontWeight: 'bold' }]}>{row.totalTax.toFixed(2)}</Text>
                 </View>
             ))}
             {/* Total Row */}
             <View style={[styles.taxableValueRow, { backgroundColor: colors.background }]}>
-                <Text style={[styles.taxableValueCell, { width: '18%', textAlign: 'left', fontWeight: 'bold' }]}>Total</Text>
-                <Text style={[styles.taxableValueCell, { width: '18%', textAlign: 'right', fontWeight: 'bold' }]}>{totalTaxable.toFixed(2)}</Text>
                 {isIntraState ? (
                     <>
+                        <Text style={[styles.taxableValueCell, { width: '18%', textAlign: 'left', fontWeight: 'bold' }]}>Total</Text>
+                        <Text style={[styles.taxableValueCell, { width: '18%', textAlign: 'right', fontWeight: 'bold' }]}>{totalTaxable.toFixed(2)}</Text>
                         <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'center', fontWeight: 'bold' }]}>{cgstRate}%</Text>
                         <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'right', fontWeight: 'bold' }]}>{totalCgst.toFixed(2)}</Text>
                         <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'center', fontWeight: 'bold' }]}>{sgstRate}%</Text>
                         <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'right', fontWeight: 'bold' }]}>{totalSgst.toFixed(2)}</Text>
+                        <Text style={[styles.taxableValueCell, { width: '16%', textAlign: 'right', fontWeight: 'bold' }]}>{totalTaxAmount.toFixed(2)}</Text>
                     </>
                 ) : (
                     <>
-                        <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'center', fontWeight: 'bold' }]}>{igstRate}%</Text>
-                        <Text style={[styles.taxableValueCell, { width: '12%', textAlign: 'right', fontWeight: 'bold' }]}>{totalIgst.toFixed(2)}</Text>
+                        <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'left', fontWeight: 'bold' }]}>Total</Text>
+                        <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'right', fontWeight: 'bold' }]}>{totalTaxable.toFixed(2)}</Text>
+                        <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'center', fontWeight: 'bold' }]}>{igstRate}%</Text>
+                        <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'right', fontWeight: 'bold' }]}>{totalIgst.toFixed(2)}</Text>
+                        <Text style={[styles.taxableValueCell, { width: '20%', textAlign: 'right', fontWeight: 'bold' }]}>{totalTaxAmount.toFixed(2)}</Text>
                     </>
                 )}
-                <Text style={[styles.taxableValueCell, { width: '16%', textAlign: 'right', fontWeight: 'bold' }]}>{totalTaxAmount.toFixed(2)}</Text>
             </View>
         </View>
     );

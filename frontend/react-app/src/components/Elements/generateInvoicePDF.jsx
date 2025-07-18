@@ -49,29 +49,18 @@ export const generateInvoicePDF = async (invoice) => {
             showSplitByDefault: true
         };
 
-        // Get customer's state code for GST calculation
-        const customerStateCode = getCustomerStateCode(invoice?.customer);
-
-        // Calculate subtotal (before GST)
-        const subtotal = invoice.items.reduce((sum, item) => sum + (item.quantity * item.rate), 0);
-        console.log('💰 [generateInvoicePDF] Base calculation:', {
-            itemCount: invoice.items.length,
-            subtotal: subtotal?.toFixed(2)
-        });
-
-        // Calculate GST amounts based on state code
-        const gstDetails = invoice?.customer?.gstApplicable === 'Yes'
-            ? calculateGSTAmounts(subtotal, customerStateCode)
-            : {
-                cgstRate: 0,
-                sgstRate: 0,
-                igstRate: 0,
-                cgstAmount: 0,
-                sgstAmount: 0,
-                igstAmount: 0,
-                totalGST: 0,
-                isIntraState: false
-            };
+        // Use pre-calculated GST details from InvoiceForm.jsx - no calculations needed here
+        const subtotal = invoice.subtotal || 0;
+        const gstDetails = {
+            cgstRate: invoice.cgstRate || 0,
+            sgstRate: invoice.sgstRate || 0,
+            igstRate: invoice.igstRate || 0,
+            cgstAmount: invoice.cgstAmount || 0,
+            sgstAmount: invoice.sgstAmount || 0,
+            igstAmount: invoice.igstAmount || 0,
+            totalGST: invoice.totalGST || 0,
+            isIntraState: invoice.isIntraState || false
+        };
 
         // Determine if we're in preview mode
         const isPreviewMode = invoice.isPreviewMode || false;
@@ -88,20 +77,17 @@ export const generateInvoicePDF = async (invoice) => {
                 shouldShowSplit
             });
         } else {
-            // In normal mode, use business logic
-            shouldShowSplit = customerStateCode === "27" || invoice.isIntraState;
+            // In normal mode, use business logic based on state comparison
+            shouldShowSplit = gstDetails.isIntraState;
             console.log('🔍 [generateInvoicePDF] Normal Mode GST Display:', {
-                customerStateCode,
-                isIntraState: invoice.isIntraState,
+                isIntraState: gstDetails.isIntraState,
                 shouldShowSplit
             });
         }
 
-        // Log GST calculation details
-        console.log('💰 [generateInvoicePDF] GST Calculation:', {
+        // Log GST details (pre-calculated from InvoiceForm.jsx)
+        console.log('💰 [generateInvoicePDF] GST Details (Pre-calculated):', {
             isPreviewMode,
-            customerStateCode,
-            customerState: invoice?.customer?.state,
             isIntraState: gstDetails.isIntraState,
             gstType: shouldShowSplit ? 'CGST+SGST' : 'IGST',
             subtotal: subtotal?.toFixed(2),
@@ -111,10 +97,11 @@ export const generateInvoicePDF = async (invoice) => {
             totalGST: gstDetails.totalGST?.toFixed(2),
             finalAmount: (subtotal + gstDetails.totalGST)?.toFixed(2),
             displaySettings: gstDisplaySettings,
-            shouldShowSplit
+            shouldShowSplit,
+            debug: invoice._debug
         });
 
-        // Enhance invoice with GST calculations and display settings
+        // Enhance invoice with pre-calculated GST details and display settings
         const enhancedInvoice = {
             ...invoice,
             subtotal,
@@ -122,8 +109,7 @@ export const generateInvoicePDF = async (invoice) => {
             gstDisplaySettings,
             isPreviewMode, // Pass preview mode flag
             shouldShowSplit, // Pass split display decision
-            totalAmount: subtotal + gstDetails.totalGST,
-            customerStateCode
+            totalAmount: subtotal + gstDetails.totalGST
         };
 
         // Enhanced invoice data with file URLs
