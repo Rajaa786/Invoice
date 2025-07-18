@@ -1137,6 +1137,7 @@ const InvoiceForm = () => {
           city: selectedCustomer.billingCity || "",
           state: selectedCustomer.billingState || "",
           country: selectedCustomer.billingCountry || "",
+          zip: selectedCustomer.billingZip || "",
           email: selectedCustomer.billingEmail || "",
           contactNo: selectedCustomer.billingContactNo || "",
           phone: selectedCustomer.billingContactNo || "",

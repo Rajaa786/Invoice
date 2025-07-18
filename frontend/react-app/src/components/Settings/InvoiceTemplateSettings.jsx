@@ -189,6 +189,7 @@ const SAMPLE_INVOICE_DATA = {
         city: 'Mumbai',
         state: 'Maharashtra',
         country: 'India',
+        zip: '400001',
         email: 'john@customer.com',
         contactNo: '+91 98765 43210',
         gstin: '27PQRST5678G1Z5',

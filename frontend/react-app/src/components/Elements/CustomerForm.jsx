@@ -54,6 +54,7 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
     billingCountry: "India", // Default country
     billingState: "",
     billingCity: "",
+    billingZip: "",
     billingAddressLine1: "",
     billingAddressLine2: "",
     billingContactNo: "",
@@ -64,6 +65,7 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
     shippingCountry: "India", // Default country
     shippingState: "",
     shippingCity: "",
+    shippingZip: "",
     shippingAddressLine1: "",
     shippingAddressLine2: "",
     shippingContactNo: "",
@@ -121,6 +123,7 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
         billingCountry: editCustomer.billingCountry || "India",
         billingState: editCustomer.billingState || "",
         billingCity: editCustomer.billingCity || "",
+        billingZip: editCustomer.billingZip || "",
         billingAddressLine1: editCustomer.billingAddressLine1 || "",
         billingAddressLine2: editCustomer.billingAddressLine2 || "",
         billingContactNo: editCustomer.billingContactNo || "",
@@ -129,6 +132,7 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
         shippingCountry: editCustomer.shippingCountry || "India",
         shippingState: editCustomer.shippingState || "",
         shippingCity: editCustomer.shippingCity || "",
+        shippingZip: editCustomer.shippingZip || "",
         shippingAddressLine1: editCustomer.shippingAddressLine1 || "",
         shippingAddressLine2: editCustomer.shippingAddressLine2 || "",
         shippingContactNo: editCustomer.shippingContactNo || "",
@@ -172,6 +176,7 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
         billingCountry: "India",
         billingState: "",
         billingCity: "",
+        billingZip: "",
         billingAddressLine1: "",
         billingAddressLine2: "",
         billingContactNo: "",
@@ -180,6 +185,7 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
         shippingCountry: "India",
         shippingState: "",
         shippingCity: "",
+        shippingZip: "",
         shippingAddressLine1: "",
         shippingAddressLine2: "",
         shippingContactNo: "",
@@ -204,7 +210,7 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
     "Karnataka": ["Bengaluru", "Mysuru", "Hubli"],
     "Kerala": ["Thiruvananthapuram", "Kochi", "Kozhikode"],
     "Madhya Pradesh": ["Bhopal", "Indore", "Gwalior"],
-    "Maharashtra": ["Mumbai", "Pune", "Nagpur", "Aurangabad"],
+    "Maharashtra": ["Mumbai", "Pune", "Nagpur", "Aurangabad", "Nashik"],
     "Manipur": ["Imphal", "Thoubal", "Churachandpur"],
     "Meghalaya": ["Shillong", "Tura", "Jowai"],
     "Mizoram": ["Aizawl", "Lunglei", "Champhai"],
@@ -276,6 +282,7 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
       ...formData,
       shippingCountry: formData.billingCountry,
       shippingState: formData.billingState,
+      shippingZip: formData.billingZip,
       shippingAddressLine1: formData.billingAddressLine1,
       shippingAddressLine2: formData.billingAddressLine2,
       shippingContactNo: formData.billingContactNo,
@@ -310,6 +317,7 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
     if (!formData.billingCountry) newErrors.billingCountry = "Country is required";
     if (!formData.billingState) newErrors.billingState = "State is required";
     if (!formData.billingCity) newErrors.billingCity = "City is required";
+    if (!formData.billingZip.trim()) newErrors.billingZip = "ZIP code is required";
     if (!formData.billingAddressLine1.trim()) newErrors.billingAddressLine1 = "Address is required";
     if (!formData.billingContactNo.trim()) newErrors.billingContactNo = "Contact number is required";
     if (!formData.billingEmail.trim()) newErrors.billingEmail = "Email is required";
@@ -318,6 +326,7 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
     if (!formData.shippingCountry) newErrors.shippingCountry = "Country is required";
     if (!formData.shippingState) newErrors.shippingState = "State is required";
     if (!formData.shippingCity) newErrors.shippingCity = "City is required";
+    if (!formData.shippingZip.trim()) newErrors.shippingZip = "ZIP code is required";
     if (!formData.shippingAddressLine1.trim()) newErrors.shippingAddressLine1 = "Address is required";
     if (!formData.shippingContactNo.trim()) newErrors.shippingContactNo = "Contact number is required";
     if (!formData.shippingEmail.trim()) newErrors.shippingEmail = "Email is required";
@@ -347,6 +356,15 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
     }
     if (formData.shippingContactNo && !phoneRegex.test(formData.shippingContactNo.replace(/\D/g, ''))) {
       newErrors.shippingContactNo = "Invalid phone number (10 digits required)";
+    }
+
+    // ZIP code validation (6 digits for India)
+    const zipRegex = /^[0-9]{6}$/;
+    if (formData.billingZip && !zipRegex.test(formData.billingZip.replace(/\D/g, ''))) {
+      newErrors.billingZip = "Invalid ZIP code (6 digits required)";
+    }
+    if (formData.shippingZip && !zipRegex.test(formData.shippingZip.replace(/\D/g, ''))) {
+      newErrors.shippingZip = "Invalid ZIP code (6 digits required)";
     }
 
     setErrors(newErrors);
@@ -421,6 +439,7 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
             billingCountry: "India",
             billingState: "",
             billingCity: "",
+            billingZip: "",
             billingAddressLine1: "",
             billingAddressLine2: "",
             billingContactNo: "",
@@ -429,6 +448,7 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
             shippingCountry: "India",
             shippingState: "",
             shippingCity: "",
+            shippingZip: "",
             shippingAddressLine1: "",
             shippingAddressLine2: "",
             shippingContactNo: "",
@@ -485,6 +505,7 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
       billingCountry: "India",
       billingState: randomState,
       billingCity: randomCity,
+      billingZip: `${Math.floor(Math.random() * 900000) + 100000}`,
       billingAddressLine1: "123 Business Park",
       billingAddressLine2: "Tech Hub Area",
       billingContactNo: `94${Math.floor(Math.random() * 100000000).toString().padStart(8, '0')}`,
@@ -495,6 +516,7 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
       shippingCountry: "India",
       shippingState: randomState,
       shippingCity: randomCity,
+      shippingZip: `${Math.floor(Math.random() * 900000) + 100000}`,
       shippingAddressLine1: "123 Business Park",
       shippingAddressLine2: "Tech Hub Area",
       shippingContactNo: `94${Math.floor(Math.random() * 100000000).toString().padStart(8, '0')}`,
@@ -1022,6 +1044,31 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
 
                         <div className="space-y-1.5">
                           <Label className="text-xs">
+                            ZIP Code
+                            <span className="text-destructive ml-0.5">*</span>
+                          </Label>
+                          <Input
+                            placeholder="Enter ZIP code"
+                            value={formData.billingZip}
+                            onChange={(e) => handleInputChange("billingZip", e.target.value)}
+                            className={cn(
+                              "h-9 text-xs",
+                              errors.billingZip && "border-destructive"
+                            )}
+                            maxLength={6}
+                          />
+                          {errors.billingZip && (
+                            <p className="text-destructive text-[10px] flex items-center gap-1">
+                              <AlertCircle className="w-2.5 h-2.5" />
+                              {errors.billingZip}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">
                             Contact Number
                             <span className="text-destructive ml-0.5">*</span>
                           </Label>
@@ -1035,9 +1082,7 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
                             />
                           </div>
                         </div>
-                      </div>
 
-                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                           <Label className="text-xs">
                             Email Address
@@ -1054,7 +1099,9 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
                             />
                           </div>
                         </div>
+                      </div>
 
+                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                           <Label className="text-xs">Alternate Contact</Label>
                           <div className="relative">
@@ -1085,7 +1132,181 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
                       </div>
 
                       {/* Shipping address fields - Same structure as billing but with shipping fields */}
-                      {/* ... Copy the billing address structure here with shipping fields ... */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">
+                            Country/Region
+                            <span className="text-destructive ml-0.5">*</span>
+                          </Label>
+                          <Select
+                            value={formData.shippingCountry}
+                            onValueChange={(value) => handleInputChange("shippingCountry", value)}
+                          >
+                            <SelectTrigger className="h-9 text-xs">
+                              <SelectValue placeholder="Select Country" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="india">India</SelectItem>
+                              <SelectItem value="us">United States</SelectItem>
+                              <SelectItem value="uk">United Kingdom</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">
+                            State
+                            <span className="text-destructive ml-0.5">*</span>
+                          </Label>
+                          <Select
+                            value={formData.shippingState}
+                            onValueChange={(value) => handleInputChange("shippingState", value)}
+                          >
+                            <SelectTrigger className="h-9 text-xs">
+                              <SelectValue placeholder="Select State" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {indianStates.map((state) => (
+                                <SelectItem key={state} value={state} className="text-xs">
+                                  {state}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">
+                            Address Line 1
+                            <span className="text-destructive ml-0.5">*</span>
+                          </Label>
+                          <Textarea
+                            placeholder="Street Address, Building Name"
+                            value={formData.shippingAddressLine1}
+                            onChange={(e) => handleInputChange("shippingAddressLine1", e.target.value)}
+                            className={cn(
+                              "min-h-[70px] text-xs resize-none",
+                              errors.shippingAddressLine1 && "border-destructive"
+                            )}
+                          />
+                          {errors.shippingAddressLine1 && (
+                            <p className="text-destructive text-[10px] flex items-center gap-1">
+                              <AlertCircle className="w-2.5 h-2.5" />
+                              {errors.shippingAddressLine1}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Address Line 2</Label>
+                          <Textarea
+                            placeholder="Locality, Area"
+                            value={formData.shippingAddressLine2}
+                            onChange={(e) => handleInputChange("shippingAddressLine2", e.target.value)}
+                            className="min-h-[70px] text-xs resize-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">
+                            City
+                            <span className="text-destructive ml-0.5">*</span>
+                          </Label>
+                          <Select
+                            value={formData.shippingCity}
+                            onValueChange={(value) => handleInputChange("shippingCity", value)}
+                            disabled={!formData.shippingState}
+                          >
+                            <SelectTrigger className="h-9 text-xs">
+                              <SelectValue placeholder="Select City" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {getShippingCities().map((city) => (
+                                <SelectItem key={city} value={city} className="text-xs">
+                                  {city}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">
+                            ZIP Code
+                            <span className="text-destructive ml-0.5">*</span>
+                          </Label>
+                          <Input
+                            placeholder="Enter ZIP code"
+                            value={formData.shippingZip}
+                            onChange={(e) => handleInputChange("shippingZip", e.target.value)}
+                            className={cn(
+                              "h-9 text-xs",
+                              errors.shippingZip && "border-destructive"
+                            )}
+                            maxLength={6}
+                          />
+                          {errors.shippingZip && (
+                            <p className="text-destructive text-[10px] flex items-center gap-1">
+                              <AlertCircle className="w-2.5 h-2.5" />
+                              {errors.shippingZip}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">
+                            Contact Number
+                            <span className="text-destructive ml-0.5">*</span>
+                          </Label>
+                          <div className="relative">
+                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                            <Input
+                              className="pl-8 h-9 text-xs"
+                              placeholder="Enter contact number"
+                              value={formData.shippingContactNo}
+                              onChange={(e) => handleInputChange("shippingContactNo", e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">
+                            Email Address
+                            <span className="text-destructive ml-0.5">*</span>
+                          </Label>
+                          <div className="relative">
+                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                            <Input
+                              className="pl-8 h-9 text-xs"
+                              placeholder="Enter email address"
+                              type="email"
+                              value={formData.shippingEmail}
+                              onChange={(e) => handleInputChange("shippingEmail", e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Alternate Contact</Label>
+                          <div className="relative">
+                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                            <Input
+                              className="pl-8 h-9 text-xs"
+                              placeholder="Enter alternate number"
+                              value={formData.shippingAlternateContactNo}
+                              onChange={(e) => handleInputChange("shippingAlternateContactNo", e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </TabsContent>
                   </Tabs>
                 </CardContent>

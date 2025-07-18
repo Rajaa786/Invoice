@@ -724,11 +724,10 @@ const InfoTwoColumn = ({ invoice, dynamicStyles }) => (
             {invoice.customer?.addressLine2 && (
                 <Text style={[styles.addressText, { lineHeight: 1.3, marginBottom: 1 }]}>{invoice.customer.addressLine2}</Text>
             )}
-            <Text style={[styles.addressText, { lineHeight: 1.3, marginBottom: 1 }]}> {[
+            <Text style={[styles.addressText, { lineHeight: 1.3, marginBottom: 1 }]}>{[
                 invoice.customer?.city,
-                invoice.customer?.state,
-                invoice.customer?.zip
-            ].filter(Boolean).join(", ")} </Text>
+                invoice.customer?.state
+            ].filter(Boolean).join(", ")}{invoice.customer?.zip ? ` - ${invoice.customer.zip}` : ''}</Text>
             {(invoice.customer?.phone || invoice.customer?.email) && (
                 <View style={{ marginBottom: 1 }}>
                     {invoice.customer?.phone && (
