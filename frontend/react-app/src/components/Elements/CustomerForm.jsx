@@ -210,7 +210,7 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
     "Karnataka": ["Bengaluru", "Mysuru", "Hubli"],
     "Kerala": ["Thiruvananthapuram", "Kochi", "Kozhikode"],
     "Madhya Pradesh": ["Bhopal", "Indore", "Gwalior"],
-    "Maharashtra": ["Mumbai", "Pune", "Nagpur", "Aurangabad", "Nashik"],
+    "Maharashtra": ["Mumbai", "Mumbai Suburban", "Pune", "Nagpur", "Aurangabad", "Nashik"],
     "Manipur": ["Imphal", "Thoubal", "Churachandpur"],
     "Meghalaya": ["Shillong", "Tura", "Jowai"],
     "Mizoram": ["Aizawl", "Lunglei", "Champhai"],
