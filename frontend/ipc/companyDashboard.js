@@ -202,8 +202,13 @@ function registerCompanyDashboardIpc() {
     log.info("✅ IPC handler 'get-company' registered successfully");
 
     // Register the IPC handler for updating companies
-    ipcMain.handle("update-company", async (event, id, data) => {
+    ipcMain.handle("update-company", async (event, data) => {
       try {
+        const id = data.id;
+        if (!id) {
+          throw new Error("Company ID is required for update");
+        }
+
         log.info("🏢 Starting company update process for ID:", id);
         log.debug("📝 Received company update data:", {
           ...data,
@@ -256,7 +261,7 @@ function registerCompanyDashboardIpc() {
         }
 
         // Handle logo and signature updates if provided
-        if (data.logo) {
+        if (data.logo && data.logo !== result[0].logoFileName) {
           try {
             const logoFileName = await fileService.saveBase64File(data.logo, id, data.companyName, "logo");
             if (logoFileName) {
@@ -270,7 +275,7 @@ function registerCompanyDashboardIpc() {
           }
         }
 
-        if (data.signature) {
+        if (data.signature && data.signature !== result[0].signatureFileName) {
           try {
             const signatureFileName = await fileService.saveBase64File(data.signature, id, data.companyName, "signature");
             if (signatureFileName) {
@@ -290,7 +295,7 @@ function registerCompanyDashboardIpc() {
         log.error("❌ Company update failed:", {
           error: err.message,
           stack: err.stack,
-          companyId: id,
+          companyId: data,
           errorType: err.name
         });
         return { success: false, error: err.message };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Mail, Phone, Building2, Globe, Calendar, Users, TrendingUp, MapPin, FileText } from "lucide-react";
+import { Mail, Phone, Building2, Globe, Calendar, Users, TrendingUp, MapPin, FileText, Plus, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -71,7 +71,7 @@ const industries = [
   "Construction", "Telecommunications", "Media & Entertainment", "Food & Beverage"
 ];
 
-const CompanyForm = ({ open, onOpenChange, onSave }) => {
+const CompanyForm = ({ open, onOpenChange, onSave, editCompany = null }) => {
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -121,15 +121,17 @@ const CompanyForm = ({ open, onOpenChange, onSave }) => {
     // Files
     logo: null,
     signature: null,
-    // Bank details
-    bank: {
-      bankName: "",
-      accountNumber: "",
-      ifscCode: "",
-      branchName: "",
-      accountHolderName: "",
-    },
   });
+
+  // Separate state for multiple banks
+  const [banks, setBanks] = useState([{
+    id: Date.now(),
+    bankName: "",
+    accountNumber: "",
+    ifscCode: "",
+    branchName: "",
+    accountHolderName: "",
+  }]);
 
   const [imagePreviews, setImagePreviews] = useState({
     logo: null,
@@ -137,6 +139,171 @@ const CompanyForm = ({ open, onOpenChange, onSave }) => {
   });
 
   const [activeTab, setActiveTab] = useState("basic");
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Initialize form data when editCompany changes
+  useEffect(() => {
+    if (editCompany) {
+      setFormData({
+        companyType: editCompany.companyType || "manufacturer",
+        companyName: editCompany.companyName || "",
+        currency: editCompany.currency || "inr",
+        gstApplicable: editCompany.gstApplicable === "Yes",
+        gstin: editCompany.gstin || "",
+        stateCode: editCompany.stateCode || "",
+        country: editCompany.country || "india",
+        addressLine1: editCompany.addressLine1 || "",
+        addressLine2: editCompany.addressLine2 || "",
+        state: editCompany.state || "",
+        city: editCompany.city || "",
+        email: editCompany.email || "",
+        contactNo: editCompany.contactNo || "",
+        website: editCompany.website || "",
+        industry: editCompany.industry || "",
+        establishedYear: editCompany.establishedYear || "",
+        employeeCount: editCompany.employeeCount || "",
+        companySize: editCompany.companySize || "",
+        businessModel: editCompany.businessModel || "",
+        annualRevenue: editCompany.annualRevenue || "",
+        primaryMarket: editCompany.primaryMarket || "",
+        customerSegment: editCompany.customerSegment || "",
+        valueProposition: editCompany.valueProposition || "",
+        operatingHours: editCompany.operatingHours || "",
+        timezone: editCompany.timezone || "Asia/Kolkata",
+        fiscalYearStart: editCompany.fiscalYearStart || "",
+        taxId: editCompany.taxId || "",
+        logo: null,
+        signature: null,
+      });
+
+      // Set logo and signature previews if they exist
+      if (editCompany.logo) {
+        setImagePreviews(prev => ({
+          ...prev,
+          logo: editCompany.logo
+        }));
+      }
+      if (editCompany.signature) {
+        setImagePreviews(prev => ({
+          ...prev,
+          signature: editCompany.signature
+        }));
+      }
+
+      // Load existing banks for the company
+      loadCompanyBanks(editCompany.id);
+    } else {
+      // Reset form for new company
+      resetForm();
+    }
+  }, [editCompany, open]);
+
+  const loadCompanyBanks = async (companyId) => {
+    try {
+      const result = await window.electron.getBanks();
+      if (result.success) {
+        const companyBanks = result.banks.filter(bank => bank.companyId === companyId);
+        if (companyBanks.length > 0) {
+          setBanks(companyBanks.map(bank => ({
+            id: bank.id,
+            bankName: bank.bankName || "",
+            accountNumber: bank.accountNumber || "",
+            ifscCode: bank.ifscCode || "",
+            branchName: bank.branchName || "",
+            accountHolderName: bank.accountHolderName || "",
+          })));
+        } else {
+          setBanks([{
+            id: Date.now(),
+            bankName: "",
+            accountNumber: "",
+            ifscCode: "",
+            branchName: "",
+            accountHolderName: "",
+          }]);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading company banks:", error);
+      setBanks([{
+        id: Date.now(),
+        bankName: "",
+        accountNumber: "",
+        ifscCode: "",
+        branchName: "",
+        accountHolderName: "",
+      }]);
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      companyType: "manufacturer",
+      companyName: "",
+      currency: "inr",
+      gstApplicable: false,
+      gstin: "",
+      stateCode: "",
+      country: "india",
+      addressLine1: "",
+      addressLine2: "",
+      state: "",
+      city: "",
+      email: "",
+      contactNo: "",
+      website: "",
+      industry: "",
+      establishedYear: "",
+      employeeCount: "",
+      companySize: "",
+      businessModel: "",
+      annualRevenue: "",
+      primaryMarket: "",
+      customerSegment: "",
+      valueProposition: "",
+      operatingHours: "",
+      timezone: "Asia/Kolkata",
+      fiscalYearStart: "",
+      taxId: "",
+      logo: null,
+      signature: null,
+    });
+    setBanks([{
+      id: Date.now(),
+      bankName: "",
+      accountNumber: "",
+      ifscCode: "",
+      branchName: "",
+      accountHolderName: "",
+    }]);
+    setImagePreviews({ logo: null, signature: null });
+    setActiveTab("basic");
+  };
+
+  const addBank = () => {
+    setBanks(prev => [...prev, {
+      id: Date.now(),
+      bankName: "",
+      accountNumber: "",
+      ifscCode: "",
+      branchName: "",
+      accountHolderName: "",
+    }]);
+  };
+
+  const removeBank = (bankId) => {
+    if (banks.length > 1) {
+      setBanks(prev => prev.filter(bank => bank.id !== bankId));
+    }
+  };
+
+  const updateBank = (bankId, field, value) => {
+    setBanks(prev => prev.map(bank =>
+      bank.id === bankId
+        ? { ...bank, [field]: value }
+        : bank
+    ));
+  };
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({
@@ -182,7 +349,7 @@ const CompanyForm = ({ open, onOpenChange, onSave }) => {
     };
 
     for (const [field, label] of Object.entries(requiredFields)) {
-      if (!formData[field] || formData[field].trim() === "") {
+      if (!formData[field] || String(formData[field]).trim() === "") {
         toast({
           title: "Validation Error",
           description: `Please enter ${label}`,
@@ -194,7 +361,7 @@ const CompanyForm = ({ open, onOpenChange, onSave }) => {
 
     // GST specific validation
     if (formData.gstApplicable) {
-      if (!formData.gstin || formData.gstin.trim() === "") {
+      if (!formData.gstin || String(formData.gstin).trim() === "") {
         toast({
           title: "Validation Error",
           description: "Please enter GSTIN/UIN",
@@ -202,7 +369,7 @@ const CompanyForm = ({ open, onOpenChange, onSave }) => {
         });
         return false;
       }
-      if (!formData.stateCode || formData.stateCode.trim() === "") {
+      if (!formData.stateCode || String(formData.stateCode).trim() === "") {
         toast({
           title: "Validation Error",
           description: "Please enter state code",
@@ -232,25 +399,33 @@ const CompanyForm = ({ open, onOpenChange, onSave }) => {
       return false;
     }
 
-    // Bank validation: if any bank field is filled, all must be filled
-    const { bank } = formData;
-    const anyBankFieldFilled = Object.values(bank).some(v => v && v.trim() !== "");
-    if (anyBankFieldFilled) {
-      const requiredBankFields = {
-        bankName: "Bank name",
-        accountNumber: "Account number",
-        ifscCode: "IFSC code",
-        branchName: "Branch name",
-        accountHolderName: "Account holder name",
-      };
-      for (const [field, label] of Object.entries(requiredBankFields)) {
-        if (!bank[field] || bank[field].trim() === "") {
-          toast({
-            title: "Validation Error",
-            description: `Please enter ${label} in Bank Details`,
-            variant: "destructive",
-          });
-          return false;
+    // Bank validation: check each bank independently
+    for (let i = 0; i < banks.length; i++) {
+      const bank = banks[i];
+      // Check if any field except id is filled
+      const anyBankFieldFilled = Object.entries(bank).some(([key, value]) => {
+        if (key === 'id') return false;
+        return value && String(value).trim() !== "";
+      });
+
+      if (anyBankFieldFilled) {
+        const requiredBankFields = {
+          bankName: "Bank name",
+          accountNumber: "Account number",
+          ifscCode: "IFSC code",
+          branchName: "Branch name",
+          accountHolderName: "Account holder name",
+        };
+
+        for (const [field, label] of Object.entries(requiredBankFields)) {
+          if (!bank[field] || String(bank[field]).trim() === "") {
+            toast({
+              title: "Validation Error",
+              description: `Please enter ${label} for Bank ${i + 1}`,
+              variant: "destructive",
+            });
+            return false;
+          }
         }
       }
     }
@@ -275,22 +450,39 @@ const CompanyForm = ({ open, onOpenChange, onSave }) => {
       return;
     }
 
+    setIsLoading(true);
+
     try {
       const dataToSend = { ...formData };
 
-      // Convert files to base64
-      if (formData.logo) {
-        const logoBase64 = await fileToBase64(formData.logo);
-        dataToSend.logo = logoBase64;
-      }
+      // Handle logo and signature
+      if (editCompany) {
+        // In edit mode, only include logo/signature if they've been changed
+        if (formData.logo instanceof File) {
+          const logoBase64 = await fileToBase64(formData.logo);
+          dataToSend.logo = logoBase64;
+        } else if (imagePreviews.logo) {
+          dataToSend.logo = imagePreviews.logo;
+        }
 
-      if (formData.signature) {
-        const signatureBase64 = await fileToBase64(formData.signature);
-        dataToSend.signature = signatureBase64;
-      }
+        if (formData.signature instanceof File) {
+          const signatureBase64 = await fileToBase64(formData.signature);
+          dataToSend.signature = signatureBase64;
+        } else if (imagePreviews.signature) {
+          dataToSend.signature = imagePreviews.signature;
+        }
+      } else {
+        // In create mode, convert new files to base64
+        if (formData.logo) {
+          const logoBase64 = await fileToBase64(formData.logo);
+          dataToSend.logo = logoBase64;
+        }
 
-      // Remove bank from company payload
-      delete dataToSend.bank;
+        if (formData.signature) {
+          const signatureBase64 = await fileToBase64(formData.signature);
+          dataToSend.signature = signatureBase64;
+        }
+      }
 
       console.log("Sending form data:", {
         ...dataToSend,
@@ -298,80 +490,100 @@ const CompanyForm = ({ open, onOpenChange, onSave }) => {
         signature: dataToSend.signature ? "[SIGNATURE DATA BASE64]" : null,
       });
 
-      const result = await window.electron.addCompany(dataToSend);
+      let result;
+      if (editCompany) {
+        // Update existing company
+        result = await window.electron.updateCompany({ ...dataToSend, id: editCompany.id });
+      } else {
+        // Create new company
+        result = await window.electron.addCompany(dataToSend);
+      }
 
       if (result.success) {
-        // Add bank account if all fields are filled
-        const { bank } = formData;
-        const allBankFieldsFilled = Object.values(bank).every(v => v && v.trim() !== "");
-        if (allBankFieldsFilled) {
-          await window.electron.addBank({
-            companyId: result.result.id,
-            bankName: bank.bankName,
-            accountNumber: bank.accountNumber,
-            ifscCode: bank.ifscCode,
-            branchName: bank.branchName,
-            accountHolderName: bank.accountHolderName,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          });
+        const companyId = editCompany ? editCompany.id : result.result.id;
+
+        // Handle banks - only save banks that have all fields filled
+        const validBanks = banks.filter(bank => {
+          const hasAllFields = bank.bankName && bank.accountNumber && bank.ifscCode &&
+            bank.branchName && bank.accountHolderName;
+          return hasAllFields && bank.bankName.trim() !== "";
+        });
+
+        if (editCompany) {
+          // For edit mode, we need to handle existing banks
+          try {
+            // Get current banks for the company
+            const currentBanksResult = await window.electron.getBanks();
+            if (currentBanksResult.success) {
+              const currentCompanyBanks = currentBanksResult.banks.filter(bank => bank.companyId === companyId);
+
+              // Remove banks that are no longer in the form
+              for (const currentBank of currentCompanyBanks) {
+                const stillExists = validBanks.find(bank => bank.id === currentBank.id);
+                if (!stillExists) {
+                  await window.electron.deleteBank(currentBank.id);
+                }
+              }
+            }
+
+            // Update or create banks
+            for (const bank of validBanks) {
+              const bankData = {
+                companyId,
+                bankName: bank.bankName,
+                accountNumber: bank.accountNumber,
+                ifscCode: bank.ifscCode,
+                branchName: bank.branchName,
+                accountHolderName: bank.accountHolderName,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              };
+
+              if (typeof bank.id === 'number' && bank.id < 1000000000000) {
+                // This is an existing bank (has a real database ID)
+                await window.electron.updateBank({ ...bankData, id: bank.id });
+              } else {
+                // This is a new bank
+                await window.electron.addBank(bankData);
+              }
+            }
+          } catch (bankError) {
+            console.error("Error managing banks:", bankError);
+            // Don't fail the entire operation for bank errors
+          }
+        } else {
+          // For create mode, add all valid banks
+          for (const bank of validBanks) {
+            await window.electron.addBank({
+              companyId,
+              bankName: bank.bankName,
+              accountNumber: bank.accountNumber,
+              ifscCode: bank.ifscCode,
+              branchName: bank.branchName,
+              accountHolderName: bank.accountHolderName,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+          }
         }
 
         toast({
           title: "Success",
-          description: "Company created successfully",
+          description: editCompany ? "Company updated successfully" : "Company created successfully",
           variant: "success",
         });
 
-        // Reset form
-        setFormData({
-          companyType: "manufacturer",
-          companyName: "",
-          currency: "inr",
-          gstApplicable: false,
-          gstin: "",
-          stateCode: "",
-          country: "india",
-          addressLine1: "",
-          addressLine2: "",
-          state: "",
-          city: "",
-          email: "",
-          contactNo: "",
-          website: "",
-          industry: "",
-          establishedYear: "",
-          employeeCount: "",
-          companySize: "",
-          businessModel: "",
-          annualRevenue: "",
-          primaryMarket: "",
-          customerSegment: "",
-          valueProposition: "",
-          operatingHours: "",
-          timezone: "Asia/Kolkata",
-          fiscalYearStart: "",
-          taxId: "",
-          logo: null,
-          signature: null,
-          bank: {
-            bankName: "",
-            accountNumber: "",
-            ifscCode: "",
-            branchName: "",
-            accountHolderName: "",
-          },
-        });
-
-        setImagePreviews({ logo: null, signature: null });
-        setActiveTab("basic");
+        // Reset form only if creating new company
+        if (!editCompany) {
+          resetForm();
+        }
 
         if (onSave) onSave(result.result);
         onOpenChange(false);
       } else {
         toast({
           title: "Error",
-          description: result.error || "Failed to create company",
+          description: result.error || `Failed to ${editCompany ? 'update' : 'create'} company`,
           variant: "destructive",
         });
       }
@@ -382,6 +594,8 @@ const CompanyForm = ({ open, onOpenChange, onSave }) => {
         variant: "destructive",
       });
       console.error("Error in form submission:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -428,14 +642,16 @@ const CompanyForm = ({ open, onOpenChange, onSave }) => {
       taxId: "TECH" + randomNum,
       logo: null,
       signature: null,
-      bank: {
-        bankName: "Test Bank",
-        accountNumber: "1234567890123456",
-        ifscCode: "TEST0001234",
-        branchName: "Test Branch",
-        accountHolderName: "Test Account Holder",
-      },
     });
+
+    setBanks([{
+      id: Date.now(),
+      bankName: "Test Bank",
+      accountNumber: "1234567890123456",
+      ifscCode: "TEST0001234",
+      branchName: "Test Branch",
+      accountHolderName: "Test Account Holder",
+    }]);
 
     toast({
       title: "Dummy Data Filled",
@@ -450,10 +666,10 @@ const CompanyForm = ({ open, onOpenChange, onSave }) => {
         <DialogHeader className="pb-4">
           <DialogTitle className="flex items-center gap-2 text-lg">
             <Building2 className="h-4 w-4" />
-            Create New Company
+            {editCompany ? 'Edit Company' : 'Create New Company'}
           </DialogTitle>
           <DialogDescription className="sr-only">
-            Create a new company profile with business and contact information
+            {editCompany ? 'Edit existing company profile' : 'Create a new company profile'} with business and contact information
           </DialogDescription>
           <Button
             onClick={fillDummyData}
@@ -991,74 +1207,92 @@ const CompanyForm = ({ open, onOpenChange, onSave }) => {
               {/* Bank Account Details Section */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-sm">
-                    <FileText className="h-3 w-3" />
-                    Bank Account Details
+                  <CardTitle className="flex items-center gap-2 text-sm justify-between">
+                    <span className="flex items-center gap-2">
+                      <FileText className="h-3 w-3" />
+                      Bank Account Details
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addBank}
+                      className="h-7 px-2 text-xs"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add Bank
+                    </Button>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-xs">Bank Name*</Label>
-                      <Input
-                        placeholder="Enter bank name"
-                        value={formData.bank.bankName}
-                        onChange={e => setFormData(prev => ({
-                          ...prev,
-                          bank: { ...prev.bank, bankName: e.target.value }
-                        }))}
-                        className="text-sm"
-                      />
+                <CardContent className="space-y-6">
+                  {banks.map((bank, index) => (
+                    <div key={bank.id} className="relative">
+                      {banks.length > 1 && (
+                        <div className="flex justify-between items-center mb-3">
+                          <Badge variant="outline" className="text-xs">
+                            Bank {index + 1}
+                          </Badge>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => removeBank(bank.id)}
+                            className="h-6 w-6 p-0"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                        <div className="space-y-2">
+                          <Label className="text-xs">Bank Name*</Label>
+                          <Input
+                            placeholder="Enter bank name"
+                            value={bank.bankName}
+                            onChange={e => updateBank(bank.id, 'bankName', e.target.value)}
+                            className="text-sm"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Account Number*</Label>
+                          <Input
+                            placeholder="Enter account number"
+                            value={bank.accountNumber}
+                            onChange={e => updateBank(bank.id, 'accountNumber', e.target.value)}
+                            className="text-sm"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">IFSC Code*</Label>
+                          <Input
+                            placeholder="Enter IFSC code"
+                            value={bank.ifscCode}
+                            onChange={e => updateBank(bank.id, 'ifscCode', e.target.value)}
+                            className="text-sm"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Branch Name*</Label>
+                          <Input
+                            placeholder="Enter branch name"
+                            value={bank.branchName}
+                            onChange={e => updateBank(bank.id, 'branchName', e.target.value)}
+                            className="text-sm"
+                          />
+                        </div>
+                        <div className="space-y-2 lg:col-span-2">
+                          <Label className="text-xs">Account Holder Name*</Label>
+                          <Input
+                            placeholder="Enter account holder name"
+                            value={bank.accountHolderName}
+                            onChange={e => updateBank(bank.id, 'accountHolderName', e.target.value)}
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs">Account Number*</Label>
-                      <Input
-                        placeholder="Enter account number"
-                        value={formData.bank.accountNumber}
-                        onChange={e => setFormData(prev => ({
-                          ...prev,
-                          bank: { ...prev.bank, accountNumber: e.target.value }
-                        }))}
-                        className="text-sm"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs">IFSC Code*</Label>
-                      <Input
-                        placeholder="Enter IFSC code"
-                        value={formData.bank.ifscCode}
-                        onChange={e => setFormData(prev => ({
-                          ...prev,
-                          bank: { ...prev.bank, ifscCode: e.target.value }
-                        }))}
-                        className="text-sm"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs">Branch Name*</Label>
-                      <Input
-                        placeholder="Enter branch name"
-                        value={formData.bank.branchName}
-                        onChange={e => setFormData(prev => ({
-                          ...prev,
-                          bank: { ...prev.bank, branchName: e.target.value }
-                        }))}
-                        className="text-sm"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs">Account Holder Name*</Label>
-                      <Input
-                        placeholder="Enter account holder name"
-                        value={formData.bank.accountHolderName}
-                        onChange={e => setFormData(prev => ({
-                          ...prev,
-                          bank: { ...prev.bank, accountHolderName: e.target.value }
-                        }))}
-                        className="text-sm"
-                      />
-                    </div>
-                  </div>
+                  ))}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -1071,8 +1305,8 @@ const CompanyForm = ({ open, onOpenChange, onSave }) => {
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)} size="sm">
                   Cancel
                 </Button>
-                <Button type="submit" size="sm">
-                  Create Company
+                <Button type="submit" size="sm" disabled={isLoading}>
+                  {isLoading ? 'Saving...' : (editCompany ? 'Update Company' : 'Create Company')}
                 </Button>
               </div>
             </DialogFooter>
