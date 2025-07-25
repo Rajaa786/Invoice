@@ -9,6 +9,7 @@ const banks = sqliteTable("banks", {
     ifscCode: text("ifsc_code").notNull(),
     branchName: text("branch_name").notNull(),
     accountHolderName: text("account_holder_name").notNull(),
+    accountType: text("account_type").default("savings"), // savings, current, fixed_deposit, etc.
     createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });

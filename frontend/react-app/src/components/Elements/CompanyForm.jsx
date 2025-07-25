@@ -24,47 +24,6 @@ import { Badge } from "../ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { useToast } from "../../hooks/use-toast";
 
-const stateCityMapping = {
-  "andhra pradesh": ["Visakhapatnam", "Vijayawada", "Guntur"],
-  "arunachal pradesh": ["Itanagar", "Tawang", "Ziro"],
-  assam: ["Guwahati", "Silchar", "Dibrugarh"],
-  bihar: ["Patna", "Gaya", "Bhagalpur"],
-  chhattisgarh: ["Raipur", "Bhilai", "Bilaspur"],
-  goa: ["Panaji", "Margao", "Vasco da Gama"],
-  gujarat: ["Ahmedabad", "Surat", "Vadodara"],
-  haryana: ["Gurgaon", "Faridabad", "Panipat"],
-  "himachal pradesh": ["Shimla", "Manali", "Dharamshala"],
-  jharkhand: ["Ranchi", "Jamshedpur", "Dhanbad"],
-  karnataka: ["Bengaluru", "Mysuru", "Hubli"],
-  kerala: ["Thiruvananthapuram", "Kochi", "Kozhikode"],
-  "madhya pradesh": ["Bhopal", "Indore", "Gwalior"],
-  maharashtra: ["Mumbai", "Pune", "Nagpur", "Aurangabad"],
-  manipur: ["Imphal", "Thoubal", "Churachandpur"],
-  meghalaya: ["Shillong", "Tura", "Jowai"],
-  mizoram: ["Aizawl", "Lunglei", "Champhai"],
-  nagaland: ["Kohima", "Dimapur", "Mokokchung"],
-  odisha: ["Bhubaneswar", "Cuttack", "Rourkela"],
-  punjab: ["Ludhiana", "Amritsar", "Jalandhar"],
-  rajasthan: ["Jaipur", "Udaipur", "Jodhpur"],
-  sikkim: ["Gangtok", "Namchi", "Gyalshing"],
-  "tamil nadu": ["Chennai", "Coimbatore", "Madurai"],
-  telangana: ["Hyderabad", "Warangal", "Nizamabad"],
-  tripura: ["Agartala", "Dharmanagar", "Udaipur"],
-  "uttar pradesh": ["Lucknow", "Kanpur", "Varanasi"],
-  uttarakhand: ["Dehradun", "Haridwar", "Nainital"],
-  "west bengal": ["Kolkata", "Asansol", "Siliguri"],
-  delhi: ["New Delhi", "Dwarka", "Karol Bagh"],
-  "jammu and kashmir": ["Srinagar", "Jammu", "Leh"],
-  ladakh: ["Leh", "Kargil"],
-  puducherry: ["Puducherry", "Karaikal", "Yanam"],
-  chandigarh: ["Chandigarh"],
-  "andaman and nicobar islands": ["Port Blair"],
-  "dadra and nagar haveli and daman and diu": ["Daman", "Diu", "Silvassa"],
-  lakshadweep: ["Kavaratti"],
-};
-
-const indianStates = Object.keys(stateCityMapping);
-
 const industries = [
   "Technology", "Manufacturing", "Healthcare", "Finance", "Education",
   "Retail", "Real Estate", "Transportation", "Energy", "Agriculture",
@@ -91,6 +50,7 @@ const CompanyForm = ({ open, onOpenChange, onSave, editCompany = null }) => {
     addressLine2: "",
     state: "",
     city: "",
+    pincode: "",
 
     // Contact Information
     email: "",
@@ -131,6 +91,7 @@ const CompanyForm = ({ open, onOpenChange, onSave, editCompany = null }) => {
     ifscCode: "",
     branchName: "",
     accountHolderName: "",
+    accountType: "",
   }]);
 
   const [imagePreviews, setImagePreviews] = useState({
@@ -140,6 +101,102 @@ const CompanyForm = ({ open, onOpenChange, onSave, editCompany = null }) => {
 
   const [activeTab, setActiveTab] = useState("basic");
   const [isLoading, setIsLoading] = useState(false);
+
+  // States and cities management
+  const [states, setStates] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [isLoadingStates, setIsLoadingStates] = useState(false);
+  const [isLoadingCities, setIsLoadingCities] = useState(false);
+  const [cityFormOpen, setCityFormOpen] = useState(false);
+  const [newCityData, setNewCityData] = useState({ name: "", stateId: null });
+
+  // Load states when component mounts
+  useEffect(() => {
+    const loadStates = async () => {
+      setIsLoadingStates(true);
+      try {
+        // First seed the data if needed
+        await window.electron.seedStatesCities();
+
+        // Then load states
+        const result = await window.electron.getStates();
+        if (result.success) {
+          setStates(result.states);
+        } else {
+          console.error("Failed to load states:", result.error);
+        }
+      } catch (error) {
+        console.error("Error loading states:", error);
+      } finally {
+        setIsLoadingStates(false);
+      }
+    };
+    loadStates();
+  }, []);
+
+  // Load cities when state changes
+  useEffect(() => {
+    if (formData.state && states.length > 0) {
+      const selectedState = states.find(s => s.name.toLowerCase() === formData.state.toLowerCase());
+      if (selectedState) {
+        loadCitiesByState(selectedState.id);
+      }
+    } else {
+      setCities([]);
+    }
+  }, [formData.state, states]);
+
+  // Function to load cities by state
+  const loadCitiesByState = async (stateId) => {
+    setIsLoadingCities(true);
+    try {
+      const result = await window.electron.getCitiesByState(stateId);
+      if (result.success) {
+        setCities(result.cities);
+      } else {
+        console.error("Failed to load cities:", result.error);
+        setCities([]);
+      }
+    } catch (error) {
+      console.error("Error loading cities:", error);
+      setCities([]);
+    } finally {
+      setIsLoadingCities(false);
+    }
+  };
+
+  // Function to handle adding new city (states are pre-defined)
+
+  const handleAddCity = async () => {
+    try {
+      const result = await window.electron.addCity(newCityData);
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: "City added successfully",
+          variant: "success",
+        });
+        setNewCityData({ name: "", stateId: null });
+        setCityFormOpen(false);
+        // Reload cities for current state
+        if (newCityData.stateId) {
+          loadCitiesByState(newCityData.stateId);
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to add city",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Initialize form data when editCompany changes
   useEffect(() => {
@@ -156,6 +213,7 @@ const CompanyForm = ({ open, onOpenChange, onSave, editCompany = null }) => {
         addressLine2: editCompany.addressLine2 || "",
         state: editCompany.state || "",
         city: editCompany.city || "",
+        pincode: editCompany.pincode || "",
         email: editCompany.email || "",
         contactNo: editCompany.contactNo || "",
         website: editCompany.website || "",
@@ -211,6 +269,7 @@ const CompanyForm = ({ open, onOpenChange, onSave, editCompany = null }) => {
             ifscCode: bank.ifscCode || "",
             branchName: bank.branchName || "",
             accountHolderName: bank.accountHolderName || "",
+            accountType: bank.accountType || "",
           })));
         } else {
           setBanks([{
@@ -232,6 +291,7 @@ const CompanyForm = ({ open, onOpenChange, onSave, editCompany = null }) => {
         ifscCode: "",
         branchName: "",
         accountHolderName: "",
+        accountType: "",
       }]);
     }
   };
@@ -249,6 +309,7 @@ const CompanyForm = ({ open, onOpenChange, onSave, editCompany = null }) => {
       addressLine2: "",
       state: "",
       city: "",
+      pincode: "",
       email: "",
       contactNo: "",
       website: "",
@@ -275,6 +336,7 @@ const CompanyForm = ({ open, onOpenChange, onSave, editCompany = null }) => {
       ifscCode: "",
       branchName: "",
       accountHolderName: "",
+      accountType: "",
     }]);
     setImagePreviews({ logo: null, signature: null });
     setActiveTab("basic");
@@ -288,6 +350,7 @@ const CompanyForm = ({ open, onOpenChange, onSave, editCompany = null }) => {
       ifscCode: "",
       branchName: "",
       accountHolderName: "",
+      accountType: "",
     }]);
   };
 
@@ -415,6 +478,7 @@ const CompanyForm = ({ open, onOpenChange, onSave, editCompany = null }) => {
           ifscCode: "IFSC code",
           branchName: "Branch name",
           accountHolderName: "Account holder name",
+          accountType: "Account type",
         };
 
         for (const [field, label] of Object.entries(requiredBankFields)) {
@@ -505,7 +569,7 @@ const CompanyForm = ({ open, onOpenChange, onSave, editCompany = null }) => {
         // Handle banks - only save banks that have all fields filled
         const validBanks = banks.filter(bank => {
           const hasAllFields = bank.bankName && bank.accountNumber && bank.ifscCode &&
-            bank.branchName && bank.accountHolderName;
+            bank.branchName && bank.accountHolderName && bank.accountType;
           return hasAllFields && bank.bankName.trim() !== "";
         });
 
@@ -535,6 +599,7 @@ const CompanyForm = ({ open, onOpenChange, onSave, editCompany = null }) => {
                 ifscCode: bank.ifscCode,
                 branchName: bank.branchName,
                 accountHolderName: bank.accountHolderName,
+                accountType: bank.accountType,
                 createdAt: new Date(),
                 updatedAt: new Date(),
               };
@@ -561,6 +626,7 @@ const CompanyForm = ({ open, onOpenChange, onSave, editCompany = null }) => {
               ifscCode: bank.ifscCode,
               branchName: bank.branchName,
               accountHolderName: bank.accountHolderName,
+              accountType: bank.accountType,
               createdAt: new Date(),
               updatedAt: new Date(),
             });
@@ -608,7 +674,7 @@ const CompanyForm = ({ open, onOpenChange, onSave, editCompany = null }) => {
     });
   };
 
-  const availableCities = stateCityMapping[formData.state] || [];
+
 
   const fillDummyData = () => {
     const randomNum = Math.floor(Math.random() * 1000);
@@ -624,6 +690,7 @@ const CompanyForm = ({ open, onOpenChange, onSave, editCompany = null }) => {
       addressLine2: "Tech Hub Area",
       state: "maharashtra",
       city: "Mumbai",
+      pincode: "400001",
       email: `contact${randomNum}@techsolutions.com`,
       contactNo: "9" + Math.floor(Math.random() * 1000000000).toString().padStart(9, '0'),
       website: `www.techsolutions${randomNum}.com`,
@@ -651,6 +718,7 @@ const CompanyForm = ({ open, onOpenChange, onSave, editCompany = null }) => {
       ifscCode: "TEST0001234",
       branchName: "Test Branch",
       accountHolderName: "Test Account Holder",
+      accountType: "current",
     }]);
 
     toast({
@@ -1093,20 +1161,21 @@ const CompanyForm = ({ open, onOpenChange, onSave, editCompany = null }) => {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label className="text-xs">State*</Label>
                         <Select
                           value={formData.state}
                           onValueChange={(value) => handleInputChange("state", value)}
+                          disabled={isLoadingStates}
                         >
                           <SelectTrigger className="text-sm">
-                            <SelectValue placeholder="Select state" />
+                            <SelectValue placeholder={isLoadingStates ? "Loading states..." : "Select state"} />
                           </SelectTrigger>
                           <SelectContent>
-                            {indianStates.map((state) => (
-                              <SelectItem key={state} value={state}>
-                                {state.split(" ").map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(" ")}
+                            {states.map((state) => (
+                              <SelectItem key={state.id} value={state.name}>
+                                {state.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -1117,19 +1186,55 @@ const CompanyForm = ({ open, onOpenChange, onSave, editCompany = null }) => {
                         <Select
                           value={formData.city}
                           onValueChange={(value) => handleInputChange("city", value)}
-                          disabled={!formData.state}
+                          disabled={!formData.state || isLoadingCities}
                         >
                           <SelectTrigger className="text-sm">
-                            <SelectValue placeholder="Select city" />
+                            <SelectValue placeholder={
+                              !formData.state
+                                ? "Select state first"
+                                : isLoadingCities
+                                  ? "Loading cities..."
+                                  : "Select city"
+                            } />
                           </SelectTrigger>
                           <SelectContent>
-                            {availableCities.map((city) => (
-                              <SelectItem key={city} value={city}>
-                                {city}
+                            {formData.state && (
+                              <div className="p-2 border-b">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    const selectedState = states.find(s => s.name === formData.state);
+                                    if (selectedState) {
+                                      setNewCityData({ name: "", stateId: selectedState.id });
+                                      setCityFormOpen(true);
+                                    }
+                                  }}
+                                  className="w-full h-8 text-xs"
+                                >
+                                  <Plus className="h-3 w-3 mr-1" />
+                                  Add New City
+                                </Button>
+                              </div>
+                            )}
+                            {cities.map((city) => (
+                              <SelectItem key={city.id} value={city.name}>
+                                {city.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Pincode</Label>
+                        <Input
+                          placeholder="Enter pincode"
+                          value={formData.pincode}
+                          onChange={(e) => handleInputChange("pincode", e.target.value)}
+                          className="text-sm"
+                          maxLength={6}
+                          pattern="[0-9]{6}"
+                        />
                       </div>
                     </div>
                   </div>
@@ -1281,7 +1386,7 @@ const CompanyForm = ({ open, onOpenChange, onSave, editCompany = null }) => {
                             className="text-sm"
                           />
                         </div>
-                        <div className="space-y-2 lg:col-span-2">
+                        <div className="space-y-2">
                           <Label className="text-xs">Account Holder Name*</Label>
                           <Input
                             placeholder="Enter account holder name"
@@ -1289,6 +1394,25 @@ const CompanyForm = ({ open, onOpenChange, onSave, editCompany = null }) => {
                             onChange={e => updateBank(bank.id, 'accountHolderName', e.target.value)}
                             className="text-sm"
                           />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Account Type*</Label>
+                          <Select
+                            value={bank.accountType}
+                            onValueChange={(value) => updateBank(bank.id, 'accountType', value)}
+                          >
+                            <SelectTrigger className="text-sm">
+                              <SelectValue placeholder="Select account type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="savings">Savings Account</SelectItem>
+                              <SelectItem value="current">Current Account</SelectItem>
+                              <SelectItem value="fixed_deposit">Fixed Deposit</SelectItem>
+                              <SelectItem value="overdraft">Overdraft Account</SelectItem>
+                              <SelectItem value="nri">NRI Account</SelectItem>
+                              <SelectItem value="joint">Joint Account</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
                     </div>
@@ -1313,6 +1437,41 @@ const CompanyForm = ({ open, onOpenChange, onSave, editCompany = null }) => {
           </form>
         </Tabs>
       </DialogContent>
+
+      {/* States are pre-defined and cannot be added dynamically */}
+
+      {/* Add City Dialog */}
+      <Dialog open={cityFormOpen} onOpenChange={setCityFormOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add New City</DialogTitle>
+            <DialogDescription>
+              Add a new city to {states.find(s => s.id === newCityData.stateId)?.name || 'the selected state'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm">City Name*</Label>
+              <Input
+                placeholder="Enter city name"
+                value={newCityData.name}
+                onChange={(e) => setNewCityData(prev => ({ ...prev, name: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCityFormOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddCity}
+              disabled={!newCityData.name || !newCityData.stateId}
+            >
+              Add City
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 };

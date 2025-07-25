@@ -62,6 +62,8 @@ import { useCompanyConfiguration } from "../../hooks/useConfiguration";
 import { toast } from "react-hot-toast";
 import { Switch } from "../ui/switch";
 import { getCustomerStateCode, getCompanyStateCode, calculateGSTAmounts } from "../../shared/constants/GSTConfig";
+import { getCurrentFinancialYear, hasFinancialYearChanged, getFinancialYearChangeNotification } from "../../utils/financialYearUtils";
+import FinancialYearNotification from "./FinancialYearNotification";
 
 const InvoiceForm = () => {
   const params = useParams(); // Get URL parameters including invoice ID
@@ -111,6 +113,9 @@ const InvoiceForm = () => {
   });
   const [paymentDateOpen, setPaymentDateOpen] = useState(false);
 
+  // Financial Year Notification
+  const [fyNotification, setFyNotification] = useState(null);
+  const [showFyNotification, setShowFyNotification] = useState(false);
 
   const defaultTerms = ["0", "15", "30", "45", "60", "90"];
 
@@ -331,9 +336,10 @@ const InvoiceForm = () => {
   // Add this with your other useEffects
   useEffect(() => {
     if (companyInitials) {
-      setInvoiceNumber(`${companyInitials}${invoiceSequence}`);
+      const typePrefix = invoiceType === 'proforma' ? 'PRO-' : '';
+      setInvoiceNumber(`${typePrefix}${companyInitials}${invoiceSequence}`);
     }
-  }, [companyInitials, invoiceSequence]);
+  }, [companyInitials, invoiceSequence, invoiceType]);
 
 
   useEffect(() => {
@@ -405,6 +411,45 @@ const InvoiceForm = () => {
 
       // Fetch items associated with this company
       fetchCompanyItems(selectedCompany.id);
+
+      // Auto-set invoice type based on GST registration (only if not proforma)
+      if (invoiceType !== 'proforma') {
+        const newInvoiceType = selectedCompany.gstApplicable === 'Yes' ? 'tax' : 'sales';
+        if (invoiceType !== newInvoiceType) {
+          setInvoiceType(newInvoiceType);
+          console.log(`🏢 Auto-set invoice type to "${newInvoiceType}" based on company GST status:`, selectedCompany.gstApplicable);
+        }
+      }
+
+      // Check for financial year change
+      const lastActivityKey = `lastActivity_${selectedCompany.id}`;
+      const lastActivity = localStorage.getItem(lastActivityKey);
+      const currentFY = getCurrentFinancialYear();
+
+      if (lastActivity && hasFinancialYearChanged(lastActivity)) {
+        const skippedKey = `fyNotificationSkipped_${currentFY}`;
+        const hasSkipped = localStorage.getItem(skippedKey);
+
+        if (!hasSkipped) {
+          const lastDate = new Date(lastActivity);
+          const lastFY = currentFY === getCurrentFinancialYear() ?
+            `${new Date().getFullYear() - 1}-${String(new Date().getFullYear()).slice(-2)}` :
+            getCurrentFinancialYear();
+
+          const notification = getFinancialYearChangeNotification(
+            lastFY,
+            currentFY,
+            selectedCompany.companyName
+          );
+
+          setFyNotification(notification);
+          setShowFyNotification(true);
+          console.log(`📅 Financial year changed from ${lastFY} to ${currentFY} for company ${selectedCompany.companyName}`);
+        }
+      }
+
+      // Update last activity
+      localStorage.setItem(lastActivityKey, new Date().toISOString());
     }
   }, [selectedCompany]); // This should run when selectedCompany changes
 
@@ -704,7 +749,8 @@ const InvoiceForm = () => {
                 .toString()
                 .padStart(originalSequenceLength, "0");
               setInvoiceSequence(newSequence);
-              setInvoiceNumber(`${initials}${newSequence}`);
+              const typePrefix = invoiceType === 'proforma' ? 'PRO-' : '';
+              setInvoiceNumber(`${typePrefix}${initials}${newSequence}`);
               return;
             }
           }
@@ -712,13 +758,15 @@ const InvoiceForm = () => {
 
         // If no invoices found for this company or invalid format, start from 0001
         setInvoiceSequence("0001");
-        setInvoiceNumber(`${initials}0001`);
+        const typePrefix = invoiceType === 'proforma' ? 'PRO-' : '';
+        setInvoiceNumber(`${typePrefix}${initials}0001`);
       }
     } catch (error) {
       console.error("Error fetching company invoices:", error);
       // Default to 0001 if there's an error
       setInvoiceSequence("0001");
-      setInvoiceNumber(`${initials}-0001`);
+      const typePrefix = invoiceType === 'proforma' ? 'PRO-' : '';
+      setInvoiceNumber(`${typePrefix}${initials}0001`);
     }
   };
 
@@ -734,8 +782,9 @@ const InvoiceForm = () => {
         if (success) {
           // Update current initials
           setCompanyInitials(newInitials);
-          // Update invoice number
-          setInvoiceNumber(`${newInitials}${invoiceSequence}`);
+          // Update invoice number with proper prefix
+          const typePrefix = invoiceType === 'proforma' ? 'PRO-' : '';
+          setInvoiceNumber(`${typePrefix}${newInitials}${invoiceSequence}`);
           console.log("✅ Company initials updated successfully");
         } else {
           console.error("❌ Failed to save company initials");
@@ -747,7 +796,8 @@ const InvoiceForm = () => {
   };
   const handleSequenceChange = (value) => {
     setInvoiceSequence(value);
-    setInvoiceNumber(`${companyInitials}${value}`);
+    const typePrefix = invoiceType === 'proforma' ? 'PRO-' : '';
+    setInvoiceNumber(`${typePrefix}${companyInitials}${value}`);
   };
   // Create a new function to find existing items
   const findExistingItem = (items, itemId) => {
@@ -1084,6 +1134,8 @@ const InvoiceForm = () => {
         paymentTerms: paymentTerms,
         customerNotes: customerNotes,
         termsAndConditions: termsAndConditions,
+        // Add invoice type to PDF data
+        invoiceType: invoiceType,
         // GST details including isIntraState flag
         subtotal: subtotal,
         cgstRate: gstDetails.cgstRate,
@@ -1199,9 +1251,26 @@ const InvoiceForm = () => {
   // Handle download
   const handleDownload = () => {
     if (pdfUrl && savedInvoice) {
+      // Create a better filename with customer name and date
+      let filename = `Invoice-${savedInvoice.invoiceNumber}`;
+
+      // Add customer name if available
+      if (selectedCustomer) {
+        const customerName = selectedCustomer.firstName && selectedCustomer.lastName
+          ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}`
+          : selectedCustomer.companyName || "Customer";
+        // Clean the customer name for filename (remove invalid characters)
+        const cleanCustomerName = customerName.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '_');
+        filename += `-${cleanCustomerName}`;
+      }
+
+      // Add date
+      const date = format(new Date(), 'yyyy-MM-dd');
+      filename += `-${date}.pdf`;
+
       const link = document.createElement("a");
       link.href = pdfUrl;
-      link.download = `Invoice-${savedInvoice.invoiceNumber}.pdf`;
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1389,6 +1458,25 @@ const InvoiceForm = () => {
     }
   };
 
+  // Handle financial year prefix update
+  const handleUpdateFinancialYearPrefix = async (newPrefix) => {
+    if (selectedCompany) {
+      try {
+        const success = await saveCompanyInitials(selectedCompany.id, newPrefix);
+        if (success) {
+          setCompanyInitials(newPrefix);
+          toast.success(`Company prefix updated to ${newPrefix}`);
+          console.log(`✅ Updated company prefix to ${newPrefix} for FY change`);
+        } else {
+          toast.error("Failed to update company prefix");
+        }
+      } catch (error) {
+        console.error("Error updating prefix:", error);
+        toast.error("An error occurred while updating prefix");
+      }
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-4 space-y-3">
       {/* Compact Header */}
@@ -1499,14 +1587,25 @@ const InvoiceForm = () => {
               <div className="flex items-center justify-center gap-3">
                 <span className={`text-xs font-medium transition-colors duration-200 ${invoiceType === 'proforma' ? 'text-purple-600' : 'text-gray-500'}`}>Proforma</span>
                 <button
-                  onClick={() => setInvoiceType(invoiceType === 'tax' ? 'proforma' : 'tax')}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${invoiceType === 'tax' ? 'bg-green-500 focus:ring-green-500' : 'bg-purple-500 focus:ring-purple-500'}`}
+                  onClick={() => {
+                    if (invoiceType === 'proforma') {
+                      // Switch from proforma to tax/sales based on company GST
+                      const newType = selectedCompany?.gstApplicable === 'Yes' ? 'tax' : 'sales';
+                      setInvoiceType(newType);
+                    } else {
+                      // Switch to proforma
+                      setInvoiceType('proforma');
+                    }
+                  }}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${invoiceType !== 'proforma' ? 'bg-green-500 focus:ring-green-500' : 'bg-purple-500 focus:ring-purple-500'}`}
                 >
                   <span
-                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform duration-200 ${invoiceType === 'tax' ? 'translate-x-5' : 'translate-x-1'}`}
+                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform duration-200 ${invoiceType !== 'proforma' ? 'translate-x-5' : 'translate-x-1'}`}
                   />
                 </button>
-                <span className={`text-xs font-medium transition-colors duration-200 ${invoiceType === 'tax' ? 'text-green-600' : 'text-gray-500'}`}>Tax Invoice</span>
+                <span className={`text-xs font-medium transition-colors duration-200 ${invoiceType !== 'proforma' ? 'text-green-600' : 'text-gray-500'}`}>
+                  {invoiceType === 'sales' ? 'Bill for Sales' : 'Tax Invoice'}
+                </span>
               </div>
               {/* Visual Card Display */}
               <div className="relative h-16 overflow-hidden">
@@ -1531,8 +1630,8 @@ const InvoiceForm = () => {
                     </div>
                   </div>
                 </div>
-                {/* Tax Invoice Card */}
-                <div className={`absolute inset-0 transition-all duration-300 ease-in-out ${invoiceType === 'tax' ? 'opacity-100 scale-100 translate-x-0' : 'opacity-0 scale-95 translate-x-2 pointer-events-none'}`}>
+                {/* Tax/Sales Invoice Card */}
+                <div className={`absolute inset-0 transition-all duration-300 ease-in-out ${invoiceType !== 'proforma' ? 'opacity-100 scale-100 translate-x-0' : 'opacity-0 scale-95 translate-x-2 pointer-events-none'}`}>
                   <div className="relative bg-white border border-green-200 rounded-md p-3 h-full">
                     <div className="flex items-center justify-between h-full">
                       <div className="flex items-center gap-2">
@@ -1543,12 +1642,17 @@ const InvoiceForm = () => {
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <h4 className="text-sm font-medium text-gray-900">Tax Invoice</h4>
+                            <h4 className="text-sm font-medium text-gray-900">
+                              {invoiceType === 'sales' ? 'Bill for Sales' : 'Tax Invoice'}
+                            </h4>
                             <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              <span className="w-1 h-1 bg-green-500 rounded-full mr-1"></span> GST
+                              <span className="w-1 h-1 bg-green-500 rounded-full mr-1"></span>
+                              {invoiceType === 'sales' ? 'SALES' : 'GST'}
                             </span>
                           </div>
-                          <p className="text-xs text-gray-600">Official legal document</p>
+                          <p className="text-xs text-gray-600">
+                            {invoiceType === 'sales' ? 'Sales document without GST' : 'Official legal document'}
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
@@ -2080,7 +2184,7 @@ const InvoiceForm = () => {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Account Number:</span>
-                        <span className="font-medium">XXXXXX{bankDetails.accountNumber.slice(-4)}</span>
+                        <span className="font-medium">{bankDetails.accountNumber}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">IFSC Code:</span>
@@ -2909,6 +3013,16 @@ const InvoiceForm = () => {
           </div>
         )
       }
+
+      {/* Financial Year Change Notification */}
+      <FinancialYearNotification
+        open={showFyNotification}
+        onOpenChange={setShowFyNotification}
+        notification={fyNotification}
+        currentPrefix={companyInitials}
+        companyName={selectedCompany?.companyName}
+        onUpdatePrefix={handleUpdateFinancialYearPrefix}
+      />
     </div >
   );
 };

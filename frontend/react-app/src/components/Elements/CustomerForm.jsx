@@ -10,7 +10,7 @@ import {
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
-import { Phone, Mail, Copy, User, Building2, CreditCard, MapPin, AlertCircle, Wand2, Building, Plus } from "lucide-react";
+import { Phone, Mail, Copy, User, Building2, CreditCard, MapPin, AlertCircle, Wand2, Building, Plus, X } from "lucide-react";
 import { Textarea } from "../ui/textarea";
 import {
   Select,
@@ -83,6 +83,10 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
   const [companyFormOpen, setCompanyFormOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState(null);
 
+  // State for multiple company associations
+  const [associatedCompanies, setAssociatedCompanies] = useState([]);
+  const [isLoadingAssociations, setIsLoadingAssociations] = useState(false);
+
   // Fetch companies when component mounts
   useEffect(() => {
     const fetchCompanies = async () => {
@@ -103,6 +107,36 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
 
     fetchCompanies();
   }, []);
+
+  // Load associated companies for edit mode
+  const loadAssociatedCompanies = async (customerId) => {
+    setIsLoadingAssociations(true);
+    try {
+      const result = await window.electron.getCustomerCompanies(customerId);
+      if (result.success) {
+        setAssociatedCompanies(result.result || []);
+      } else {
+        console.error("Failed to fetch associated companies:", result.error);
+        setAssociatedCompanies([]);
+      }
+    } catch (error) {
+      console.error("Error fetching associated companies:", error);
+      setAssociatedCompanies([]);
+    } finally {
+      setIsLoadingAssociations(false);
+    }
+  };
+
+  // Functions to manage company associations
+  const addCompanyAssociation = (company) => {
+    if (!associatedCompanies.find(assoc => assoc.id === company.id)) {
+      setAssociatedCompanies(prev => [...prev, company]);
+    }
+  };
+
+  const removeCompanyAssociation = (companyId) => {
+    setAssociatedCompanies(prev => prev.filter(company => company.id !== companyId));
+  };
 
   // Initialize form with edit data when editCustomer changes
   useEffect(() => {
@@ -140,27 +174,11 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
         shippingAlternateContactNo: editCustomer.shippingAlternateContactNo || "",
       });
 
-      // Fetch associated company for this customer
-      const fetchCustomerCompany = async () => {
-        try {
-          const result = await window.electron.getCustomerCompanies(editCustomer.id);
-          if (result.success && result.result && result.result.length > 0) {
-            // Get the first company (since we're now only allowing one company per customer)
-            setFormData(prev => ({
-              ...prev,
-              companyId: result.result[0].id || ""
-            }));
-          } else {
-            console.error("Failed to fetch customer company or no company associated:", result.error);
-          }
-        } catch (error) {
-          console.error("Error fetching customer company:", error);
-        }
-      };
-
-      fetchCustomerCompany();
+      // Load associated companies for this customer
+      loadAssociatedCompanies(editCustomer.id);
     } else {
       // Reset form when not editing
+      setAssociatedCompanies([]);
       setFormData({
         customerType: "Business",
         salutation: "Mr.",
@@ -389,31 +407,33 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
         // Update existing customer
         result = await window.electron.updateCustomer({ ...formData, id: editCustomer.id });
 
-        // Update customer-company association
+        // Update customer-company associations
         if (result.success) {
+          const companyIds = associatedCompanies.map(company => company.id);
           const updateCompanyResult = await window.electron.updateCustomerCompanies(
             editCustomer.id,
-            formData.companyId ? [formData.companyId] : []
+            companyIds
           );
 
           if (!updateCompanyResult.success) {
-            console.error("Failed to update customer-company association:", updateCompanyResult.error);
+            console.error("Failed to update customer-company associations:", updateCompanyResult.error);
           }
         }
       } else {
         // Create new customer
         result = await window.electron.addCustomer(formData);
 
-        // Add customer-company association for new customer
-        if (result.success && formData.companyId) {
+        // Add customer-company associations for new customer
+        if (result.success && associatedCompanies.length > 0) {
           const newCustomerId = result.result.lastInsertRowid; // Use lastInsertRowid for new customer
+          const companyIds = associatedCompanies.map(company => company.id);
           const updateCompanyResult = await window.electron.updateCustomerCompanies(
             newCustomerId,
-            [formData.companyId]
+            companyIds
           );
 
           if (!updateCompanyResult.success) {
-            console.error("Failed to add customer-company association:", updateCompanyResult.error);
+            console.error("Failed to add customer-company associations:", updateCompanyResult.error);
           }
         }
       }
@@ -456,6 +476,7 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
             shippingAlternateContactNo: "",
           });
           setSelectedCompany(null);
+          setAssociatedCompanies([]);
           setErrors({});
         }
         onOpenChange(false);
@@ -917,6 +938,124 @@ const CustomerForm = ({ open, onOpenChange, onSave, editCustomer = null }) => {
                         </div>
                       </div>
                     )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Company Associations */}
+              <Card className="shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Building className="w-3 h-3 text-primary" />
+                      <h3 className="text-xs font-medium">Company Associations</h3>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] h-5">
+                      {associatedCompanies.length} associated
+                    </Badge>
+                  </div>
+
+                  {/* Company Association List */}
+                  <div className="space-y-3">
+                    {associatedCompanies.length > 0 ? (
+                      <div className="space-y-2">
+                        {associatedCompanies.map((company) => (
+                          <div key={company.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-md">
+                            <div className="flex items-center gap-2">
+                              {company.logo && (
+                                <img src={company.logo} alt={company.companyName} className="w-6 h-6 rounded object-contain" />
+                              )}
+                              <div>
+                                <p className="text-xs font-medium">{company.companyName}</p>
+                                <p className="text-[10px] text-gray-500">{company.email}</p>
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeCompanyAssociation(company.id)}
+                              className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 text-gray-500">
+                        <Building2 className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                        <p className="text-xs">No companies associated</p>
+                        <p className="text-[10px]">Add companies to link this customer</p>
+                      </div>
+                    )}
+
+                    {/* Add Company Section */}
+                    <div className="pt-3 border-t">
+                      <div className="flex gap-2">
+                        <Popover open={companySelectOpen} onOpenChange={setCompanySelectOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 h-8 text-xs"
+                              disabled={isLoadingCompanies}
+                            >
+                              <Plus className="w-3 h-3 mr-1" />
+                              {isLoadingCompanies ? "Loading..." : "Add Company"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-80 p-0" align="start">
+                            <Command>
+                              <div className="p-2 border-b flex gap-2">
+                                <CommandInput placeholder="Search companies..." className="flex-1" />
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    setCompanyFormOpen(true);
+                                    setCompanySelectOpen(false);
+                                  }}
+                                  className="h-8 px-2 text-xs"
+                                >
+                                  <Plus className="h-3 w-3 mr-1" />
+                                  New
+                                </Button>
+                              </div>
+                              <CommandEmpty>
+                                <div className="p-4 text-center text-muted-foreground">
+                                  <p className="text-sm">No companies found</p>
+                                  <p className="text-xs mt-1">Create a new company or adjust your search</p>
+                                </div>
+                              </CommandEmpty>
+                              <CommandGroup className="max-h-48 overflow-y-auto">
+                                {companies
+                                  .filter(company => !associatedCompanies.find(assoc => assoc.id === company.id))
+                                  .map((company) => (
+                                    <CommandItem
+                                      key={company.id}
+                                      value={company.companyName}
+                                      onSelect={() => {
+                                        addCompanyAssociation(company);
+                                        setCompanySelectOpen(false);
+                                      }}
+                                      className="flex items-center gap-3 p-2 cursor-pointer"
+                                    >
+                                      {company.logo && (
+                                        <img src={company.logo} alt={company.companyName} className="w-6 h-6 rounded object-contain" />
+                                      )}
+                                      <div className="flex-1">
+                                        <p className="text-sm font-medium">{company.companyName}</p>
+                                        <p className="text-xs text-gray-500">{company.email}</p>
+                                      </div>
+                                    </CommandItem>
+                                  ))}
+                              </CommandGroup>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

@@ -1,7 +1,6 @@
-// GST State Codes for India
+// GST State Codes for India (matching database state names)
 const STATE_CODES = {
-  "27": "Maharashtra",
-  "01": "Jammu & Kashmir",
+  "01": "Jammu and Kashmir",
   "02": "Himachal Pradesh",
   "03": "Punjab",
   "04": "Chandigarh",
@@ -25,18 +24,17 @@ const STATE_CODES = {
   "22": "Chhattisgarh",
   "23": "Madhya Pradesh",
   "24": "Gujarat",
-  "25": "Daman & Diu",
-  "26": "Dadra & Nagar Haveli",
-  "28": "Andhra Pradesh",
+  "26": "Dadra and Nagar Haveli and Daman and Diu",
+  "27": "Maharashtra",
   "29": "Karnataka",
   "30": "Goa",
   "31": "Lakshadweep",
   "32": "Kerala",
   "33": "Tamil Nadu",
   "34": "Puducherry",
-  "35": "Andaman & Nicobar Islands",
+  "35": "Andaman and Nicobar Islands",
   "36": "Telangana",
-  "37": "Andhra Pradesh (New)",
+  "37": "Andhra Pradesh",
   "38": "Ladakh",
 };
 

@@ -14,6 +14,7 @@ const log = require("electron-log/main");
 const { registerAnalyticsDashboardIpc } = require("./ipc/analyticsDashboard");
 const { registerMigrationIpc } = require("./ipc/migrationRunner");
 const { registerFileHandlers } = require("./ipc/fileHandlers");
+const { registerStatesCitiesIpc } = require("./ipc/statesCitiesHandler");
 const settings = require('electron-settings');
 // Utility function to detect development environment
 const isDev = () => {
@@ -185,6 +186,7 @@ function createWindow() {
   registerAnalyticsDashboardIpc();
   registerMigrationIpc();
   registerFileHandlers();
+  registerStatesCitiesIpc();
 
   // Register zoom level monitoring
   registerZoomMonitoring();

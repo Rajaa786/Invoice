@@ -31,6 +31,7 @@ function registerBankDashboardIpc() {
                     ifscCode: data.ifscCode,
                     branchName: data.branchName,
                     accountHolderName: data.accountHolderName,
+                    accountType: data.accountType || "savings",
                     createdAt: new Date(),
                     updatedAt: new Date(),
                 };
@@ -218,6 +219,7 @@ function registerBankDashboardIpc() {
                     ifscCode: data.ifscCode,
                     branchName: data.branchName,
                     accountHolderName: data.accountHolderName,
+                    accountType: data.accountType || "savings",
                     updatedAt: new Date(),
                 };
 

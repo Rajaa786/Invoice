@@ -17,6 +17,7 @@ const companies = sqliteTable("companies", {
   addressLine2: text("address_line_2"),
   state: text("state").notNull(),
   city: text("city").notNull(),
+  pincode: text("pincode"),
 
   email: text("email").notNull(),
   contactNo: text("contact_no").notNull(),
